@@ -1,0 +1,66 @@
+
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}{{ block.super }}
+<script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
+{{ media }}
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}" />{% endblock %}
+
+{% block coltype %}colM{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% if not is_popup %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; {% if has_change_permission %}<a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>{% else %}{{ opts.verbose_name_plural|capfirst }}{% endif %}
+&rsaquo; {{ account.user.email }}
+</div>
+{% endblock %}
+{% endif %}
+
+{% block content %}
+<div id="content-main">
+
+<h1>{{ action|capfirst }}</h1>
+
+<ul class="messagelist">
+  {% if action == 'reset' %}
+      <li class="warning">You are going to <b>Reset</b> verification status and personal info for user &lt;{{account.user.email}}&gt;?</li>
+  {% elif action == 'approve' %}
+      <li class="success">You are going to manually <b>Approve</b> identity verification user &lt;{{account.user.email}}&gt;?</li>
+  {% elif action == 'decline' %}
+      <li class="error">You are going to manually <b>Decline</b> identity verification user &lt;{{account.user.email}}&gt;?</li>
+  {% endif %}
+  <li class="warning">Make sure that you know what are you doing!</li>
+</ul>
+
+<form method="post" action="{% url 'admin:account-action' account_id=account.pk %}">
+    <input type="hidden" name="action" value="{{action}}">
+    <div>
+        <label>I know what I am doing</label>
+        <input type="checkbox" name="confirm">
+        
+    </div>
+    {% csrf_token %}
+  {% if action == 'reset' %}
+    <button>Yes, reset verification status!!</button>
+  {% elif action == 'approve' %}
+    <button>Yes, approve verification!!</button>
+  {% elif action == 'decline' %}
+    <button>Yes, decline verification!!</button>
+  {% endif %}
+</form>
+</div>
+
+<script type="text/javascript">
+    $(document).ready(function(){
+        $('button').disable();
+    })
+</script>
+{% endblock %}
