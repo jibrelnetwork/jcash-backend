@@ -1,0 +1,12 @@
+uwsgi:
+  master: true
+  http: 0.0.0.0:80
+  enable-threads: true
+
+  chdir: /app
+  module: jcash.wsgi:application
+
+  log-format: %(addr) - %(user) [%(ltime)] "%(method) %(uri) %(proto)" %(status) %(size) "%(referer)" "%(uagent)"
+
+  processes: 5
+  max-requests: 5000
