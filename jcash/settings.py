@@ -34,12 +34,24 @@ def here(path):
 
 
 import raven
+import raven.exceptions
+
+# There is no .git directory in output image, so we can't get information from it
+# But CI/CD system places Git commit into version.txt file
+try:
+    CODE_VERSION = raven.fetch_git_sha(here(''))
+except raven.exceptions.InvalidGitRepository:
+    try:
+        with open('version.txt') as version_file:
+            CODE_VERSION = version_file.read().strip()
+    except Exception:
+        pass
 
 RAVEN_CONFIG = {
     #!! 'dsn': os.environ.get('RAVEN_DSN'),
     # If you are using git, you can also automatically configure the
     # release based on the git info.
-    'release': raven.fetch_git_sha(here('')),
+    'release': CODE_VERSION,
 }
 
 # Quick-start development settings - unsuitable for production
