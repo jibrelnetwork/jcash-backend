@@ -124,7 +124,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'jcash.wsgi.application'
 
-JCASH_DATABASE_URI = os.environ['JCASH_DATABASE_URI']
+JCASH_DATABASE_URI = os.getenv('JCASH_DATABASE_URI', 'postgres://localhost/jcash')
 
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
@@ -132,7 +132,7 @@ JCASH_DATABASE_URI = os.environ['JCASH_DATABASE_URI']
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
 DATABASES = {'default': dj_database_url.parse(JCASH_DATABASE_URI,
-                                              conn_max_age=600)}
+                                              conn_max_age=300)}
 
 
 # Password validation
@@ -215,11 +215,11 @@ REST_AUTH_REGISTER_SERIALIZERS = {
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-ONFIDO_API_KEY = os.environ['ONFIDO_API_KEY']
+ONFIDO_API_KEY = os.getenv('ONFIDO_API_KEY')
 
 
 RECAPTCHA_ENABLED = False
-RECAPTCHA_PRIVATE_KEY = os.environ['RECAPTCHA_PRIVATE_KEY']
+RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
@@ -230,7 +230,7 @@ ACCOUNT_ADAPTER = 'jcash.api.utils.AccountAdapter'
 ACCOUNT_EMAIL_CONFIRMATION_COOLDOWN = 20
 OLD_PASSWORD_FIELD_ENABLED = True
 
-GA_ID = os.environ['GA_ID']
+GA_ID = os.getenv('GA_ID')
 
 COUNTRIES_NOT_ALLOWED = ['USA']
 
