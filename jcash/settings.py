@@ -262,7 +262,8 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Celery configuration
 CELERY_NAME = "jibreljcashcelery"
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER', "pyamqp://guest:guest@localhost:5672//")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", 'redis://:supersecretpass@localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", 'redis://:supersecretpass@localhost:6379/1')
 
 # Email notifications
 EMAIL_NOTIFICATIONS__ENABLED = True
