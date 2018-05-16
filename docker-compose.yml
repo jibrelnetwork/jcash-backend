@@ -16,6 +16,7 @@ services:
       SECRET_KEY: GENERATE-YOUR-UNIQUE-SECRET-KEY-64-CHARS-LONG
       RAVEN_PROJECT_ID: 600330
       RAVEN_SECRET: bc12312bcb2312b3c12c3b12da8a9cc9:d6bfc155c6bc312cbc412bcb623cb6c3
+    image: jibrelnetwork/jcash-backend:latest
     ports:
       - 8000:80
     restart: on-failure
