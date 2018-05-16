@@ -1,10 +1,13 @@
-#!/bin/sh -e
+#!/bin/bash -e
 
 RUNMODE="${1:-app}"
+
+export APP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 if [ "${RUNMODE}" = "app" ]; then
     echo "Starting jcash-backend service, version: `cat /app/version.txt` on node `hostname`"
     python jcash/manage.py migrate --noinput
+    python jcash/manage.py collectstatic --noinput --verbosity 0
     uwsgi --yaml /app/uwsgi.yml
 elif [ "${RUNMODE}" = "celerybeat" ]; then
     echo "Starting jcash-backend-celery-beat service, version: `cat /app/version.txt` on node `hostname`"

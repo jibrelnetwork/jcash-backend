@@ -14,6 +14,7 @@ import os
 import sys
 import logging
 from os.path import join, dirname
+from pathlib import Path
 from datetime import datetime
 
 import dj_database_url
@@ -46,6 +47,10 @@ except raven.exceptions.InvalidGitRepository:
             CODE_VERSION = version_file.read().strip()
     except Exception:
         pass
+
+# When jCash is installed as package - here() points to `/usr/local/lib/python3.6/site-packages/`
+# so - we need workaround to save static and media files
+APP_DIR = os.getenv('APP_DIR', here(''))
 
 RAVEN_CONFIG = {
     #!! 'dsn': os.environ.get('RAVEN_DSN'),
@@ -175,9 +180,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = here('static')
+STATIC_ROOT = Path(APP_DIR) / 'static'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = here('uploaded_media')
+MEDIA_ROOT = Path(APP_DIR) / 'uploaded_media'
 
 
 FILE_UPLOAD_PERMISSIONS = 0o644

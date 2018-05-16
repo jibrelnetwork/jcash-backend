@@ -10,3 +10,9 @@ uwsgi:
 
   processes: 5
   max-requests: 5000
+
+  static-map: /static=/app/static/
+
+  static-skip-ext: .po
+  static-skip-ext: .py
+  static-skip-ext: .pyc
