@@ -3,20 +3,31 @@ from itertools import chain
 from operator import itemgetter
 import logging
 
+from allauth.account import app_settings as allauth_settings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import authentication, permissions
 from django.contrib.auth.models import User
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, logout as django_logout
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import ugettext_lazy as _
 from rest_framework_extensions.cache.decorators import cache_response
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from rest_framework.viewsets import ModelViewSet
+from rest_framework import status
+from rest_auth.registration.views import RegisterView as RestAuthRegisterView, VerifyEmailView
 from django.db import transaction
+from rest_auth.app_settings import (
+    PasswordChangeSerializer,
+    TokenSerializer,
+    JWTSerializer
+)
+from rest_auth.views import (
+    PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView
+)
 
 from allauth.account.models import EmailAddress
 from allauth.account.utils import send_email_confirmation
@@ -91,8 +102,9 @@ class AccountView(GenericAPIView):
         if serializer.is_valid():
             serializer.save(account)
             self.maybe_start_identity_verification(account)
-            return Response({'success': True}, 201)
-        return Response({'success': False, 'error': serializer.errors}, status=400)
+            serializer_get = self.serializer_classes.get('get')(account)
+            return Response(serializer_get.data, 201)
+        return Response({'error': serializer.errors}, status=400)
 
     def maybe_start_identity_verification(self, account):
         #if account.document_url and not account.onfido_check_id:
@@ -104,10 +116,14 @@ class AccountView(GenericAPIView):
 
 class ResendEmailConfirmationView(GenericAPIView):
     """
-    Re-send email confirmation email
+    Resend email confirmation.
+
+    * Requires token authentication.
+
+    post:
+    Resend email confirmation.
     """
 
-    #permission_classes = (permissions.AllowAny,)
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = ResendEmailConfirmationSerializer
 
@@ -118,16 +134,18 @@ class ResendEmailConfirmationView(GenericAPIView):
             try:
                 user = User.objects.get(username=serializer.data['email'])
             except User.DoesNotExist:
-                return Response({'email': [_('No such user')]}, status=400)
+                return Response({'success': False, 'error': [_('No such user')]}, status=400)
             else:
                 send_email_confirmation(request, user)
-                return Response({'details': _('Verification e-mail re-sent.')})
+                return Response({'success': True})
         return Response(serializer.errors, status=400)
 
 
 class CurrencyView(APIView):
     """
-    Get available currencies on the platform
+    Get available currencies on the platform.
+
+    * Requires token authentication.
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -140,7 +158,9 @@ class CurrencyView(APIView):
 
 class CurrencyRateView(APIView):
     """
-    Get currency info
+    Get currency info.
+
+    * Requires token authentication.
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -158,7 +178,7 @@ class CurrencyRateView(APIView):
 
 class CurrencyRatesView(GenericAPIView):
     """
-    Get currency-pairs rates
+    Get currency-pairs rates.
     """
 
     permission_classes = (permissions.AllowAny,)
@@ -231,10 +251,12 @@ class AddressView(GenericAPIView):
         return Response(serializer.errors, status=400)
 
 
-class UserDetailsView(APIView):
+class CustomUserDetailsView(APIView):
     """
     Reads UserModel fields
     Accepts GET method.
+
+    * Requires token authentication.
 
     Default display fields: pk, username, email
     Read-only fields: pk, username, email
@@ -324,3 +346,115 @@ class ApplicationRefundView(APIView):
             return Response({"success":True})
 
         return Response({"success":False, "error":serializer.errors}, status=400)
+
+
+class RegisterView(RestAuthRegisterView):
+    """
+    User registration.
+
+    * Requires token authentification.
+    """
+    def get_response_data(self, user):
+        if allauth_settings.EMAIL_VERIFICATION == \
+                allauth_settings.EmailVerificationMethod.MANDATORY:
+            return {"detail": _("Verification e-mail sent.")}
+
+        if getattr(settings, 'REST_USE_JWT', False):
+            data = {
+                'user': user,
+                'token': self.token
+            }
+            serializer_data = JWTSerializer(data).data
+            #serializer_data['success'] = True
+        else:
+            serializer_data =  TokenSerializer(user.auth_token).data
+            #serializer_data['success'] = True
+        return serializer_data
+
+
+class CustomPasswordChangeView(PasswordChangeView):
+    """
+    Calls Django Auth SetPasswordForm save method.
+
+    Accepts the following POST parameters: old_password, new_password
+
+    Returns the success/fail message.
+
+    * Requires token authentification.
+    """
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"success": True})
+
+
+class CustomPasswordResetView(PasswordResetView):
+    """
+    Calls Django Auth PasswordResetForm save method.
+
+    Accepts the following POST parameters: email
+    Returns the success/fail message.
+    """
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        # Return the success message with OK HTTP status
+        return Response(
+            {"success": True},
+            status=status.HTTP_200_OK
+        )
+
+
+class CustomPasswordResetConfirmView(PasswordResetConfirmView):
+    """
+    Password reset e-mail link is confirmed, therefore
+    this resets the user's password.
+
+    Accepts the following POST parameters: token, uid,
+        new_password
+    Returns the success/fail message.
+    """
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"success": True}
+        )
+
+
+class CustomVerifyEmailView(VerifyEmailView):
+    """
+    Email confirmation.
+
+    Accepts the following POST parameters: email
+    Returns the success/fail message.
+    """
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.kwargs['key'] = serializer.validated_data['key']
+        confirmation = self.get_object()
+        confirmation.confirm(self.request)
+        return Response({'success': True}, status=status.HTTP_200_OK)
+
+
+class CustomLogoutView(LogoutView):
+    """
+    Calls Django logout method and delete the Token object
+    assigned to the current User object.
+
+    Accepts/Returns nothing.
+    """
+    def logout(self, request):
+        try:
+            request.user.auth_token.delete()
+        except (AttributeError, ObjectDoesNotExist):
+            pass
+
+        django_logout(request)
+
+        return Response({"success": True},
+                        status=status.HTTP_200_OK)

@@ -2,12 +2,16 @@ import logging
 from datetime import datetime
 
 from django.db import transaction
+from django import forms
 from django.db.models import Sum
 from django.conf import settings
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model, authenticate, password_validation
+from django.contrib.auth.tokens import default_token_generator
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.sites.models import Site
+from django.utils.http import urlsafe_base64_decode as uid_decoder
 from django.utils import timezone, dateformat
+from django.utils.encoding import force_text
 from allauth.account import app_settings as allauth_settings
 from allauth.utils import email_address_exists
 from allauth.account.adapter import get_adapter
@@ -16,6 +20,7 @@ from rest_auth.serializers import PasswordResetSerializer, PasswordResetForm
 from rest_framework import serializers, exceptions
 from rest_framework.fields import CurrentUserDefault
 import requests
+
 
 from jcash.api.models import (
     Address, Account, is_user_email_confirmed, Document,
@@ -75,12 +80,13 @@ class CaptchaHelper():
 class AccountSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     is_email_confirmed = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Account
         fields = ('username', 'first_name', 'last_name', 'birthday',
-                  'citizenship', 'residency', 'terms_confirmed',
-                  'is_identity_verified', 'is_identity_declined', 'is_email_confirmed')
+                  'citizenship', 'residency', 'is_identity_verified',
+                  'is_identity_declined', 'is_email_confirmed', 'status')
         read_only_fields = ('is_identity_verified', 'is_identity_declined', 'is_email_confirmed')
 
     def get_username(self, obj):
@@ -89,14 +95,39 @@ class AccountSerializer(serializers.ModelSerializer):
     def get_is_email_confirmed(self, obj):
         return is_user_email_confirmed(obj.user)
 
+    def get_status(self, obj):
+        def is_personal_data_filled(obj):
+            fields = [obj.first_name, obj.last_name, obj.birthday,
+                      obj.residency, obj.citizenship]
+            return True if all(fields) else False
+
+        if obj.is_blocked:
+            return 'blocked'
+        elif is_personal_data_filled(obj) and \
+            obj.user.documents.count() >= 2 and \
+            not obj.is_identity_verified and \
+            not obj.is_identity_declined:
+            return 'pending'
+        elif is_personal_data_filled(obj) and \
+            obj.is_identity_verified and \
+            not obj.is_identity_declined:
+            return 'verified'
+        elif is_personal_data_filled(obj) and \
+            not obj.is_identity_verified and \
+            obj.is_identity_declined:
+            return 'declined'
+        else:
+            return 'created'
+
 
 class RegisterSerializer(serializers.Serializer):
-
-    email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
-    password_confirm = serializers.CharField(required=True, write_only=True)
-    captcha = serializers.CharField(required=True, write_only=True)
-    tracking = serializers.JSONField(write_only=True, required=False, default=dict)
+    """
+    /auth/registration/
+    """
+    email = serializers.EmailField(required=True, help_text="user's email address")
+    password = serializers.CharField(required=True, write_only=True, help_text="user's password")
+    captcha = serializers.CharField(required=True, write_only=True, help_text="captcha token")
+    tracking = serializers.JSONField(write_only=True, required=False, default=dict, help_text="json with tracking info")
 
     def validate_username(self, username):
         username = get_adapter().clean_username(username)
@@ -118,8 +149,6 @@ class RegisterSerializer(serializers.Serializer):
         return get_adapter().clean_password(password)
 
     def validate(self, data):
-        if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError(_("The two password fields didn't match."))
         return data
 
     def validate_captcha(self, captcha_token):
@@ -153,9 +182,9 @@ UserModel = get_user_model()
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True, allow_blank=False)
-    password = serializers.CharField(style={'input_type': 'password'})
-    captcha = serializers.CharField(required=True, write_only=True)
+    email = serializers.EmailField(required=True, allow_blank=False, help_text="user's email")
+    password = serializers.CharField(style={'input_type': 'password'}, help_text="user's password")
+    captcha = serializers.CharField(required=True, write_only=True, help_text="captcha token")
 
     def validate_captcha(self, captcha_token):
         CaptchaHelper.validate_captcha(captcha_token)
@@ -262,7 +291,8 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         Send a django.core.mail.EmailMultiAlternatives to `to_email`.
         """
-        activate_url = '{protocol}://{domain}/#/welcome/password/change/{uid}/{token}'.format(**context)
+        activate_url = '{protocol}://{domain}/#/auth/recovery/confirm/{uid}/{token}'.format(**context)
+        logger.info("{} {}".format(to_email, activate_url))
         #!!send_email_reset_password(to_email, activate_url, None)
 
 
@@ -303,6 +333,125 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         self.reset_form.save(**opts)
 
 
+class SetPasswordForm(forms.Form):
+    """
+    A form that lets a user change set their password without entering the old
+    password
+    """
+    new_password = forms.CharField(
+        label=_("New password"),
+        widget=forms.PasswordInput,
+        strip=False,
+        help_text=password_validation.password_validators_help_text_html(),
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_new_password(self):
+        password1 = self.cleaned_data.get('new_password')
+        password_validation.validate_password(password1, self.user)
+        return password1
+
+    def save(self, commit=True):
+        password = self.cleaned_data["new_password"]
+        self.user.set_password(password)
+        if commit:
+            self.user.save()
+        return self.user
+
+
+class CustomPasswordChangeSerializer(serializers.Serializer):
+    """
+    Serializer for password change.
+    """
+    old_password = serializers.CharField(max_length=128)
+    new_password = serializers.CharField(max_length=128)
+
+    set_password_form_class = SetPasswordForm
+
+    def __init__(self, *args, **kwargs):
+        self.old_password_field_enabled = getattr(
+            settings, 'OLD_PASSWORD_FIELD_ENABLED', False
+        )
+        self.logout_on_password_change = getattr(
+            settings, 'LOGOUT_ON_PASSWORD_CHANGE', False
+        )
+        super(CustomPasswordChangeSerializer, self).__init__(*args, **kwargs)
+
+        if not self.old_password_field_enabled:
+            self.fields.pop('old_password')
+
+        self.request = self.context.get('request')
+        self.user = getattr(self.request, 'user', None)
+
+    def validate_old_password(self, value):
+        invalid_password_conditions = (
+            self.old_password_field_enabled,
+            self.user,
+            not self.user.check_password(value)
+        )
+
+        if all(invalid_password_conditions):
+            raise serializers.ValidationError('Invalid password')
+        return value
+
+    def validate(self, attrs):
+        self.set_password_form = self.set_password_form_class(
+            user=self.user, data=attrs
+        )
+
+        if not self.set_password_form.is_valid():
+            raise serializers.ValidationError(self.set_password_form.errors)
+        return attrs
+
+    def save(self):
+        self.set_password_form.save()
+        if not self.logout_on_password_change:
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(self.request, self.user)
+
+
+class CustomPasswordResetConfirmSerializer(serializers.Serializer):
+    """
+    Serializer for requesting a password reset e-mail.
+    """
+    new_password = serializers.CharField(max_length=128)
+    uid = serializers.CharField()
+    token = serializers.CharField()
+
+    set_password_form_class = SetPasswordForm
+
+    def custom_validation(self, attrs):
+        pass
+
+    def validate(self, attrs):
+        self._errors = {}
+
+        # Decode the uidb64 to uid to get User object
+        try:
+            uid = force_text(uid_decoder(attrs['uid']))
+            self.user = UserModel._default_manager.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            raise exceptions.ValidationError({'uid': ['Invalid value']})
+
+        self.custom_validation(attrs)
+        # Construct SetPasswordForm instance
+        self.set_password_form = self.set_password_form_class(
+            user=self.user, data=attrs
+        )
+        if not self.set_password_form.is_valid():
+            raise serializers.ValidationError(self.set_password_form.errors)
+        if not default_token_generator.check_token(self.user, attrs['token']):
+            raise exceptions.ValidationError({'token': ['Invalid value']})
+
+        return attrs
+
+    def save(self):
+        return self.set_password_form.save()
+
+
 class ResendEmailConfirmationSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True, allow_blank=False)
 
@@ -320,13 +469,12 @@ class DocumentSerializer(serializers.Serializer):
     birthday = serializers.DateField(required=True)
     citizenship = serializers.CharField(required=True)
     residency = serializers.CharField(required=True)
-    terms_confirmed = serializers.BooleanField(required=True)
 
     class Meta:
         model = Document
         fields = ('passport', 'utilitybills', 'first_name'
                   'last_name', 'birthday', 'citizenship',
-                  'residency', 'terms_confirmed')
+                  'residency')
 
     def save(self, account):
         current_site = Site.objects.get_current()
@@ -349,7 +497,6 @@ class DocumentSerializer(serializers.Serializer):
             account.citizenship = self.validated_data['citizenship']
             account.birthday = self.validated_data['birthday']
             account.residency = self.validated_data['residency']
-            account.terms_confirmed = self.validated_data['terms_confirmed']
             account.last_updated_at = timezone.now()
             account.save()
 

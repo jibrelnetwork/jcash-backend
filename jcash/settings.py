@@ -185,11 +185,14 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
     ),
+    'EXCEPTION_HANDLER': 'jcash.api.utils.custom_exception_handler',
 }
 
 REST_AUTH_SERIALIZERS = {
     'LOGIN_SERIALIZER': 'jcash.api.serializers.LoginSerializer',
     'PASSWORD_RESET_SERIALIZER': 'jcash.api.serializers.CustomPasswordResetSerializer',
+    'PASSWORD_CHANGE_SERIALIZER': 'jcash.api.serializers.CustomPasswordChangeSerializer',
+    'PASSWORD_RESET_CONFIRM_SERIALIZER': 'jcash.api.serializers.CustomPasswordResetConfirmSerializer',
 }
 
 REST_AUTH_REGISTER_SERIALIZERS = {
