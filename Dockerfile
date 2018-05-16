@@ -9,5 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements.production.tx
 COPY . /app
 RUN pip install --no-cache-dir .
 
+VOLUME ["/app/uploads"]
+
 ENTRYPOINT ["/app/run.sh"]
 CMD ["app"]

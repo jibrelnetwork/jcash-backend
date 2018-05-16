@@ -182,7 +182,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = Path(APP_DIR) / 'static'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = Path(APP_DIR) / 'uploaded_media'
+MEDIA_ROOT = Path(APP_DIR) / 'uploads'
 
 
 FILE_UPLOAD_PERMISSIONS = 0o644
