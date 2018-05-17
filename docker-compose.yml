@@ -1,0 +1,61 @@
+version: '3.2'
+
+services:
+
+  jcash: &jcash_service_definition
+    build:
+      context: .
+    command: app
+    environment: &jcash_environment_definition
+      CELERY_BROKER_URL: redis://:supersecretpass@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:supersecretpass@redis:6379/1
+      DB_HOST: postgres
+      DB_USER: jcash
+      DB_PASSWORD: mysecretpassword
+      JCASH_DATABASE_URI: postgres://jcash:mysecretpassword@postgres/jcash
+      SECRET_KEY: GENERATE-YOUR-UNIQUE-SECRET-KEY-64-CHARS-LONG
+      RAVEN_PROJECT_ID: 600330
+      RAVEN_SECRET: bc12312bcb2312b3c12c3b12da8a9cc9:d6bfc155c6bc312cbc412bcb623cb6c3
+    image: jibrelnetwork/jcash-backend:latest
+    ports:
+      - 8000:80
+    restart: on-failure
+    volumes:
+      - jcash-uploads:/app/uploads
+
+  jcash-beat:
+    <<: *jcash_service_definition
+    command: celerybeat
+    ports: []
+
+  jcash-worker:
+    <<: *jcash_service_definition
+    command: celeryworker
+    ports: []
+
+  postgres:
+    environment:
+      - PGDATA=/var/lib/postgresql/data
+      - POSTGRES_DB=jcash
+      - POSTGRES_USER=jcash
+      - POSTGRES_PASSWORD=mysecretpassword
+    image: postgres:9
+    ports:
+      - 5432:5432
+    volumes:
+      - jcash-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    command: redis-server --requirepass supersecretpass
+    environment:
+      REDIS_PASSWORD: supersecretpass
+    image: redis:3
+    ports:
+      - 6379:6379
+    volumes:
+      - redis-data:/data
+
+volumes:
+  jcash-uploads:
+  jcash-postgres-data:
+  redis-data:

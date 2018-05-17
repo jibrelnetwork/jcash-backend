@@ -4,6 +4,20 @@ jcash(Jibrel jCash backend)
 
 "Authorization: Token {token}". To get token use: `POST /auth/login/`
 
+# Quick Start
+
+## With docker-compose
+
+First of all - get [Docker-Compose](https://docs.docker.com/compose/install/). Then:
+
+- just start all components with one command:
+    ```
+    docker-compose pull && docker-compose up
+    ```
+- build on your computer and start:
+    ```
+    docker-compose up --build
+    ```    
 
 # Installation
 

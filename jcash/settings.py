@@ -14,6 +14,7 @@ import os
 import sys
 import logging
 from os.path import join, dirname
+from pathlib import Path
 from datetime import datetime
 
 import dj_database_url
@@ -34,22 +35,41 @@ def here(path):
 
 
 import raven
+import raven.exceptions
+
+# There is no .git directory in output image, so we can't get information from it
+# But CI/CD system places Git commit into version.txt file
+try:
+    CODE_VERSION = raven.fetch_git_sha(here(''))
+except raven.exceptions.InvalidGitRepository:
+    try:
+        with open('version.txt') as version_file:
+            CODE_VERSION = version_file.read().strip()
+    except Exception:
+        pass
+
+# When jCash is installed as package - here() points to `/usr/local/lib/python3.6/site-packages/`
+# so - we need workaround to save static and media files
+APP_DIR = os.getenv('APP_DIR', here(''))
 
 RAVEN_CONFIG = {
     #!! 'dsn': os.environ.get('RAVEN_DSN'),
     # If you are using git, you can also automatically configure the
     # release based on the git info.
-    'release': raven.fetch_git_sha(here('')),
+    'release': CODE_VERSION,
 }
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '78fta+ic^6f*a+gngvllkmnmvqu=sdgtn5$*s8e=*li%7sqbs+'
+SECRET_KEY = os.getenv(
+    'SECRET_KEY',
+    '78fta+ic^6f*a+gngvllkmnmvqu=sdgtn5$*s8e=*li%7sqbs+'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', False)
 
 ALLOWED_HOSTS = ['*']
 
@@ -112,7 +132,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'jcash.wsgi.application'
 
-JCASH_DATABASE_URI = os.environ['JCASH_DATABASE_URI']
+JCASH_DATABASE_URI = os.getenv('JCASH_DATABASE_URI', 'postgres://localhost/jcash')
 
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
@@ -120,7 +140,7 @@ JCASH_DATABASE_URI = os.environ['JCASH_DATABASE_URI']
 # Database
 # https://docs.djangoproject.com/en/1.11/ref/settings/#databases
 DATABASES = {'default': dj_database_url.parse(JCASH_DATABASE_URI,
-                                              conn_max_age=600)}
+                                              conn_max_age=300)}
 
 
 # Password validation
@@ -160,9 +180,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = here('static')
+STATIC_ROOT = Path(APP_DIR) / 'static'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = here('uploaded_media')
+MEDIA_ROOT = Path(APP_DIR) / 'uploads'
 
 
 FILE_UPLOAD_PERMISSIONS = 0o644
@@ -206,11 +226,11 @@ REST_AUTH_REGISTER_SERIALIZERS = {
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-ONFIDO_API_KEY = os.environ['ONFIDO_API_KEY']
+ONFIDO_API_KEY = os.getenv('ONFIDO_API_KEY')
 
 
 RECAPTCHA_ENABLED = False
-RECAPTCHA_PRIVATE_KEY = os.environ['RECAPTCHA_PRIVATE_KEY']
+RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
@@ -221,7 +241,7 @@ ACCOUNT_ADAPTER = 'jcash.api.utils.AccountAdapter'
 ACCOUNT_EMAIL_CONFIRMATION_COOLDOWN = 20
 OLD_PASSWORD_FIELD_ENABLED = True
 
-GA_ID = os.environ['GA_ID']
+GA_ID = os.getenv('GA_ID')
 
 COUNTRIES_NOT_ALLOWED = ['USA']
 
@@ -245,7 +265,8 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Celery configuration
 CELERY_NAME = "jibreljcashcelery"
-CELERY_BROKER_URL = "pyamqp://guest:guest@localhost:5672//"
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", 'redis://:supersecretpass@localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", 'redis://:supersecretpass@localhost:6379/1')
 
 # Email notifications
 EMAIL_NOTIFICATIONS__ENABLED = True
