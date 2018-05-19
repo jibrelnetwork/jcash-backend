@@ -17,7 +17,17 @@ First of all - get [Docker-Compose](https://docs.docker.com/compose/install/). T
 - build on your computer and start:
     ```
     docker-compose up --build
-    ```    
+    ```
+    
+## Post-install   
+
+Login to admin panel with default credentials: 
+- login: `admin`
+- email: `admin@example.com`
+- password: `Koochoo7eishiD8iex5theexeisahHah`
+
+After login - create new user for yourself and disable default `admin` user for security reasons. 
+Don't delete it - or this account will be recreated with default password.
 
 # Installation
 

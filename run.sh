@@ -8,6 +8,7 @@ if [ "${RUNMODE}" = "app" ]; then
     echo "Starting jcash-backend service, version: `cat /app/version.txt` on node `hostname`"
     python jcash/manage.py migrate --noinput
     python jcash/manage.py collectstatic --noinput --verbosity 0
+    cat firstrun.py | python jcash/manage.py shell
     uwsgi --yaml /app/uwsgi.yml
 elif [ "${RUNMODE}" = "celerybeat" ]; then
     echo "Starting jcash-backend-celery-beat service, version: `cat /app/version.txt` on node `hostname`"
