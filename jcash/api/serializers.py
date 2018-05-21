@@ -23,9 +23,10 @@ import requests
 
 
 from jcash.api.models import (
-    Address, Account, is_user_email_confirmed, Document,
-    DocumentHelper, AddressVerify
+    Address, Account, Document,
+    DocumentHelper, AddressVerify, Application, CurrencyPair
 )
+from jcash.commonutils import eth_sign, eth_address
 from jcash.api import tasks
 
 
@@ -93,7 +94,7 @@ class AccountSerializer(serializers.ModelSerializer):
         return obj.user.email
 
     def get_is_email_confirmed(self, obj):
-        return is_user_email_confirmed(obj.user)
+        return Account.is_user_email_confirmed(obj.user)
 
     def get_status(self, obj):
         def is_personal_data_filled(obj):
@@ -514,10 +515,58 @@ class AddressesSerializer(serializers.ModelSerializer):
         fields = ('address', 'type', 'is_verified')
 
 
+class ApplicationsSerializer(serializers.ModelSerializer):
+    """
+    [{
+        "app_uuid": "12ad8648-c15d-47f9-9b36-47675a3af79e",
+        "created_at": "2018-04-24 12:35:59",
+        "source_address": "0xf93ab5a00fab5b18c25d35a2329813203104f1e8",
+        "rec_address": "0x60cb8ecadf2a81914b46086066718737ff89af51",
+        "base_currency": "eth",
+        "rec_currency": "jAED",
+        "base_amount": 1.0,
+        "rec_amount": 1810.0,
+        "rate": 1810.0,
+        "status": "created",
+        "tx_id": "",
+        "tx_amount": 0.0
+    }]
+    """
+    class Meta:
+        model = Application
+        fields = ('id', 'created_at', 'base_amount', 'reciprocal_amount', 'rate', 'status')
+
+
 class AddressVerifySerializer(serializers.Serializer):
     address = serializers.CharField(required=True, allow_blank=False)
     sig = serializers.CharField(required=True, allow_blank=False)
     message_uuid = serializers.CharField(required=True, allow_blank=False)
+
+    def validate(self, attrs):
+        address = attrs.get('address')
+        sig = attrs.get('sig')
+        message_uuid = attrs.get('message_uuid')
+
+        address_verify = AddressVerify.objects.filter(id=message_uuid).first()
+        if not address_verify:
+            raise exceptions.ValidationError(_('Address does not exists.'))
+
+        if not address == address_verify.address.address:
+            raise exceptions.ValidationError(_('Address does not exists.'))
+
+        if not ethereum.verifySign(address_verify.message, sig, address_verify.address.address):
+            raise exceptions.ValidationError(_('Address verification failed.'))
+
+        return attrs
+
+    def save(self):
+        address_verify = AddressVerify.objects.filter(id=self.validated_data['message_uuid']).first()
+        address = Address.objects.filter(id=address_verify.address_id).first()
+        with transaction.atomic():
+            address_verify.is_verified = True
+            address_verify.save()
+            address.is_verified = True
+            address.save()
 
     class Meta:
         model = AddressVerify
@@ -547,7 +596,6 @@ class AddressSerializer(serializers.Serializer):
             .format(address.user.account.first_name, address.user.account.last_name,
                     address.address, timezone.now().strftime('%Y %B %d %I:%M %p'))
 
-
     def save(self, user):
         address = None
         try:
@@ -561,15 +609,15 @@ class AddressSerializer(serializers.Serializer):
                                                           message=self.generate_message(address))
         self.validated_data['message'] = address_verify.message
         self.validated_data['uuid'] = address_verify.id
+        self.validated_data['success'] = True
 
     def validate(self, attrs):
         address = attrs.get('address')
         type = attrs.get('type')
 
         if type and type=='eth' and address:
-            #!!if not ethaddress_verify.is_valid_address(address):
-            #!!    raise serializers.ValidationError(_('Ethereum address is not valid.'))
-            pass
+            if not eth_address.is_valid_address(address):
+                raise serializers.ValidationError(_('Ethereum address is not valid.'))
         elif not address:
             raise serializers.ValidationError(_('Must include "address".'))
         elif not type:
@@ -581,6 +629,87 @@ class AddressSerializer(serializers.Serializer):
         attrs['type'] = type
         attrs['is_verified'] = False
         return attrs
+
+
+class ApplicationSerializer(serializers.Serializer):
+    address = serializers.CharField(required=False)
+    base_currency = serializers.CharField(required=True)
+    rec_currency = serializers.CharField(required=True)
+    base_amount = serializers.FloatField(required=True)
+    uuid = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        user = self.context.get('user')
+        if not user:
+            raise serializers.ValidationError(_('Unknown user.'))
+
+        if user.account.is_blocked:
+            raise exceptions.ValidationError(_('Account is blocked.'))
+
+        address_attr = attrs.get('address')
+        base_currency_attr = attrs.get('base_currency')
+        rec_currency_attr = attrs.get('rec_currency')
+        base_amount_attr = attrs.get('base_amount')
+        rate_uuid = attrs.get('uuid')
+
+        user_addresses = Address.objects.filter(user=user, is_verified=True)
+        if not address_attr and len(user_addresses) > 1:
+            raise serializers.ValidationError(_('"address" not specified.'))
+        if address_attr and not user_addresses.filter(address=address_attr).first():
+            raise serializers.ValidationError(_('wrong "address".'))
+        address = user_addresses[0] if len(user_addresses)==1 else user_addresses.filter(address=address_attr)
+
+        if not address:
+            raise serializers.ValidationError(_('specified "address" not found.'))
+
+        attrs['address_id'] = address.pk
+
+        is_reverse_operation = False
+        currency_pair = CurrencyPair.objects.filter(base_currency__display_name=base_currency_attr,
+                                                    reciprocal_currency__display_name=rec_currency_attr,
+                                                    is_exchangeable=True).first()
+        if not currency_pair:
+            is_reverse_operation = True
+            currency_pair = CurrencyPair.objects.filter(base_currency__display_name=rec_currency_attr,
+                                                        reciprocal_currency__display_name=base_currency_attr,
+                                                        is_exchangeable=True).first()
+        if not currency_pair:
+            raise serializers.ValidationError(_('specified "currency" not found.'))
+
+        attrs['currency_pair_id'] = currency_pair.pk
+
+        currency_pair_rate = currency_pair.currency_pair_rates.filter(id=rate_uuid).first()
+
+        if not currency_pair_rate:
+            raise serializers.ValidationError(_('Currency price does not exists.'))
+
+        if currency_pair_rate.currency_pair.pk != currency_pair.pk:
+            raise serializers.ValidationError(_('Wrong currency price.'))
+
+        currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else currency_pair_rate.buy_price
+        if is_reverse_operation:
+            currency_pair_rate_price = 1.0 / currency_pair_rate_price
+
+        attrs['currency_pair_rate_id'] = currency_pair_rate.pk
+        attrs['rate'] = currency_pair_rate_price
+        attrs['reciprocal_amount'] = base_amount_attr * currency_pair_rate_price
+
+        return attrs
+
+    def save(self):
+        user = self.context['user']
+        with transaction.atomic():
+            application = Application.objects.create(user=user,
+                                                     address_id=self.validated_data['address_id'],
+                                                     currency_pair_id=self.validated_data['currency_pair_id'],
+                                                     currency_pair_rate_id=self.validated_data['currency_pair_rate_id'],
+                                                     base_currency=self.validated_data['base_currency'],
+                                                     reciprocal_currency=self.validated_data['rec_currency'],
+                                                     rate=self.validated_data['rate'],
+                                                     base_amount=self.validated_data['base_amount'],
+                                                     reciprocal_amount=self.validated_data['reciprocal_amount'])
+            application.save()
+            self.validated_data['application_id'] = application.pk
 
 
 class ApplicationRefundSerializer(serializers.Serializer):

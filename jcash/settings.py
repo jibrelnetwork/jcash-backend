@@ -292,6 +292,12 @@ MAILGUN__API_EVENTS_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/eve
 SENDGRID__API_MESSAGES_URL = "https://api.sendgrid.com/api/mail.send.json"
 SENDGRID__API_KEY = ""
 
+# accounts settings
+ACCOUNT__MAX_ADDRESSES_COUNT = 5
+
+# Alphavantage.co API
+ALPHAVANTAGE__API_KEY = ""
+
 # Logging
 LOGGING__ROOT_DIR = ""
 LOGGING__SQLALCHEMY_ECHO = False
