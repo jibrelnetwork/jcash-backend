@@ -34,6 +34,8 @@ from allauth.account.utils import send_email_confirmation
 from jcash.api.models import (
     Address,
     Account,
+    CurrencyPair,
+    Application,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -42,13 +44,17 @@ from jcash.api.serializers import (
     AddressVerifySerializer,
     ResendEmailConfirmationSerializer,
     DocumentSerializer,
-    is_user_email_confirmed,
     CurrencyRateSerializer,
+    OpenCurrencyRateSerializer,
     CurrencySerializer,
+    ApplicationSerializer,
+    ApplicationsSerializer,
     ApplicationConfirmSerializer,
     ApplicationRefundSerializer,
 )
 from jcash.api import tasks
+from jcash.commonutils import currencyrates
+from jcash.settings import ACCOUNT__MAX_ADDRESSES_COUNT
 
 
 logger = logging.getLogger(__name__)
@@ -152,7 +158,16 @@ class CurrencyView(APIView):
     serializer_class = CurrencySerializer
 
     def get(self, request):
-        data = [{"base_currency": "eth", "rec_currency":["jAED"]}, {"base_currency": "jAED", "rec_currency":["eth"]}]
+        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
+
+        data = []
+        for pair in currency_pairs:
+            if pair.is_buyable:
+                data.append({"base_currency": pair.base_currency.display_name,
+                             "rec_currency": pair.reciprocal_currency.display_name})
+            if pair.is_sellable:
+                data.append({"base_currency": pair.reciprocal_currency.display_name,
+                             "rec_currency": pair.base_currency.display_name})
         return Response(data)
 
 
@@ -170,10 +185,37 @@ class CurrencyRateView(APIView):
     def get(self, request):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
-            data = {"uuid": "12ad8648-c15d-47f9-9b36-47675a3af79e", "rate": 1810.0, "rec_amount": 0.0}
+            is_reverse_operation = False
+            currency_pair = CurrencyPair.objects.filter(base_currency__display_name=serializer.validated_data['base_currency'],
+                                                         reciprocal_currency__display_name=serializer.validated_data['rec_currency']) \
+                .first()
+
+            if not currency_pair:
+                currency_pair = CurrencyPair.objects.filter(
+                    base_currency__display_name=serializer.validated_data['rec_currency'],
+                    reciprocal_currency__display_name=serializer.validated_data['base_currency']
+                ).first()
+                is_reverse_operation = True
+
+            if not currency_pair:
+                return Response({'success': False, 'error': "Currency does not exists."}, status=400)
+
+            currency_pair_rate = currency_pair.currency_pair_rates.last()
+
+            if not currency_pair_rate:
+                return Response({'success': False, 'error': "Currency price does not exists."}, status=400)
+
+            currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else currency_pair_rate.buy_price
+            if is_reverse_operation:
+                currency_pair_rate_price = 1.0 / currency_pair_rate_price
+
+            data = {"success": True,
+                    "uuid": currency_pair_rate.id,
+                    "rate": currency_pair_rate_price,
+                    "rec_amount": currency_pair_rate_price * serializer.validated_data['base_amount']}
             return Response(data)
         else:
-            return Response(serializer.errors, status=400)
+            return Response({'success': False, 'error': serializer.errors}, status=400)
 
 
 class CurrencyRatesView(GenericAPIView):
@@ -182,10 +224,15 @@ class CurrencyRatesView(GenericAPIView):
     """
 
     permission_classes = (permissions.AllowAny,)
+    serializer_class = OpenCurrencyRateSerializer
 
     @cache_response(20)
     def get(self, request):
-        data = [{"currency": "eth/jAED", "rate": 1800.0},{"currency": "eth/jUSD", "rate": 700.0}]
+        currencyrates.feth_currency_price()
+        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
+        data = [{"currency": pair.display_name,
+                 "rate": pair.currency_pair_rates.last().buy_price \
+                     if pair.currency_pair_rates.last() else 0.0 } for pair in currency_pairs]
         return Response(data)
 
 
@@ -206,6 +253,7 @@ class AddressVerifyView(GenericAPIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
+            serializer.save()
             return Response({'success':True})
 
         return Response({'success':False, 'error': serializer.errors}, status=400)
@@ -234,21 +282,22 @@ class AddressView(GenericAPIView):
         return Response(addresses)
 
     def post(self, request):
-        logger.info('Request add address for %s', request.user.username)
-        # todo:
-        # if is_user_email_confirmed(request.user) is False:
-        #    resp = {'detail': _('Please confirm the e-mail before submitting the own addresses')}
-        #    logger.info('email address is not confirmed for %s, aborting', request.user.username)
-        #    return Response(resp, status=403)
+        if Account.is_user_email_confirmed(request.user) is False:
+            return Response({"success": False, "error":"Please confirm the e-mail before submitting the own addresses"}, status=400)
+
+        if not request.user.account.is_identity_verified:
+            return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
+
+        addresses = Address.objects.filter(user=request.user)
+        if len(addresses) >= ACCOUNT__MAX_ADDRESSES_COUNT:
+            return Response({"success": False, "error": "Couldn't add new address. Too many addresses."}, status=400)
 
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             serializer.save(request.user)
             return Response(serializer.validated_data)
 
-        logger.info('Invalid address %s for %s',
-                    serializer.data.get('address'), request.user.username)
-        return Response(serializer.errors, status=400)
+        return Response({"success": False, "error": serializer.errors}, status=400)
 
 
 class CustomUserDetailsView(APIView):
@@ -284,23 +333,21 @@ class ApplicationView(APIView):
 
     authentication_classes = (authentication.TokenAuthentication,)
     parser_classes = (JSONParser,)
+    serializer_class = ApplicationSerializer
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        return Response([{"app_uuid": "12ad8648-c15d-47f9-9b36-47675a3af79e",
-                         "created_at": "2018-04-24 12:35:59",
-                         "source_address": "0xf93ab5a00fab5b18c25d35a2329813203104f1e8",
-                         "rec_address": "0x60cb8ecadf2a81914b46086066718737ff89af51",
-                         "base_currency": "eth",
-                         "rec_currency": "jAED",
-                         "base_amount": 1.0,
-                         "rec_amount": 1810.0,
-                         "rate": 1810.0,
-                         "status": "created",
-                         "tx_id": "",
-                         "tx_amount": 0.0}])
+        applications_qs = Application.objects.filter(user=request.user)
+        applications = ApplicationsSerializer(applications_qs, many=True).data
+        return Response(applications)
 
     def post(self, request):
-        return Response({"success":True, "app_uuid": "12ad8648-c15d-47f9-9b36-47675a3af79e"})
+        serializer = self.serializer_class(data=request.data, context={'user': request.user})
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({"success":True, "app_uuid": serializer.validated_data['application_id']})
+        else:
+            return Response({"success": False, "error": serializer.errors})
 
 
 class ApplicationConfirmView(APIView):

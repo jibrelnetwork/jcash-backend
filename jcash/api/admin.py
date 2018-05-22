@@ -3,7 +3,6 @@ from wsgiref.util import FileWrapper
 
 from django.contrib import admin
 from django.utils.html import format_html
-#from django.core.urlresolvers import reverse
 from django.shortcuts import redirect, get_object_or_404, render
 from django.utils.crypto import get_random_string
 from django.conf.urls import url
@@ -21,6 +20,13 @@ from jcash.api.models import (
     Address,
     Account,
     Document,
+    Currency,
+    CurrencyPair,
+    CurrencyPairRate,
+    Application,
+    IncomingTransaction,
+    Exchange,
+    Refund,
 )
 
 from jcash.api import tasks
@@ -95,156 +101,67 @@ class ReadonlyMixin:
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
-    """"
-    list_display = ['id', 'username', 'first_name', 'last_name', 'document_thumb',
-                    'onfido_check_status',
-                    'is_identity_verified', 'is_identity_declined', 'account_actions']
-
-    list_filter = ['is_identity_verified', 'is_identity_declined',
-                   'onfido_check_status', FioFilledListFilter]
-
-    search_fields = ['user__username', 'first_name', 'last_name']
-    exclude = ['town', 'postcode', 'street', 'notified',]
-    readonly_fields = ['user', 'onfido_check_status', 'onfido_check_result',
-                        'onfido_check_id', 'onfido_check_created',
-                        'onfido_document_id', 'onfido_applicant_id',
-                        'withdraw_address', 'tracking']
-
-    actions = ['action_reset_password']
-
-    class Media:
-        js = ['https://static.filestackapi.com/v3/filestack.js', 'api/account.js']
+    list_display = ['id', 'username', 'first_name', 'last_name',
+                    'is_identity_verified', 'is_identity_declined',
+                    'is_blocked', 'comment']
 
     def username(self, obj):
         return obj.user.username
 
-    def changelist_view(self, request, extra_context=None):
-        self.request = request
-        return super(AccountAdmin, self).changelist_view(request, extra_context=extra_context)
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-
-            url(
-                r'^(?P<account_id>.+)/action/$',
-                self.admin_site.admin_view(self.account_action),
-                name='account-action',
-            ),
-        ]
-        return custom_urls + urls
-
-    def document_thumb(self, obj):
-        if not obj.document_url:
-            return ''
-        if obj.document_type in ('jpg', 'jpeg', 'png'):
-            return format_html('<a href="{src}"><img src="{src}" height="30"/></a>', src=obj.document_url)
-        else:
-            return obj.document_url
-    document_thumb.short_description = 'Passport'
-    document_thumb.allow_tags = True
-
-    def account_actions(self, obj):
-        return format_html(
-            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=reset" data-action="reset">Reset</a>&nbsp;'
-            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=approve" data-action="approve">Approve</a>&nbsp;'
-            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=decline" data-action="decline">Decline</a>&nbsp;',
-            url=reverse('admin:account-action', args=[obj.pk]))
-
-    account_actions.short_description = 'Account Actions'
-    account_actions.allow_tags = True
-
-    def reset_identity_verification(self, request, account_id, *args, **kwargs):
-        account = get_object_or_404(Account, pk=account_id)
-        logger.info('Manual Identity verification status reset for %s', account.user.username)
-        account.reset_verification_state()
-        Token.objects.filter(user=account.user).delete()
-        messages.success(request,
-                         mark_safe('Verification Status <b>Reset Done</b> for {}'.format(account.user.username)))
-        return HttpResponse('OK')
-
-    def account_action(self, request, account_id, *args, **kwargs):
-
-        if request.method == 'POST' and request.POST.get('confirm'):
-            action = request.POST.get('action')
-            if action == 'reset':
-                return self.reset_identity_verification(request, account_id)
-            elif action == 'approve':
-                return self.approve_identity_verification(request, account_id)
-            elif action == 'decline':
-                return self.decline_identity_verification(request, account_id)
-        else:
-            account = get_object_or_404(Account, pk=account_id)
-            action = request.GET.get('action')
-            return render(request, 'account_action_confirm.html', {'action': action, 'account': account, 'opts': account._meta})
-
-    def approve_identity_verification(self, request, account_id, *args, **kwargs):
-        account = get_object_or_404(Account, pk=account_id)
-        account.approve_verification()
-        logger.info('Manual Identity approve for %s', account.user.username)
-        ga_integration.on_status_verified_manual(account)
-        messages.success(request,
-                         mark_safe('Verification Status <b>Approved</b> for {}'.format(account.user.username)),
-                         extra_tags='safe')
-        return HttpResponse('OK')
-
-    def decline_identity_verification(self, request, account_id, *args, **kwargs):
-        account = get_object_or_404(Account, pk=account_id)
-        logger.info('Manual Identity decline for %s', account.user.username)
-        account.decline_verification()
-        ga_integration.on_status_not_verified_manual(account)
-        messages.success(request,
-                         mark_safe('Verification Status <b>Declined</b> for {}'.format(account.user.username)),
-                         extra_tags='safe')
-        return HttpResponse('OK')
-
-    def save_model(self, request, obj, form, change):
-        # Given a model instance save it to the database.
-        obj.save()
-        if '_reverify' in request.POST:
-            obj.reset_verification_state(fullreset=False)
-            tasks.verify_user.delay(obj.user.pk)
-            messages.success(request,
-                 mark_safe('Verification <b>Restarted</b> for <b>{}</b> {}'.format(obj, obj.user.username)))
-
-    def action_reset_password(self, request, queryset):
-        accounts = queryset.all()
-        for account in accounts:
-            logger.info('Manual reset password for %s.', account.user.username)
-            account.user.set_password(get_random_string(12))  # set unusable password
-            account.user.save()
-            serializer = serializers.CustomPasswordResetSerializer(
-                data={'email': account.user.username}, context={'request': request})
-            serializer.is_valid()
-            serializer.save()
-            logger.info('Manual reset password for %s complete.', account.user.username)
-
-        usernames = ', '.join([a.user.username for a in accounts])
-        self.message_user(request, "Users {}: passwords is dropped, change password emails is sent.".format(usernames))
-    """
-    pass
-
 
 @admin.register(Address)
 class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
-    list_display = ['address', 'type', 'is_verified', 'account_link']
+    list_display = ['created_at', 'address', 'type', 'is_verified', 'is_rejected']
     search_fields = ['user__username', 'address']
     list_select_related = ('user__account',)
-
-    def account_link(self, obj):
-        if obj.user is None:
-            return ''
-        html = '<a href="{url}">{username}</>'
-        url = reverse('admin:api_account_change', args=(obj.user.account.pk,))
-        username = obj.user.username
-        return html.format(url=url, username=username)
-    account_link.allow_tags = True
 
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
     list_display = ['user', 'image']
     search_fields = ['user__username']
+
+
+@admin.register(Currency)
+class CurrencyAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'display_name', 'symbol', 'exchanger_address', 'view_address',
+                    'controller_address','is_erc20_token','balance']
+
+
+@admin.register(CurrencyPair)
+class CurrencyPairAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'display_name', 'symbol', 'base_currency','reciprocal_currency',
+                    'is_exchangeable', 'is_buyable', 'is_sellable']
+
+
+@admin.register(CurrencyPairRate)
+class CurrencyPairRateAdmin(admin.ModelAdmin):
+    list_display = ['id', 'created_at', 'currency_pair', 'buy_price', 'sell_price']
+
+
+@admin.register(Application)
+class ApplicationAdmin(admin.ModelAdmin):
+    list_display = ['id','address','currency_pair','currency_pair_rate',
+                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount',
+                    'reciprocal_amount', 'created_at', 'status']
+
+
+@admin.register(IncomingTransaction)
+class IncomingTransactionAdmin(admin.ModelAdmin):
+    list_display = ['id', 'created_at', 'transaction_id', 'application', 'mined_at',
+                    'block_height', 'status']
+
+
+@admin.register(Exchange)
+class ExchangeAdmin(admin.ModelAdmin):
+    list_display = ['id', 'created_at', 'transaction_id', 'application', 'mined_at',
+                    'block_height', 'status']
+
+
+@admin.register(Refund)
+class RefundAdmin(admin.ModelAdmin):
+    list_display = ['id', 'created_at', 'transaction_id', 'application', 'mined_at',
+                    'block_height', 'status']
 
 
 admin.site.unregister(EmailAddress)
@@ -266,11 +183,3 @@ class EmailAddress(ReadonlyMixin, admin.ModelAdmin):
         op_names = ', '.join([em.email for em in emails])
         self.message_user(request, "Emails {} was marked as verified".format(op_names))
 
-
-def export_csv(request):
-    filename = utils.export_data_to_csv()
-
-    resp = HttpResponse(FileWrapper(open(filename, 'rb')), content_type='application/x-zip-compressed')
-    resp['Content-Disposition'] = 'attachment; filename=export.zip'
-    return resp
-export_csv = admin.site.admin_view(export_csv)

@@ -95,6 +95,15 @@ class Account(models.Model):
         # notify.send_email_kyc_account_rejected(self.user.email if self.user else None,
         # self.user.id if self.user else None) # Todo:
 
+    @classmethod
+    def is_user_email_confirmed(cls, user):
+        try:
+            email = EmailAddress.objects.get(email=user.email)
+            return email.verified
+        except EmailAddress.DoesNotExist:
+            logger.error('No EmailAddress for user %s!!', user.username)
+            return False
+
     def __str__(self):
         return '{} {}'.format(self.first_name, self.last_name)
 
@@ -131,7 +140,7 @@ class Document(models.Model):
     verification_attempts = models.IntegerField(default=0)
 
     # Relationships
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, models.DO_NOTHING,
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_documents)
 
     class Meta:
@@ -148,9 +157,10 @@ class Address(models.Model):
     meta = JSONField(default=dict)  # This field type is a guess.
 
     rel_verifies = 'verifies'
+    rel_applications = 'applications'
 
     # Relationships
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, models.DO_NOTHING,
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_addresses)
 
     class Meta:
@@ -169,15 +179,15 @@ class AddressVerify(models.Model):
     is_verified = models.BooleanField(default=False)
 
     # Relationships
-    address = models.ForeignKey(Address, models.DO_NOTHING,
+    address = models.ForeignKey(Address, on_delete=models.DO_NOTHING,
                                 blank=False, null=False, related_name=Address.rel_verifies)
 
     class Meta:
-        db_table = 'address-verify'
+        db_table = 'address_verify'
 
 
 class Notification(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, models.DO_NOTHING,
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=True, null=True, related_name='notifications')
 
     type = models.CharField(max_length=100)
@@ -226,28 +236,19 @@ class OperationError(Exception):
     Operation execution error
     """
 
-
-def is_user_email_confirmed(user):
-    try:
-        email = EmailAddress.objects.get(email=user.email)
-        return email.verified
-    except EmailAddress.DoesNotExist:
-        logger.error('No EmailAddress for user %s!!', user.username)
-        return False
-
-
 # Currency
 class Currency(models.Model):
-    name = models.CharField(max_length=10)
-    exchanger_address = models.CharField(unique=True, max_length=255)
-    contract_address = models.CharField(unique=True, max_length=255)
+    display_name = models.CharField(max_length=10)
+    symbol = models.CharField(max_length=10)
+    exchanger_address = models.CharField(max_length=255, blank=True, null=True)
+    view_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
+    controller_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     is_erc20_token = models.BooleanField(default=False)
-    is_enabled = models.BooleanField(default=False)
     balance = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    base_currencies = 'base_currencies'
-    reciprocal_currencies = 'reciprocal_currencies'
+    rel_base_currencies = 'base_currencies'
+    rel_reciprocal_currencies = 'reciprocal_currencies'
 
     class Meta:
         db_table = 'currency'
@@ -255,27 +256,35 @@ class Currency(models.Model):
 
 # CurrencyPair
 class CurrencyPair(models.Model):
-    base_currency = models.ForeignKey(Currency, null=True, related_name=Currency.base_currencies, on_delete=models.DO_NOTHING)
-    reciprocal_currency = models.ForeignKey(Currency, null=True, related_name=Currency.reciprocal_currencies, on_delete=models.DO_NOTHING)
+    display_name = models.CharField(max_length=10)
     symbol = models.CharField(max_length=10)
+    base_currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING, related_name=Currency.rel_base_currencies)
+    reciprocal_currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING, related_name=Currency.rel_reciprocal_currencies)
+    is_exchangeable = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_buyable = models.BooleanField(default=False)
+    is_sellable = models.BooleanField(default=False)
+
+    rel_currency_pair_rates = 'currency_pair_rates'
+    rel_applications = 'applications'
 
     class Meta:
-        db_table = 'currencypair'
+        db_table = 'currency_pair'
 
 
 # CurrencyPairRate
 class CurrencyPairRate(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    currency_pair = models.ForeignKey(CurrencyPair, models.DO_NOTHING)
-    reciprocal_currency = models.ForeignKey(Address, models.DO_NOTHING)
-    symbol = models.CharField(max_length=10)
-    created_at = models.DateTimeField(auto_now_add=True)
-    buy_rate = models.FloatField()
-    sell_rate = models.FloatField()
+    currency_pair = models.ForeignKey(CurrencyPair, on_delete=models.DO_NOTHING, related_name=CurrencyPair.rel_currency_pair_rates)
+    buy_price = models.FloatField()
+    sell_price = models.FloatField()
+    created_at = models.DateTimeField()
+    meta = JSONField(default={})
+
+    rel_applications = 'applications'
 
     class Meta:
-        db_table = 'currencypairrate'
+        db_table = 'currency_pair_rate'
 
 
 # AccountAddress
@@ -286,7 +295,7 @@ class AccountAddress(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'accountaddress'
+        db_table = 'account_address'
 
 
 # ApplicationStatus
@@ -294,6 +303,8 @@ class ApplicationStatus:
     created = 'created'
     rejected = 'rejected'
     cancelled = 'cancelled'
+    confirming = 'confirming'
+    confirmed = 'confirmed'
     converting = 'converting'
     converted = 'converted'
     refunding = 'refunding'
@@ -305,16 +316,28 @@ class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, models.DO_NOTHING,
                              blank=True, null=True, related_name=Account.rel_applications)
-    address = models.CharField(unique=True, max_length=255)
+    address = models.ForeignKey(Address,
+                                on_delete=models.DO_NOTHING,
+                                related_name=Address.rel_applications)
+    currency_pair = models.ForeignKey(CurrencyPair,
+                                      on_delete=models.DO_NOTHING,
+                                      related_name=CurrencyPair.rel_applications)
+    currency_pair_rate = models.ForeignKey(CurrencyPairRate,
+                                           on_delete=models.DO_NOTHING,
+                                           related_name=CurrencyPair.rel_applications)
     base_currency = models.CharField(max_length=10)
-    counter_currency = models.CharField(max_length=10)
+    reciprocal_currency = models.CharField(max_length=10)
+    rate = models.FloatField()
+    base_amount = models.FloatField()
+    reciprocal_amount = models.FloatField()
 
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, default=ApplicationStatus.created)
     meta = JSONField(default=dict)
 
-    exchanges = 'exchanges'
-    refundes = 'refundes'
+    rel_exchanges = 'exchanges'
+    rel_refundes = 'refundes'
+    rel_incoming_txs = 'incoming_txs'
 
     class Meta:
         db_table = 'application'
@@ -340,13 +363,29 @@ class TransactionStatus:
     success = 'success'
 
 
-# Exchange
-class Exchange(models.Model):
+# IncomingTransaction
+class IncomingTransaction(models.Model):
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
-    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.exchanges)
+    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_incoming_txs)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
+    value = models.FloatField(default=0)
+    status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
+    meta = JSONField(default=dict)
+
+    class Meta:
+        db_table = 'incoming_transaction'
+
+
+# Exchange
+class Exchange(models.Model):
+    transaction_id = models.CharField(max_length=120, null=True, blank=True)
+    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_exchanges)
+    created_at = models.DateTimeField()
+    mined_at = models.DateTimeField(null=True, blank=True)
+    block_height = models.IntegerField(blank=True, null=True)
+    value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
 
@@ -357,10 +396,11 @@ class Exchange(models.Model):
 # Refund
 class Refund(models.Model):
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
-    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.refundes)
+    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_refundes)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
+    value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
 
