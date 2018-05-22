@@ -24,7 +24,8 @@ import requests
 
 from jcash.api.models import (
     Address, Account, Document,
-    DocumentHelper, AddressVerify, Application, CurrencyPair
+    DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
+    IncomingTransaction, Exchange, Refund
 )
 from jcash.commonutils import eth_sign, eth_address
 from jcash.api import tasks
@@ -520,21 +521,56 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     [{
         "app_uuid": "12ad8648-c15d-47f9-9b36-47675a3af79e",
         "created_at": "2018-04-24 12:35:59",
-        "source_address": "0xf93ab5a00fab5b18c25d35a2329813203104f1e8",
-        "rec_address": "0x60cb8ecadf2a81914b46086066718737ff89af51",
+
+        "incomig_tx": "0xf93ab5a00",
+        "outgoing_tx": "0x60cb8ecad",
         "base_currency": "eth",
-        "rec_currency": "jAED",
+        "reciprocal_currency": "jAED",
         "base_amount": 1.0,
-        "rec_amount": 1810.0,
+        "reciprocal_amount": 1810.0,
         "rate": 1810.0,
         "status": "created",
-        "tx_id": "",
-        "tx_amount": 0.0
     }]
     """
+    app_uuid = serializers.SerializerMethodField()
+    incoming_tx = serializers.SerializerMethodField()
+    outgoing_tx = serializers.SerializerMethodField()
+
     class Meta:
         model = Application
-        fields = ('id', 'created_at', 'base_amount', 'reciprocal_amount', 'rate', 'status')
+        fields = ('app_uuid', 'created_at', 'incoming_tx', 'outgoing_tx',
+                  'base_currency', 'base_amount', 'reciprocal_currency',
+                  'reciprocal_amount', 'rate', 'status')
+
+    def get_app_uuid(self, obj):
+        return obj.id
+
+    def get_incoming_tx(selfself, obj):
+        try:
+            txs = IncomingTransaction.objects.filter(application=obj)
+            return txs[0].transaction_id if len(txs)>0 else ""
+        except:
+            return ""
+
+
+    def get_outgoing_tx(selfself, obj):
+        if obj.status == ApplicationStatus.converting or \
+                obj.status == ApplicationStatus.converting:
+            try:
+                txs = Exchange.objects.filter(application=obj)
+                return txs[0].transaction_id if len(txs) > 0 else ""
+            except:
+                return ""
+        elif obj.status == ApplicationStatus.refunding or \
+                obj.status == ApplicationStatus.refunded or \
+                obj.status == ApplicationStatus.rejected:
+            try:
+                txs = Refund.objects.filter(application=obj)
+                return txs[0].transaction_id if len(txs) > 0 else ""
+            except:
+                return ""
+        else:
+            return ""
 
 
 class AddressVerifySerializer(serializers.Serializer):
@@ -554,7 +590,7 @@ class AddressVerifySerializer(serializers.Serializer):
         if not address == address_verify.address.address:
             raise exceptions.ValidationError(_('Address does not exists.'))
 
-        if not ethereum.verifySign(address_verify.message, sig, address_verify.address.address):
+        if not eth_sign.verifySign(address_verify.message, sig, address_verify.address.address):
             raise exceptions.ValidationError(_('Address verification failed.'))
 
         return attrs
@@ -577,6 +613,10 @@ class CurrencyRateSerializer(serializers.Serializer):
     base_currency = serializers.CharField(required=True, allow_blank=False)
     rec_currency = serializers.CharField(required=True, allow_blank=False)
     base_amount = serializers.FloatField(required=True)
+
+
+class OpenCurrencyRateSerializer(serializers.Serializer):
+    pass
 
 
 class CurrencySerializer(serializers.Serializer):

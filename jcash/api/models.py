@@ -303,6 +303,8 @@ class ApplicationStatus:
     created = 'created'
     rejected = 'rejected'
     cancelled = 'cancelled'
+    confirming = 'confirming'
+    confirmed = 'confirmed'
     converting = 'converting'
     converted = 'converted'
     refunding = 'refunding'
@@ -335,6 +337,7 @@ class Application(models.Model):
 
     rel_exchanges = 'exchanges'
     rel_refundes = 'refundes'
+    rel_incoming_txs = 'incoming_txs'
 
     class Meta:
         db_table = 'application'
@@ -360,6 +363,21 @@ class TransactionStatus:
     success = 'success'
 
 
+# IncomingTransaction
+class IncomingTransaction(models.Model):
+    transaction_id = models.CharField(max_length=120, null=True, blank=True)
+    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_incoming_txs)
+    created_at = models.DateTimeField()
+    mined_at = models.DateTimeField(null=True, blank=True)
+    block_height = models.IntegerField(blank=True, null=True)
+    value = models.FloatField(default=0)
+    status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
+    meta = JSONField(default=dict)
+
+    class Meta:
+        db_table = 'incoming_transaction'
+
+
 # Exchange
 class Exchange(models.Model):
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
@@ -367,6 +385,7 @@ class Exchange(models.Model):
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
+    value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
 
@@ -381,6 +400,7 @@ class Refund(models.Model):
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
+    value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
 

@@ -343,7 +343,7 @@ class ApplicationView(APIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data, context={'user': request.user})
-        if serializer.is_valid():
+        if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response({"success":True, "app_uuid": serializer.validated_data['application_id']})
         else:
