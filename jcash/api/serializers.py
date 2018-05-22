@@ -555,7 +555,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
 
     def get_outgoing_tx(selfself, obj):
         if obj.status == ApplicationStatus.converting or \
-                obj.status == ApplicationStatus.converting:
+                obj.status == ApplicationStatus.converted:
             try:
                 txs = Exchange.objects.filter(application=obj)
                 return txs[0].transaction_id if len(txs) > 0 else ""
