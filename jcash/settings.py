@@ -284,7 +284,7 @@ FORCE_SCANNING_ADDRESS__ENABLED = True
 FORCE_SCANNING_ADDRESS__EMAIL_RECIPIENT = 'Jibrel Presale <presale@jibrel.network>'
 
 # Mailgun API
-MAILGUN__API_KEY = ""
+MAILGUN__API_KEY = os.getenv('MAILGUN_API_KEY', '')
 MAILGUN__API_MESSAGES_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/messages"
 MAILGUN__API_EVENTS_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/events"
 
@@ -296,7 +296,7 @@ SENDGRID__API_KEY = ""
 ACCOUNT__MAX_ADDRESSES_COUNT = 5
 
 # Alphavantage.co API
-ALPHAVANTAGE__API_KEY = ""
+ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')
 
 # Logging
 LOGGING__ROOT_DIR = ""
@@ -304,7 +304,7 @@ LOGGING__SQLALCHEMY_ECHO = False
 
 # recaptcha settings
 RECAPTCHA__VERIFY__ENABLED = False
-RECAPTCHA__SECRET__KEY = ""
+RECAPTCHA__SECRET__KEY = os.getenv('RECAPTCHA_SECRET_KEY', '')
 
 LOGIN_REDIRECT_URL = '/'
 
