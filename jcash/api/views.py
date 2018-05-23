@@ -2,7 +2,8 @@ from datetime import datetime
 from itertools import chain
 from operator import itemgetter
 import logging
-
+import coreapi
+import coreschema
 from allauth.account import app_settings as allauth_settings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -28,7 +29,6 @@ from rest_auth.app_settings import (
 from rest_auth.views import (
     PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView
 )
-
 from allauth.account.models import EmailAddress
 from allauth.account.utils import send_email_confirmation
 from jcash.api.models import (
@@ -62,17 +62,52 @@ logger = logging.getLogger(__name__)
 
 class AccountView(GenericAPIView):
     """
-    View get/set account (profile) info.
-
-    * Requires token authentication.
-
     get:
     Returns account info for current user.
 
+    Response example:
+
+    ```
+    {"username":"ivan.ivanov@example.com",
+     "first_name":"Ivan",
+     "last_name":"Ivanov",
+     "birthday":"1971-01-01",
+     "citizenship":"Russia",
+     "residency":"Russia",
+     "is_identity_verified":true,
+     "is_identity_declined":false,
+     "is_email_confirmed":true,
+     "status":"verified"}
+    ```
+
+    * Requires token authentication.
+
     put:
     Updates account info for current user.
-    """
 
+    Response example:
+
+    ```
+    {"username":"ivan.ivanov@example.com",
+     "first_name":"Ivan",
+     "last_name":"Ivanov",
+     "birthday":"1971-01-01",
+     "citizenship":"Russia",
+     "residency":"Russia",
+     "is_identity_verified":true,
+     "is_identity_declined":false,
+     "is_email_confirmed":true,
+     "status":"verified"}
+    ```
+
+    or
+
+    ```
+    {"success": false, "error": "error description"}
+    ```
+
+    * Requires token authentication.
+    """
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_classes = {
         'get': AccountSerializer,
@@ -151,6 +186,13 @@ class CurrencyView(APIView):
     """
     Get available currencies on the platform.
 
+    Response example:
+
+    ```
+    [{"base_currency": "ETH","rec_currency": "jAED"},
+    {"base_currency": "jAED","rec_currency": "ETH"}]
+    ```
+
     * Requires token authentication.
     """
 
@@ -171,9 +213,17 @@ class CurrencyView(APIView):
         return Response(data)
 
 
-class CurrencyRateView(APIView):
+class CurrencyRateView(GenericAPIView):
     """
-    Get currency info.
+    get:
+    Get currency rate info.
+    Response example:
+
+    ```
+    {"success":true,
+    "uuid":"eb5c4978-c70a-4572-9f58-72250fce6b3f",
+    "rate":1799.0,"rec_amount":0.0}
+    ```
 
     * Requires token authentication.
     """
@@ -182,9 +232,20 @@ class CurrencyRateView(APIView):
     serializer_class = CurrencyRateSerializer
     parser_classes = (JSONParser,)
 
+    def get_param_fields(self, view):
+        fields = [
+            coreapi.Field(name='base_currency', required=True, location='form',
+                          schema=coreschema.String(title='Base currency')),
+            coreapi.Field(name='base_amount', required=True, location='form',
+                          schema=coreschema.String(title='Base amount')),
+            coreapi.Field(name='rec_currency', required=True, location='form',
+                          schema=coreschema.String(title='Reciprocal currency')),
+        ]
+        return fields
+
     def get(self, request):
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
+        serializer = CurrencyRateSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
             is_reverse_operation = False
             currency_pair = CurrencyPair.objects.filter(base_currency__display_name=serializer.validated_data['base_currency'],
                                                          reciprocal_currency__display_name=serializer.validated_data['rec_currency']) \
@@ -221,6 +282,12 @@ class CurrencyRateView(APIView):
 class CurrencyRatesView(GenericAPIView):
     """
     Get currency-pairs rates.
+
+    Response example:
+
+    ```
+    [{"currency": "ETH/jAED","rate": 1799}]
+    ```
     """
 
     permission_classes = (permissions.AllowAny,)
@@ -240,10 +307,22 @@ class AddressVerifyView(GenericAPIView):
     """
     Verify account address
 
-    * Requires token authentication.
-
     post:
     Verify specified address for current user.
+
+    Response example:
+
+    ```
+    {"success": true}
+    ```
+
+    or
+
+    ```
+    {"success": false, "error": "error description"}
+    ```
+
+    * Requires token authentication.
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -252,7 +331,7 @@ class AddressVerifyView(GenericAPIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
+        if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response({'success':True})
 
@@ -263,13 +342,42 @@ class AddressView(GenericAPIView):
     """
     View get/set address for account
 
-    * Requires token authentication.
-
     get:
     Returns list of account addresses for current user.
 
+    Response example:
+
+    ```
+    [{"address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
+      "type": "eth",
+      "is_verified": true}]
+    ```
+
+    * Requires token authentication.
+
     post:
     Add a new address for current user.
+
+    Response example:
+
+    ```
+    {"success":true,
+     "address":"0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
+     "type":"eth",
+     "is_verified":false,
+     "message":"I, Ivan Ivanov, hereby confirm that I and only I own and have access to the private key of
+     the address 0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2. Date: 2018 May 23 06:40 AM UTC",
+     "uuid":"a357e783-bcad-4d1e-a6d1-b0e80aec31e0",
+     "success":true}
+    ```
+
+    or
+
+    ```
+    {"success": false, "error": "error description"}
+    ```
+
+    * Requires token authentication.
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -293,7 +401,7 @@ class AddressView(GenericAPIView):
             return Response({"success": False, "error": "Couldn't add new address. Too many addresses."}, status=400)
 
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
+        if serializer.is_valid(raise_exception=True):
             serializer.save(request.user)
             return Response(serializer.validated_data)
 
@@ -318,7 +426,7 @@ class CustomUserDetailsView(APIView):
         return Response({'pk':request.user.pk, 'username':request.user.username, 'email':request.user.email})
 
 
-class ApplicationView(APIView):
+class ApplicationView(GenericAPIView):
     """
     View get/set exchange application.
 
@@ -350,15 +458,17 @@ class ApplicationView(APIView):
             return Response({"success": False, "error": serializer.errors})
 
 
-class ApplicationConfirmView(APIView):
+class ApplicationConfirmView(GenericAPIView):
     """
     Confirm exchange application if incoming transaction amount less than exchange amount
     Accepts POST method.
 
-    * Requires token authentication.
-
     post:
-    Changes status of application to perform exchange operation
+    Changes status of application to perform exchange operation.
+
+    Returns the success/fail message.
+
+    * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = ApplicationConfirmSerializer
@@ -366,22 +476,25 @@ class ApplicationConfirmView(APIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
             return Response({"success":True})
 
         return Response({"success":False, "error":{serializer.errors}}, status=400)
 
 
 
-class ApplicationRefundView(APIView):
+class ApplicationRefundView(GenericAPIView):
     """
     Cancel exchange application and refund
     Accepts POST method.
 
-    * Requires token authentication.
-
     post:
-    Changes status of application to cancel exchange operation
+    Changes status of application to cancel exchange operation end refund.
+
+    Returns the success/fail message.
+
+    * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = ApplicationRefundSerializer
@@ -389,7 +502,8 @@ class ApplicationRefundView(APIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
             return Response({"success":True})
 
         return Response({"success":False, "error":serializer.errors}, status=400)
@@ -412,10 +526,8 @@ class RegisterView(RestAuthRegisterView):
                 'token': self.token
             }
             serializer_data = JWTSerializer(data).data
-            #serializer_data['success'] = True
         else:
             serializer_data =  TokenSerializer(user.auth_token).data
-            #serializer_data['success'] = True
         return serializer_data
 
 

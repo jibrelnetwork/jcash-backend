@@ -574,9 +574,9 @@ class ApplicationsSerializer(serializers.ModelSerializer):
 
 
 class AddressVerifySerializer(serializers.Serializer):
-    address = serializers.CharField(required=True, allow_blank=False)
-    sig = serializers.CharField(required=True, allow_blank=False)
-    message_uuid = serializers.CharField(required=True, allow_blank=False)
+    address = serializers.CharField(required=True, allow_blank=False, help_text='address string')
+    sig = serializers.CharField(required=True, allow_blank=False, help_text='sig hash from MEW')
+    message_uuid = serializers.CharField(required=True, allow_blank=False, help_text='uuid from address creation response')
 
     def validate(self, attrs):
         address = attrs.get('address')
@@ -625,7 +625,7 @@ class CurrencySerializer(serializers.Serializer):
 
 class AddressSerializer(serializers.Serializer):
     address = serializers.CharField(required=True, allow_blank=False)
-    type = serializers.CharField(required=True, allow_blank=False)
+    type = serializers.CharField(required=True, allow_blank=False, help_text='types: ["eth",]')
 
     class Meta:
         model = Address
@@ -753,8 +753,36 @@ class ApplicationSerializer(serializers.Serializer):
 
 
 class ApplicationRefundSerializer(serializers.Serializer):
-    app_uuid = serializers.CharField(required=True, allow_blank=False)
+    app_uuid = serializers.UUIDField(required=True)
+
+    def validate(self, data):
+        try:
+            self.application = Application.objects.get(id=data['app_uuid'])
+        except Application.DoesNotExist:
+            raise serializers.ValidationError(_('Application does not exists.'))
+
+        return data
+
+    def save(self):
+        with transaction.atomic():
+            if self.application:
+                self.application.status = ApplicationStatus.refunding
+                self.application.save()
 
 
 class ApplicationConfirmSerializer(serializers.Serializer):
-    app_uuid = serializers.CharField(required=True, allow_blank=False)
+    app_uuid = serializers.UUIDField(required=True)
+
+    def validate(self, data):
+        try:
+            self.application = Application.objects.get(id=data['app_uuid'])
+        except Application.DoesNotExist:
+            raise serializers.ValidationError(_('Application does not exists.'))
+
+        return data
+
+    def save(self):
+        with transaction.atomic():
+            if self.application:
+                self.application.status = ApplicationStatus.converting
+                self.application.save()

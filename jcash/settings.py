@@ -206,6 +206,9 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ),
     'EXCEPTION_HANDLER': 'jcash.api.utils.custom_exception_handler',
+    'DEFAULT_FILTER_BACKENDS': (
+        'jcash.api.param_schema.ParamSchemaFilter',
+    ),
 }
 
 REST_AUTH_SERIALIZERS = {
