@@ -493,7 +493,7 @@ class ApplicationView(GenericAPIView):
     def get(self, request):
         applications_qs = Application.objects.filter(user=request.user)
         applications = ApplicationsSerializer(applications_qs, many=True).data
-        return Response(applications)
+        return Response({"success": True, "application": applications})
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data, context={'user': request.user})
