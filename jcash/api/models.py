@@ -24,6 +24,15 @@ NOTIFICATION_SUBJECTS = {
 }
 
 
+# Account statuses
+class AccountStatus:
+    blocked = 'blocked'
+    pending = 'pending'
+    verified = 'verified'
+    declined = 'declined'
+    created = 'created'
+
+
 # Account model
 class Account(models.Model):
     # Personal data
@@ -325,6 +334,7 @@ class Application(models.Model):
     currency_pair_rate = models.ForeignKey(CurrencyPairRate,
                                            on_delete=models.DO_NOTHING,
                                            related_name=CurrencyPair.rel_applications)
+    exchanger_address = models.CharField(max_length=255, blank=True, null=True)
     base_currency = models.CharField(max_length=10)
     reciprocal_currency = models.CharField(max_length=10)
     rate = models.FloatField()
@@ -341,17 +351,6 @@ class Application(models.Model):
 
     class Meta:
         db_table = 'application'
-
-    @classmethod
-    def create_operation(cls, user, base_currency, address, counter_currency):
-        with transaction.atomic():
-            application = cls.objects.create(
-                user=user,
-                base_currency=base_currency,
-                address=address,
-                counter_currency=counter_currency
-            )
-            return application
 
 
 # TransactionStatus

@@ -25,7 +25,7 @@ import requests
 from jcash.api.models import (
     Address, Account, Document,
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
-    IncomingTransaction, Exchange, Refund
+    IncomingTransaction, Exchange, Refund, AccountStatus
 )
 from jcash.commonutils import eth_sign, eth_address
 from jcash.api import tasks
@@ -83,13 +83,17 @@ class AccountSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     is_email_confirmed = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    success = serializers.SerializerMethodField()
 
     class Meta:
         model = Account
-        fields = ('username', 'first_name', 'last_name', 'birthday',
+        fields = ('success', 'username', 'first_name', 'last_name', 'birthday',
                   'citizenship', 'residency', 'is_identity_verified',
                   'is_identity_declined', 'is_email_confirmed', 'status')
         read_only_fields = ('is_identity_verified', 'is_identity_declined', 'is_email_confirmed')
+
+    def get_success(self, obj):
+        return True if obj else False
 
     def get_username(self, obj):
         return obj.user.email
@@ -103,23 +107,25 @@ class AccountSerializer(serializers.ModelSerializer):
                       obj.residency, obj.citizenship]
             return True if all(fields) else False
 
-        if obj.is_blocked:
-            return 'blocked'
+        if not obj:
+            return ''
+        elif obj.is_blocked:
+            return AccountStatus.blocked
         elif is_personal_data_filled(obj) and \
             obj.user.documents.count() >= 2 and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
-            return 'pending'
+            return AccountStatus.pending
         elif is_personal_data_filled(obj) and \
             obj.is_identity_verified and \
             not obj.is_identity_declined:
-            return 'verified'
+            return AccountStatus.verified
         elif is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \
             obj.is_identity_declined:
-            return 'declined'
+            return AccountStatus.declined
         else:
-            return 'created'
+            return AccountStatus.created
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -521,9 +527,12 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     [{
         "app_uuid": "12ad8648-c15d-47f9-9b36-47675a3af79e",
         "created_at": "2018-04-24 12:35:59",
-
-        "incomig_tx": "0xf93ab5a00",
-        "outgoing_tx": "0x60cb8ecad",
+        "source_address": "0xf93ab5a00fab5b18c25d35a2329813203104f1e8",
+        "rec_address": "0x60cb8ecadf2a81914b46086066718737ff89af51",
+        "incoming_tx_id": "0xf93ab5a00",
+        "incoming_tx_value": 1,
+        "outgoing_tx_id": "0x60cb8ecad",
+        "outgoing_tx_value": 1810.0,
         "base_currency": "eth",
         "reciprocal_currency": "jAED",
         "base_amount": 1.0,
@@ -533,44 +542,78 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     }]
     """
     app_uuid = serializers.SerializerMethodField()
-    incoming_tx = serializers.SerializerMethodField()
-    outgoing_tx = serializers.SerializerMethodField()
+    incoming_tx_id = serializers.SerializerMethodField()
+    incoming_tx_value = serializers.SerializerMethodField()
+    outgoing_tx_id = serializers.SerializerMethodField()
+    outgoing_tx_value = serializers.SerializerMethodField()
+    source_address = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
-        fields = ('app_uuid', 'created_at', 'incoming_tx', 'outgoing_tx',
+        fields = ('app_uuid', 'created_at', 'incoming_tx_id', 'outgoing_tx_id',
+                  'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency',
                   'reciprocal_amount', 'rate', 'status')
 
     def get_app_uuid(self, obj):
         return obj.id
 
-    def get_incoming_tx(selfself, obj):
+    def get_source_address(self, obj):
+        return obj.address.address
+
+    def get_incoming_tx(self, obj):
         try:
             txs = IncomingTransaction.objects.filter(application=obj)
-            return txs[0].transaction_id if len(txs)>0 else ""
+            return txs[0] if len(txs)>0 else None
         except:
-            return ""
+            return None
 
+    def get_incoming_tx_id(self, obj):
+        tx = self.get_incoming_tx(obj)
+        if tx:
+            return tx.transaction_id
 
-    def get_outgoing_tx(selfself, obj):
+        return ""
+
+    def get_incoming_tx_value(self, obj):
+        tx = self.get_incoming_tx(obj)
+        if tx:
+            return tx.value
+
+        return 0
+
+    def get_outgoing_tx(self, obj):
         if obj.status == ApplicationStatus.converting or \
                 obj.status == ApplicationStatus.converted:
             try:
                 txs = Exchange.objects.filter(application=obj)
-                return txs[0].transaction_id if len(txs) > 0 else ""
+                return txs[0] if len(txs) > 0 else None
             except:
-                return ""
+                return None
         elif obj.status == ApplicationStatus.refunding or \
                 obj.status == ApplicationStatus.refunded or \
                 obj.status == ApplicationStatus.rejected:
             try:
                 txs = Refund.objects.filter(application=obj)
-                return txs[0].transaction_id if len(txs) > 0 else ""
+                return txs[0] if len(txs) > 0 else None
             except:
-                return ""
+                return None
         else:
-            return ""
+            return None
+
+    def get_outgoing_tx_id(self, obj):
+        tx = self.get_outgoing_tx(obj)
+        if tx:
+            return tx.transaction_id
+
+        return ""
+
+    def get_outgoing_tx_value(self, obj):
+        tx = self.get_outgoing_tx(obj)
+        if tx:
+            return tx.value
+
+        return 0
 
 
 class AddressVerifySerializer(serializers.Serializer):
@@ -716,6 +759,9 @@ class ApplicationSerializer(serializers.Serializer):
         if not currency_pair:
             raise serializers.ValidationError(_('specified "currency" not found.'))
 
+        attrs['exchanger_address'] = currency_pair.base_currency.exchanger_address if is_reverse_operation else \
+            currency_pair.reciprocal_currency.exchanger_address
+
         attrs['currency_pair_id'] = currency_pair.pk
 
         currency_pair_rate = currency_pair.currency_pair_rates.filter(id=rate_uuid).first()
@@ -747,7 +793,8 @@ class ApplicationSerializer(serializers.Serializer):
                                                      reciprocal_currency=self.validated_data['rec_currency'],
                                                      rate=self.validated_data['rate'],
                                                      base_amount=self.validated_data['base_amount'],
-                                                     reciprocal_amount=self.validated_data['reciprocal_amount'])
+                                                     reciprocal_amount=self.validated_data['reciprocal_amount'],
+                                                     exchanger_address=self.validated_data['exchanger_address'])
             application.save()
             self.validated_data['application_id'] = application.pk
 

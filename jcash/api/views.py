@@ -27,15 +27,17 @@ from rest_auth.app_settings import (
     JWTSerializer
 )
 from rest_auth.views import (
-    PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView
+    PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView, LoginView
 )
 from allauth.account.models import EmailAddress
 from allauth.account.utils import send_email_confirmation
 from jcash.api.models import (
     Address,
     Account,
+    AccountStatus,
     CurrencyPair,
     Application,
+    ApplicationStatus,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -60,15 +62,29 @@ from jcash.settings import ACCOUNT__MAX_ADDRESSES_COUNT
 logger = logging.getLogger(__name__)
 
 
+def get_class_members(obj):
+    _obj = obj()
+    return ",".join([attr for attr in dir(_obj) if not callable(getattr(_obj, attr)) and not attr.startswith("__")])
+
+
+def docstring_parameter(*sub):
+    def dec(obj):
+        obj.__doc__ = obj.__doc__.format(*sub)
+        return obj
+    return dec
+
+
+@docstring_parameter(get_class_members(AccountStatus))
 class AccountView(GenericAPIView):
     """
     get:
     Returns account info for current user.
 
-    Response example:
+    Response example
 
     ```
-    {"username":"ivan.ivanov@example.com",
+    {{"success":true,
+     "username":"ivan.ivanov@example.com",
      "first_name":"Ivan",
      "last_name":"Ivanov",
      "birthday":"1971-01-01",
@@ -77,8 +93,10 @@ class AccountView(GenericAPIView):
      "is_identity_verified":true,
      "is_identity_declined":false,
      "is_email_confirmed":true,
-     "status":"verified"}
+     "status":"verified"}}
     ```
+
+    **Statuses** <mark>[{0}]</mark>
 
     * Requires token authentication.
 
@@ -88,7 +106,8 @@ class AccountView(GenericAPIView):
     Response example:
 
     ```
-    {"username":"ivan.ivanov@example.com",
+    {{"success":true,
+     "username":"ivan.ivanov@example.com",
      "first_name":"Ivan",
      "last_name":"Ivanov",
      "birthday":"1971-01-01",
@@ -97,13 +116,13 @@ class AccountView(GenericAPIView):
      "is_identity_verified":true,
      "is_identity_declined":false,
      "is_email_confirmed":true,
-     "status":"verified"}
+     "status":"verified"}}
     ```
 
     or
 
     ```
-    {"success": false, "error": "error description"}
+    {{"success": false, "error": "error description"}}
     ```
 
     * Requires token authentication.
@@ -189,8 +208,8 @@ class CurrencyView(APIView):
     Response example:
 
     ```
-    [{"base_currency": "ETH","rec_currency": "jAED"},
-    {"base_currency": "jAED","rec_currency": "ETH"}]
+    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED"},
+    {"base_currency": "jAED","rec_currency": "ETH"}]}
     ```
 
     * Requires token authentication.
@@ -202,13 +221,13 @@ class CurrencyView(APIView):
     def get(self, request):
         currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
 
-        data = []
+        data = {"success": True, "currencies": []}
         for pair in currency_pairs:
             if pair.is_buyable:
-                data.append({"base_currency": pair.base_currency.display_name,
+                data["currencies"].append({"base_currency": pair.base_currency.display_name,
                              "rec_currency": pair.reciprocal_currency.display_name})
             if pair.is_sellable:
-                data.append({"base_currency": pair.reciprocal_currency.display_name,
+                data["currencies"].append({"base_currency": pair.reciprocal_currency.display_name,
                              "rec_currency": pair.base_currency.display_name})
         return Response(data)
 
@@ -286,7 +305,7 @@ class CurrencyRatesView(GenericAPIView):
     Response example:
 
     ```
-    [{"currency": "ETH/jAED","rate": 1799}]
+    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED","rate":1799.0}]}
     ```
     """
 
@@ -295,11 +314,12 @@ class CurrencyRatesView(GenericAPIView):
 
     @cache_response(20)
     def get(self, request):
-        currencyrates.feth_currency_price()
         currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
-        data = [{"currency": pair.display_name,
-                 "rate": pair.currency_pair_rates.last().buy_price \
-                     if pair.currency_pair_rates.last() else 0.0 } for pair in currency_pairs]
+        data = {'success': True,
+                'currencies':[{"base_currency": pair.base_currency.display_name,
+                               "rec_currency": pair.reciprocal_currency.display_name,
+                               "rate": pair.currency_pair_rates.last().buy_price \
+                     if pair.currency_pair_rates.last() else 0.0 } for pair in currency_pairs]}
         return Response(data)
 
 
@@ -348,9 +368,10 @@ class AddressView(GenericAPIView):
     Response example:
 
     ```
-    [{"address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
-      "type": "eth",
-      "is_verified": true}]
+    {"success":true,
+     "addresses":
+     [{"address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2","type": "eth","is_verified": true}]
+     }
     ```
 
     * Requires token authentication.
@@ -367,8 +388,7 @@ class AddressView(GenericAPIView):
      "is_verified":false,
      "message":"I, Ivan Ivanov, hereby confirm that I and only I own and have access to the private key of
      the address 0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2. Date: 2018 May 23 06:40 AM UTC",
-     "uuid":"a357e783-bcad-4d1e-a6d1-b0e80aec31e0",
-     "success":true}
+     "uuid":"a357e783-bcad-4d1e-a6d1-b0e80aec31e0"}
     ```
 
     or
@@ -387,7 +407,8 @@ class AddressView(GenericAPIView):
     def get(self, request):
         addresses_qs = Address.objects.filter(user=request.user)
         addresses = AddressesSerializer(addresses_qs, many=True).data
-        return Response(addresses)
+        response_data = {'success': True, 'addresses':addresses}
+        return Response(response_data)
 
     def post(self, request):
         if Account.is_user_email_confirmed(request.user) is False:
@@ -415,17 +436,18 @@ class CustomUserDetailsView(APIView):
 
     * Requires token authentication.
 
-    Default display fields: pk, username, email
-    Read-only fields: pk, username, email
+    Default display fields: username, email
+    Read-only fields: username, email
 
     Returns UserModel fields.
     """
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        return Response({'pk':request.user.pk, 'username':request.user.username, 'email':request.user.email})
+        return Response({'success':True, 'username':request.user.username, 'email':request.user.email})
 
 
+@docstring_parameter(get_class_members(ApplicationStatus))
 class ApplicationView(GenericAPIView):
     """
     View get/set exchange application.
@@ -434,6 +456,30 @@ class ApplicationView(GenericAPIView):
 
     get:
     Returns an exchange history for current user.
+
+    Response example:
+
+    ```
+    {{"success":true, "applications":
+    [{{
+    "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b",
+    "created_at": "2018-05-22T16:08:21.132030Z",
+    "incoming_tx_id": "0x1234543431",
+    "outgoing_tx_id": "",
+    "incoming_tx_value": 2,
+    "outgoing_tx_value": 0,
+    "source_address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
+    "exchanger_address": "0x55555555",
+    "base_currency": "ETH",
+    "base_amount": 1,
+    "reciprocal_currency": "jAED",
+    "reciprocal_amount": 1799,
+    "rate": 1799,
+    "status": "converting"
+    }}]}}
+    ```
+
+    **Statuses** <mark>[{0}]</mark>
 
     post:
     Create a new exchange application for current user.
@@ -468,6 +514,18 @@ class ApplicationConfirmView(GenericAPIView):
 
     Returns the success/fail message.
 
+    Response example:
+
+    ```
+    {"success":true}
+    ```
+
+    or
+
+    ```
+    {"success": false, "error": "error description"}
+    ```
+
     * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
@@ -493,6 +551,18 @@ class ApplicationRefundView(GenericAPIView):
     Changes status of application to cancel exchange operation end refund.
 
     Returns the success/fail message.
+
+    Response example:
+
+    ```
+    {"success":true}
+    ```
+
+    or
+
+    ```
+    {"success": false, "error": "error description"}
+    ```
 
     * Requires token authentication.
     """
@@ -528,6 +598,7 @@ class RegisterView(RestAuthRegisterView):
             serializer_data = JWTSerializer(data).data
         else:
             serializer_data =  TokenSerializer(user.auth_token).data
+        serializer_data['success'] = True
         return serializer_data
 
 
@@ -595,7 +666,12 @@ class CustomVerifyEmailView(VerifyEmailView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.kwargs['key'] = serializer.validated_data['key']
-        confirmation = self.get_object()
+
+        try:
+            confirmation = self.get_object()
+        except:
+            return Response({'success': False, 'error': 'failed'}, status=404)
+
         confirmation.confirm(self.request)
         return Response({'success': True}, status=status.HTTP_200_OK)
 
@@ -617,3 +693,20 @@ class CustomLogoutView(LogoutView):
 
         return Response({"success": True},
                         status=status.HTTP_200_OK)
+
+
+class CustomLoginView(LoginView):
+    """
+    Check the credentials and return the REST Token
+    if the credentials are valid and authenticated.
+    Calls Django Auth login method to register User ID
+    in Django session framework
+
+    Accept the following POST parameters: username, password
+    Return the REST Framework Token Object's key.
+    """
+    def get_response(self):
+        response = super().get_response()
+        response.data['success'] = True
+
+        return response

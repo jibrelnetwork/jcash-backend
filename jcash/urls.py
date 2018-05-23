@@ -23,7 +23,7 @@ from jcash.api.views import (
     ResendEmailConfirmationView, CustomUserDetailsView,
     RegisterView, CustomPasswordChangeView, CustomPasswordResetView,
     CustomPasswordResetConfirmView, CustomVerifyEmailView,
-    CustomLogoutView,
+    CustomLogoutView, CustomLoginView,
 )
 from rest_auth.views import (
     LoginView
@@ -39,7 +39,7 @@ urlpatterns = [
         name='rest_password_reset'),
     url(r'^auth/password/reset/confirm/$', CustomPasswordResetConfirmView.as_view(),
         name='rest_password_reset_confirm'),
-    url(r'^auth/login/$', LoginView.as_view(), name='rest_login'),
+    url(r'^auth/login/$', CustomLoginView.as_view(), name='rest_login'),
     url(r'^auth/logout/$', CustomLogoutView.as_view(), name='rest_logout'),
     url(r'^auth/user/$', CustomUserDetailsView.as_view(), name='rest_user_details'),
     url(r'^auth/password/change/$', CustomPasswordChangeView.as_view(),
