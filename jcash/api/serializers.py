@@ -460,10 +460,6 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
         return self.set_password_form.save()
 
 
-class ResendEmailConfirmationSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True, allow_blank=False)
-
-
 class OperationConfirmSerializer(serializers.Serializer):
     operation_id = serializers.CharField()
     token = serializers.CharField()

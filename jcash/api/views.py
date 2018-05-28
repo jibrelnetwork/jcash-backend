@@ -44,7 +44,6 @@ from jcash.api.serializers import (
     AddressesSerializer,
     AddressSerializer,
     AddressVerifySerializer,
-    ResendEmailConfirmationSerializer,
     DocumentSerializer,
     CurrencyRateSerializer,
     OpenCurrencyRateSerializer,
@@ -184,20 +183,13 @@ class ResendEmailConfirmationView(GenericAPIView):
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
-    serializer_class = ResendEmailConfirmationSerializer
 
-    @cache_response(20)
     def post(self, request):
-        serializer = ResendEmailConfirmationSerializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                user = User.objects.get(username=serializer.data['email'])
-            except User.DoesNotExist:
-                return Response({'success': False, 'error': [_('No such user')]}, status=400)
-            else:
-                send_email_confirmation(request, user)
-                return Response({'success': True})
-        return Response(serializer.errors, status=400)
+        try:
+            send_email_confirmation(request, request.user)
+        except:
+            return Response({'success': False, 'error': [_('Resend email confirmation failed')]}, status=400)
+        return Response({'success': True})
 
 
 class CurrencyView(APIView):
