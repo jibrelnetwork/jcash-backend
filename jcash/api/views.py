@@ -54,7 +54,6 @@ from jcash.api.serializers import (
     ApplicationConfirmSerializer,
     ApplicationRefundSerializer,
 )
-from jcash.api import tasks
 from jcash.commonutils import currencyrates
 from jcash.settings import ACCOUNT__MAX_ADDRESSES_COUNT
 
@@ -159,8 +158,8 @@ class AccountView(GenericAPIView):
         account = self.ensure_account(request)
         self.action = request.method.lower()
         serializer = self.get_serializer_class()(data=request.data)
-        if serializer.is_valid():
-            serializer.save(account)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save(account, request)
             self.maybe_start_identity_verification(account)
             serializer_get = self.serializer_classes.get('get')(account)
             return Response(serializer_get.data, 201)

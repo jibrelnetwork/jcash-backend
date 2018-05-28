@@ -13,6 +13,7 @@ from django.utils.encoding import force_text
 
 from jcash.api.models import Address, Account
 from jcash.api.views import AccountView
+from jcash.commonutils.notify import send_email_verify_email
 
 import logging
 
@@ -57,10 +58,6 @@ class AccountAdapter(DefaultAccountAdapter):
             request,
             emailconfirmation)
 
-        logger.info("{} {}".format(emailconfirmation.email_address.email, activate_url))
-
-        #send_email_verify_email(
-        #    emailconfirmation.email_address.email,
-        #    activate_url,
-        #    emailconfirmation.email_address.user.pk
-        #)
+        send_email_verify_email(emailconfirmation.email_address.email,
+                                activate_url,
+                                emailconfirmation.email_address.user.pk)

@@ -30,3 +30,4 @@ six==1.11.0
 urllib3==1.22
 uritemplate==3.0.0
 web3==4.2.0
+-e git+https://github.com/onfido/api-python-client.git@c6aa7f838d6bab239bd971d12f208892d4911d81#egg=onfido

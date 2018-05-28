@@ -16,14 +16,6 @@ from django.contrib.sites.shortcuts import get_current_site
 logger = logging.getLogger(__name__)
 
 
-NOTIFICATION_KEYS = {
-}
-
-
-NOTIFICATION_SUBJECTS = {
-}
-
-
 # Account statuses
 class AccountStatus:
     blocked = 'blocked'
@@ -62,6 +54,7 @@ class Account(models.Model):
 
     comment = models.TextField(null=True, blank=True)
     tracking = JSONField(blank=True, default=dict)
+    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     rel_applications = 'applications'
     rel_documents = 'documents'
@@ -134,12 +127,10 @@ class DocumentHelper:
 # Document model
 class Document(models.Model):
     image = models.FileField('uploaded document', upload_to=DocumentHelper.unique_document_filename)  # stores the uploaded documents
-    url = models.URLField(max_length=250, null=False, blank=True)
     ext = models.CharField(max_length=20, null=False, blank=True)
     type = models.CharField(max_length=20, null=False, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
     onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
     onfido_check_id = models.CharField(max_length=200, null=True, blank=True)
     onfido_check_status = models.CharField(max_length=200, null=True, blank=True)
@@ -195,6 +186,14 @@ class AddressVerify(models.Model):
         db_table = 'address_verify'
 
 
+class NotificationType:
+    # Registration
+    account_created         = 'account_created'
+    account_email_confirmed = 'account_email_confirmed'
+    password_change_request = 'password_change_request'
+    password_changed        = 'password_changed'
+
+
 class Notification(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=True, null=True, related_name='notifications')
@@ -211,20 +210,38 @@ class Notification(models.Model):
     class Meta:
         db_table = 'notification'
 
+    notification_keys = {
+        NotificationType.account_created: 'registration_01',
+        NotificationType.account_email_confirmed: 'registration_02',
+        NotificationType.password_change_request: 'account_01_01',
+        NotificationType.password_changed: 'account_01_02',
+    }
+
+    notification_subjects = {
+        'account_01_01': 'Password change request',
+        'account_01_02': 'Your password was updated',
+        'registration_01': 'Verify your email address',
+        'registration_02': 'Accessing your jCash',
+    }
+
     def __str__(self):
         return '{} [{}, {}]'.format(self.type, self.created, self.is_sended)
 
-    def get_subject(self):
-        return NOTIFICATION_SUBJECTS[self.get_key()].format(**self.meta)
+    @classmethod
+    def get_subject(cls, type, data):
+        return cls.notification_subjects[cls.get_key(type)].format(**data)
 
-    def get_template(self):
-        return "{}.html".format(self.get_key())
+    @classmethod
+    def get_template(cls, type):
+        return "{}.html".format(cls.get_key(type))
 
-    def get_key(self):
-        return NOTIFICATION_KEYS[self.type]
+    @classmethod
+    def get_key(cls, type):
+        return cls.notification_keys[type]
 
-    def get_body(self):
-        return render_to_string(self.get_template(), self.meta)
+    @classmethod
+    def get_body(cls, type, data):
+        return render_to_string(cls.get_template(type), data)
 
 
 class Affiliate(models.Model):
