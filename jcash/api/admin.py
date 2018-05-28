@@ -27,9 +27,9 @@ from jcash.api.models import (
     IncomingTransaction,
     Exchange,
     Refund,
+    Notification,
 )
 
-from jcash.api import tasks
 from jcash.api import serializers
 from jcash.api import utils
 #from jcash.commonutils import ga_integration
@@ -164,6 +164,11 @@ class RefundAdmin(admin.ModelAdmin):
                     'block_height', 'status']
 
 
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'created', 'type', 'email', 'is_sended', 'sended']
+
+
 admin.site.unregister(EmailAddress)
 
 
@@ -182,4 +187,3 @@ class EmailAddress(ReadonlyMixin, admin.ModelAdmin):
             email.save()
         op_names = ', '.join([em.email for em in emails])
         self.message_user(request, "Emails {} was marked as verified".format(op_names))
-

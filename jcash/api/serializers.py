@@ -28,7 +28,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus
 )
 from jcash.commonutils import eth_sign, eth_address
-from jcash.api import tasks
+from jcash.commonutils.notify import send_email_reset_password
 
 
 logger = logging.getLogger(__name__)
@@ -301,7 +301,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         activate_url = '{protocol}://{domain}/#/auth/recovery/confirm/{uid}/{token}'.format(**context)
         logger.info("{} {}".format(to_email, activate_url))
-        #!!send_email_reset_password(to_email, activate_url, None)
+        send_email_reset_password(to_email, activate_url, None)
 
 
 class CustomPasswordResetSerializer(PasswordResetSerializer):
@@ -484,20 +484,23 @@ class DocumentSerializer(serializers.Serializer):
                   'last_name', 'birthday', 'citizenship',
                   'residency')
 
-    def save(self, account):
+    def get_document_url(self, request, path):
+        return "{}://{}{}".format("https" if request.is_secure() else "http",
+                                  request.get_host(),
+                                  path)
+
+    def save(self, account, request):
         current_site = Site.objects.get_current()
 
         with transaction.atomic():
             passport_document = Document.objects.create(user=account.user)
             passport_document.image = self.validated_data['passport']
             passport_document.type = 'passport'
-            passport_document.url = "https://{}{}".format("saleapi.jibrel.network", passport_document.image.url)
             passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
             passport_document.save()
             utilitybills_document = Document.objects.create(user=account.user)
             utilitybills_document.image = self.validated_data['utilitybills']
             utilitybills_document.type = 'utilitybills'
-            utilitybills_document.url = "https://{}{}".format("saleapi.jibrel.network", utilitybills_document.image.url)
             utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
             utilitybills_document.save()
             account.first_name = self.validated_data['first_name']
