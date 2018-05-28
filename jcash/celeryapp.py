@@ -11,4 +11,4 @@ celery_app = celery.Celery(
     broker=django.conf.settings.CELERY_BROKER_URL,
 )
 celery_app.config_from_object('django.conf:settings', namespace='CELERY')
-celery_app.autodiscover_tasks()
+celery_app.autodiscover_tasks(['jcash.celery_tasks'], force=True)
