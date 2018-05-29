@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 def get_status_class_members(obj):
     def get_description(obj, attr):
-        return "*{}* - {}".format(getattr(getattr(obj,attr), 'name'),
+        return "<mark>{}</mark> - {}".format(getattr(getattr(obj,attr), 'name'),
                                 getattr(getattr(obj,attr), 'description'))
 
     _obj = obj()
