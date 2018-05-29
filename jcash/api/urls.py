@@ -9,6 +9,7 @@ urlpatterns = [
     url(r'^account/', views.AccountView.as_view()),
     url(r'^address/$', views.AddressView.as_view()),
     url(r'^address-verify/$', views.AddressVerifyView.as_view()),
+    url(r'^address-remove/$', views.RemoveAddressView.as_view()),
     url(r'^currency/', views.CurrencyView.as_view()),
     url(r'^currency-rates/', views.CurrencyRatesView.as_view()),
     url(r'^currency-rate/', views.CurrencyRateView.as_view()),
