@@ -712,7 +712,7 @@ class RemoveAddressSerializer(serializers.Serializer):
         fields = ('address')
 
     def save(self):
-        address = self.validated_data['address']
+        address = self.validated_data['address_obj']
         with transaction.atomic():
             address.is_removed = True
             address.save()
@@ -728,6 +728,8 @@ class RemoveAddressSerializer(serializers.Serializer):
 
         if address.is_removed:
             raise serializers.ValidationError(_('address already removed.'))
+
+        attrs['address_obj'] = address
 
         return attrs
 
