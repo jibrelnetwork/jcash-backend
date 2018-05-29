@@ -4,6 +4,8 @@ from operator import itemgetter
 import logging
 import coreapi
 import coreschema
+import inspect
+import sys
 from allauth.account import app_settings as allauth_settings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -38,6 +40,7 @@ from jcash.api.models import (
     CurrencyPair,
     Application,
     ApplicationStatus,
+    ObjStatus,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -62,9 +65,14 @@ from jcash.settings import ACCOUNT__MAX_ADDRESSES_COUNT
 logger = logging.getLogger(__name__)
 
 
-def get_class_members(obj):
+def get_status_class_members(obj):
+    def get_description(obj, attr):
+        return "*{}* - {}".format(getattr(getattr(obj,attr), 'name'),
+                                getattr(getattr(obj,attr), 'description'))
+
     _obj = obj()
-    return ",".join([attr for attr in dir(_obj) if not callable(getattr(_obj, attr)) and not attr.startswith("__")])
+    return ", ".join([get_description(_obj, attr) for attr in dir(_obj) \
+                         if not callable(getattr(_obj, attr)) and not attr.startswith("__")])
 
 
 def docstring_parameter(*sub):
@@ -74,7 +82,7 @@ def docstring_parameter(*sub):
     return dec
 
 
-@docstring_parameter(get_class_members(AccountStatus))
+@docstring_parameter(get_status_class_members(AccountStatus))
 class AccountView(GenericAPIView):
     """
     get:
@@ -96,7 +104,9 @@ class AccountView(GenericAPIView):
      "status":"verified"}}
     ```
 
-    **Statuses** <mark>[{0}]</mark>
+    **Statuses**
+
+    {0}
 
     * Requires token authentication.
 
@@ -126,18 +136,22 @@ class AccountView(GenericAPIView):
     ```
 
     post:
-    Set account info current user.
+    Set account info for current user.
 
     Response example:
 
     ```
     {{"success":true,
-
      "username":"ivan.ivanov@example.com",
-
-     ...
-
-     }}
+     "first_name":"Ivan",
+     "last_name":"Ivanov",
+     "birthday":"1971-01-01",
+     "citizenship":"Russia",
+     "residency":"Russia",
+     "is_identity_verified":true,
+     "is_identity_declined":false,
+     "is_email_confirmed":true,
+     "status":"verified"}}
     ```
 
     * Requires token authentication.
@@ -151,9 +165,14 @@ class AccountView(GenericAPIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser,)
 
     def get_serializer_class(self):
-        if not hasattr(self, 'action'):
-            action = 'put' if 'PUT' in self.allowed_methods else 'get'
-        else:
+        action = 'get'
+        frame = sys._getframe(2)
+        if frame:
+            args = inspect.getargvalues(frame)
+            if args and 'method' in args.locals and 'path' in args.locals:
+                action = args.locals['method'].lower()
+
+        if hasattr(self, 'action'):
             action = self.action
 
         return self.serializer_classes.get(action, AccountSerializer)
@@ -463,7 +482,7 @@ class CustomUserDetailsView(APIView):
         return Response({'success':True, 'username':request.user.username, 'email':request.user.email})
 
 
-@docstring_parameter(get_class_members(ApplicationStatus))
+@docstring_parameter(get_status_class_members(ApplicationStatus))
 class ApplicationView(GenericAPIView):
     """
     View get/set exchange application.
@@ -495,7 +514,9 @@ class ApplicationView(GenericAPIView):
     }}]}}
     ```
 
-    **Statuses** <mark>[{0}]</mark>
+    **Statuses**
+
+    {0}
 
     post:
     Create a new exchange application for current user.

@@ -125,7 +125,7 @@ class DocumentAdmin(admin.ModelAdmin):
 @admin.register(Currency)
 class CurrencyAdmin(admin.ModelAdmin):
     list_display = ['created_at', 'display_name', 'symbol', 'exchanger_address', 'view_address',
-                    'controller_address','is_erc20_token','balance']
+                    'controller_address','is_erc20_token','balance','abi']
 
 
 @admin.register(CurrencyPair)

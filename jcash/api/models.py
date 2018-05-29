@@ -16,13 +16,23 @@ from django.contrib.sites.shortcuts import get_current_site
 logger = logging.getLogger(__name__)
 
 
+# ObjStatus
+class ObjStatus:
+    def __init__(self, name, description):
+        self.name = name
+        self.description = description
+
+    def __repr__(self):
+        return self.name
+
+
 # Account statuses
 class AccountStatus:
-    blocked = 'blocked'
-    pending = 'pending'
-    verified = 'verified'
-    declined = 'declined'
-    created = 'created'
+    blocked = ObjStatus('blocked', 'blocked account')
+    pending = ObjStatus('pending', 'user''s documents in pending mode')
+    verified = ObjStatus('verified', 'verified account')
+    declined = ObjStatus('declined', 'declined account')
+    created = ObjStatus('created', 'new account')
 
 
 # Account model
@@ -272,6 +282,7 @@ class Currency(models.Model):
     is_erc20_token = models.BooleanField(default=False)
     balance = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
+    abi = JSONField(default=dict)
 
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
@@ -326,15 +337,16 @@ class AccountAddress(models.Model):
 
 # ApplicationStatus
 class ApplicationStatus:
-    created = 'created'
-    rejected = 'rejected'
-    cancelled = 'cancelled'
-    confirming = 'confirming'
-    confirmed = 'confirmed'
-    converting = 'converting'
-    converted = 'converted'
-    refunding = 'refunding'
-    refunded = 'refunded'
+    created = ObjStatus('created', 'new application')
+    rejected = ObjStatus('rejected', 'we received unexpected value (and CAN NOT go further)')
+    cancelled = ObjStatus('cancelled', 'user clicked back')
+    waiting = ObjStatus('waiting', 'waiting for user tx')
+    confirming = ObjStatus('confirming', 'we received unexpected value (and CAN go further)')
+    confirmed = ObjStatus('confirmed', 'clicked "Yes, convert"')
+    converting = ObjStatus('converting', 'we sent tx but it was not mined')
+    converted = ObjStatus('converted', 'converted, tx is mined')
+    refunding = ObjStatus('refunding', 'clicked "No, refund" (tx is in progress, not mined yet)')
+    refunded = ObjStatus('refunded', 'refunded, tx is mined')
 
 
 # Application
@@ -381,11 +393,13 @@ class TransactionStatus:
 
 # IncomingTransaction
 class IncomingTransaction(models.Model):
-    transaction_id = models.CharField(max_length=120, null=True, blank=True)
-    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_incoming_txs)
-    created_at = models.DateTimeField()
+    transaction_id = models.CharField(max_length=120, null=False, blank=False, unique=True)
+    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_incoming_txs, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
+    from_address = models.CharField(max_length=120, null=True, blank=True)
+    to_address = models.CharField(max_length=120, null=True, blank=True)
     value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
