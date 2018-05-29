@@ -505,10 +505,11 @@ class RemoveAddressView(GenericAPIView):
         if not request.user.account.is_identity_verified:
             return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
 
-        serializer = RemoveAddressSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        serializer = RemoveAddressSerializer(data=request.data, context={'user': request.user})
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
 
-        return self.get_account_addresses(request)
+        return AddressView.get_account_addresses(request)
 
 
 class CustomUserDetailsView(APIView):
