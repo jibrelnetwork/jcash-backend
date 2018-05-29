@@ -460,12 +460,73 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
         return self.set_password_form.save()
 
 
+class ResendEmailConfirmationSerializer(serializers.Serializer):
+    pass
+
+
 class OperationConfirmSerializer(serializers.Serializer):
     operation_id = serializers.CharField()
     token = serializers.CharField()
 
 
-class DocumentSerializer(serializers.Serializer):
+class DocumentPutSerializer(serializers.Serializer):
+    passport = serializers.FileField(required=False)
+    utilitybills = serializers.FileField(required=False)
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+    birthday = serializers.DateField(required=False)
+
+    class Meta:
+        model = Document
+        fields = ('passport', 'utilitybills', 'first_name'
+                  'last_name', 'birthday', 'citizenship', 'residency')
+
+    def get_document_url(self, request, path):
+        return "{}://{}{}".format("https" if request.is_secure() else "http",
+                                  request.get_host(),
+                                  path)
+
+    def save(self, account):
+        current_site = Site.objects.get_current()
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('passport') and self.validated_data.get('passport'):
+                is_updated = True
+                passport_document = Document.objects.create(user=account.user)
+                passport_document.image = self.validated_data['passport']
+                passport_document.type = 'passport'
+                passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
+                passport_document.save()
+            if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
+                is_updated = True
+                utilitybills_document = Document.objects.create(user=account.user)
+                utilitybills_document.image = self.validated_data['utilitybills']
+                utilitybills_document.type = 'utilitybills'
+                utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
+                utilitybills_document.save()
+            if serializer_fields.get('first_name') and self.validated_data.get('first_name'):
+                is_updated = True
+                account.first_name = self.validated_data['first_name']
+            if serializer_fields.get('last_name') and self.validated_data.get('last_name'):
+                is_updated = True
+                account.last_name = self.validated_data['last_name']
+            if serializer_fields.get('citizenship') and self.validated_data.get('citizenship'):
+                is_updated = True
+                account.citizenship = self.validated_data['citizenship']
+            if serializer_fields.get('birthday') and self.validated_data.get('birthday'):
+                is_updated = True
+                account.birthday = self.validated_data['birthday']
+            if serializer_fields.get('residency') and self.validated_data.get('residency'):
+                is_updated = True
+                account.residency = self.validated_data['residency']
+            if is_updated:
+                account.last_updated_at = timezone.now()
+            account.save()
+
+
+class DocumentPostSerializer(DocumentPutSerializer):
     passport = serializers.FileField(required=True)
     utilitybills = serializers.FileField(required=True)
     first_name = serializers.CharField(required=True)
@@ -484,28 +545,6 @@ class DocumentSerializer(serializers.Serializer):
         return "{}://{}{}".format("https" if request.is_secure() else "http",
                                   request.get_host(),
                                   path)
-
-    def save(self, account, request):
-        current_site = Site.objects.get_current()
-
-        with transaction.atomic():
-            passport_document = Document.objects.create(user=account.user)
-            passport_document.image = self.validated_data['passport']
-            passport_document.type = 'passport'
-            passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
-            passport_document.save()
-            utilitybills_document = Document.objects.create(user=account.user)
-            utilitybills_document.image = self.validated_data['utilitybills']
-            utilitybills_document.type = 'utilitybills'
-            utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
-            utilitybills_document.save()
-            account.first_name = self.validated_data['first_name']
-            account.last_name = self.validated_data['last_name']
-            account.citizenship = self.validated_data['citizenship']
-            account.birthday = self.validated_data['birthday']
-            account.residency = self.validated_data['residency']
-            account.last_updated_at = timezone.now()
-            account.save()
 
 
 class AddressesSerializer(serializers.ModelSerializer):

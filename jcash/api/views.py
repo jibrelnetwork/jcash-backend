@@ -44,7 +44,8 @@ from jcash.api.serializers import (
     AddressesSerializer,
     AddressSerializer,
     AddressVerifySerializer,
-    DocumentSerializer,
+    DocumentPutSerializer,
+    DocumentPostSerializer,
     CurrencyRateSerializer,
     OpenCurrencyRateSerializer,
     CurrencySerializer,
@@ -52,6 +53,7 @@ from jcash.api.serializers import (
     ApplicationsSerializer,
     ApplicationConfirmSerializer,
     ApplicationRefundSerializer,
+    ResendEmailConfirmationSerializer,
 )
 from jcash.commonutils import currencyrates
 from jcash.settings import ACCOUNT__MAX_ADDRESSES_COUNT
@@ -123,12 +125,28 @@ class AccountView(GenericAPIView):
     {{"success": false, "error": "error description"}}
     ```
 
+    post:
+    Set account info current user.
+
+    Response example:
+
+    ```
+    {{"success":true,
+
+     "username":"ivan.ivanov@example.com",
+
+     ...
+
+     }}
+    ```
+
     * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_classes = {
         'get': AccountSerializer,
-        'put': DocumentSerializer,
+        'put': DocumentPutSerializer,
+        'post': DocumentPostSerializer
     }
     parser_classes = (MultiPartParser, FormParser, JSONParser,)
 
@@ -147,6 +165,17 @@ class AccountView(GenericAPIView):
             account = Account.objects.create(user=request.user)
         return account
 
+    def update_account_info(self, request):
+        account = self.ensure_account(request)
+        self.action = request.method.lower()
+        serializer = self.get_serializer_class()(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save(account)
+            self.maybe_start_identity_verification(account)
+            serializer_get = self.serializer_classes.get('get')(account)
+
+            return Response(serializer_get.data, 201)
+
     def get(self, request):
         account = self.ensure_account(request)
         self.action = request.method.lower()
@@ -154,15 +183,10 @@ class AccountView(GenericAPIView):
         return Response(serializer.data)
 
     def put(self, request):
-        account = self.ensure_account(request)
-        self.action = request.method.lower()
-        serializer = self.get_serializer_class()(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save(account, request)
-            self.maybe_start_identity_verification(account)
-            serializer_get = self.serializer_classes.get('get')(account)
-            return Response(serializer_get.data, 201)
-        return Response({'error': serializer.errors}, status=400)
+        return self.update_account_info(request)
+
+    def post(self, request):
+        return self.update_account_info(request)
 
     def maybe_start_identity_verification(self, account):
         #if account.document_url and not account.onfido_check_id:
@@ -183,6 +207,7 @@ class ResendEmailConfirmationView(GenericAPIView):
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = ResendEmailConfirmationSerializer
 
     def post(self, request):
         try:
