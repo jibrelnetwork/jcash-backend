@@ -46,6 +46,7 @@ from jcash.api.serializers import (
     AccountSerializer,
     AddressesSerializer,
     AddressSerializer,
+    RemoveAddressSerializer,
     AddressVerifySerializer,
     DocumentPutSerializer,
     DocumentPostSerializer,
@@ -439,11 +440,15 @@ class AddressView(GenericAPIView):
     serializer_class = AddressSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        addresses_qs = Address.objects.filter(user=request.user)
+    @classmethod
+    def get_account_addresses(cls, request):
+        addresses_qs = Address.objects.filter(user=request.user, is_removed=False)
         addresses = AddressesSerializer(addresses_qs, many=True).data
         response_data = {'success': True, 'addresses':addresses}
         return Response(response_data)
+
+    def get(self, request):
+        return self.get_account_addresses(request)
 
     def post(self, request):
         if Account.is_user_email_confirmed(request.user) is False:
@@ -462,6 +467,48 @@ class AddressView(GenericAPIView):
             return Response(serializer.validated_data)
 
         return Response({"success": False, "error": serializer.errors}, status=400)
+
+
+class RemoveAddressView(GenericAPIView):
+    """
+    Remove address for account.
+
+    post:
+    Remove an address for current user.
+
+    Response example:
+
+    ```
+    {"success":true,
+     "addresses":
+     [{"address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2","type": "eth","is_verified": true}]
+     }
+    ```
+
+    or
+
+    ```
+    {"success": false, "error": "error description"}
+    ```
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = RemoveAddressSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        if Account.is_user_email_confirmed(request.user) is False:
+            return Response({"success": False, "error":"Please confirm the e-mail"}, status=400)
+
+        if not request.user.account.is_identity_verified:
+            return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
+
+        serializer = RemoveAddressSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        return self.get_account_addresses(request)
 
 
 class CustomUserDetailsView(APIView):

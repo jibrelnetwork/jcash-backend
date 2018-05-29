@@ -110,22 +110,22 @@ class AccountSerializer(serializers.ModelSerializer):
         if not obj:
             return ''
         elif obj.is_blocked:
-            return AccountStatus.blocked
+            return str(AccountStatus.blocked)
         elif is_personal_data_filled(obj) and \
             obj.user.documents.count() >= 2 and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
-            return AccountStatus.pending
+            return str(AccountStatus.pending)
         elif is_personal_data_filled(obj) and \
             obj.is_identity_verified and \
             not obj.is_identity_declined:
-            return AccountStatus.verified
+            return str(AccountStatus.verified)
         elif is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \
             obj.is_identity_declined:
-            return AccountStatus.declined
+            return str(AccountStatus.declined)
         else:
-            return AccountStatus.created
+            return str(AccountStatus.created)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -621,16 +621,16 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         return 0
 
     def get_outgoing_tx(self, obj):
-        if obj.status == ApplicationStatus.converting or \
-                obj.status == ApplicationStatus.converted:
+        if obj.status == str(ApplicationStatus.converting) or \
+                obj.status == str(ApplicationStatus.converted):
             try:
                 txs = Exchange.objects.filter(application=obj)
                 return txs[0] if len(txs) > 0 else None
             except:
                 return None
-        elif obj.status == ApplicationStatus.refunding or \
-                obj.status == ApplicationStatus.refunded or \
-                obj.status == ApplicationStatus.rejected:
+        elif obj.status == str(ApplicationStatus.refunding) or \
+                obj.status == str(ApplicationStatus.refunded) or \
+                obj.status == str(ApplicationStatus.rejected):
             try:
                 txs = Refund.objects.filter(application=obj)
                 return txs[0] if len(txs) > 0 else None
@@ -702,6 +702,34 @@ class OpenCurrencyRateSerializer(serializers.Serializer):
 
 class CurrencySerializer(serializers.Serializer):
     pass
+
+
+class RemoveAddressSerializer(serializers.Serializer):
+    address = serializers.CharField(required=True, allow_blank=False)
+
+    class Meta:
+        model = Address
+        fields = ('address')
+
+    def save(self):
+        address = self.validated_data['address']
+        with transaction.atomic():
+            address.is_removed = True
+            address.save()
+
+    def validate(self, attrs):
+        user = self.context.get('user')
+        if not user:
+            raise serializers.ValidationError(_('Unknown user.'))
+        try:
+            address = Address.objects.get(address__iexact=attrs.get('address'), user=user)
+        except Address.DoesNotExist:
+            raise serializers.ValidationError(_('address does not exist.'))
+
+        if address.is_removed:
+            raise serializers.ValidationError(_('address already removed.'))
+
+        return attrs
 
 
 class AddressSerializer(serializers.Serializer):
@@ -851,7 +879,7 @@ class ApplicationRefundSerializer(serializers.Serializer):
     def save(self):
         with transaction.atomic():
             if self.application:
-                self.application.status = ApplicationStatus.refunding
+                self.application.status = str(ApplicationStatus.refunding)
                 self.application.save()
 
 
@@ -869,5 +897,5 @@ class ApplicationConfirmSerializer(serializers.Serializer):
     def save(self):
         with transaction.atomic():
             if self.application:
-                self.application.status = ApplicationStatus.converting
+                self.application.status = str(ApplicationStatus.converting)
                 self.application.save()

@@ -25,6 +25,9 @@ class ObjStatus:
     def __repr__(self):
         return self.name
 
+    def __str__(self):
+        return self.name
+
 
 # Account statuses
 class AccountStatus:
@@ -163,6 +166,7 @@ class Address(models.Model):
     type = models.CharField(max_length=10)
     is_verified = models.BooleanField(default=False)
     is_rejected = models.BooleanField(default=False)
+    is_removed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     meta = JSONField(default=dict)  # This field type is a guess.
 
@@ -371,7 +375,7 @@ class Application(models.Model):
     reciprocal_amount = models.FloatField()
 
     created_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=10, default=ApplicationStatus.created)
+    status = models.CharField(max_length=10, default=str(ApplicationStatus.created))
     meta = JSONField(default=dict)
 
     rel_exchanges = 'exchanges'
