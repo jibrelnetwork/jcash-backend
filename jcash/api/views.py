@@ -314,8 +314,8 @@ class CurrencyRateView(GenericAPIView):
 
             if not currency_pair:
                 currency_pair = CurrencyPair.objects.filter(
-                    base_currency__display_name=serializer.validated_data['rec_currency'],
-                    reciprocal_currency__display_name=serializer.validated_data['base_currency']
+                    base_currency__display_name__iexact=serializer.validated_data['rec_currency'],
+                    reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']
                 ).first()
                 is_reverse_operation = True
 
