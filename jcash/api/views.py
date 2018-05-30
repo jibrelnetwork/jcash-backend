@@ -166,15 +166,18 @@ class AccountView(GenericAPIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser,)
 
     def get_serializer_class(self):
+        """
+        Get serializer class.
+        Attention! Do not use it (documentation API only)
+        :return: serializer
+        """
         action = 'get'
-        frame = sys._getframe(2)
-        if frame:
-            args = inspect.getargvalues(frame)
-            if args and 'method' in args.locals and 'path' in args.locals:
-                action = args.locals['method'].lower()
-
-        if hasattr(self, 'action'):
-            action = self.action
+        if not hasattr(self, 'action'):
+            frame = sys._getframe(2)
+            if frame:
+                args = inspect.getargvalues(frame)
+                if args and 'method' in args.locals and 'path' in args.locals:
+                    action = args.locals['method'].lower()
 
         return self.serializer_classes.get(action, AccountSerializer)
 
@@ -188,7 +191,8 @@ class AccountView(GenericAPIView):
     def update_account_info(self, request):
         account = self.ensure_account(request)
         self.action = request.method.lower()
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer_class = self.serializer_classes.get(self.action)
+        serializer = serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             serializer.save(account)
             self.maybe_start_identity_verification(account)
@@ -199,7 +203,7 @@ class AccountView(GenericAPIView):
     def get(self, request):
         account = self.ensure_account(request)
         self.action = request.method.lower()
-        serializer = self.get_serializer_class()(account)
+        serializer = AccountSerializer(account)
         return Response(serializer.data)
 
     def put(self, request):
@@ -457,9 +461,9 @@ class AddressView(GenericAPIView):
         if not request.user.account.is_identity_verified:
             return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
 
-        addresses = Address.objects.filter(user=request.user)
+        addresses = Address.objects.filter(user=request.user, is_removed=False)
         if len(addresses) >= ACCOUNT__MAX_ADDRESSES_COUNT:
-            return Response({"success": False, "error": "Couldn't add new address. Too many addresses."}, status=400)
+            return Response({"success": False, "error": "Too many addresses."}, status=400)
 
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):

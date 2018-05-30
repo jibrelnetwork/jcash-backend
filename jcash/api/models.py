@@ -167,6 +167,7 @@ class Address(models.Model):
     is_verified = models.BooleanField(default=False)
     is_rejected = models.BooleanField(default=False)
     is_removed = models.BooleanField(default=False)
+    is_allowed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     meta = JSONField(default=dict)  # This field type is a guess.
 
