@@ -9,88 +9,6 @@ from .alphavantage import Alphavantage
 from jcash.api.models import Currency, CurrencyPair, CurrencyPairRate
 
 
-def fetch_crypto_price(base_currency: str, reciprocal_currency: str, symbol: str):
-    """
-    Fetch exchangeable currency price.
-    :param base_currency:
-    :param reciprocal_currency:
-    :param symbol:
-    """
-    # noinspection PyBroadException
-    try:
-        logging.getLogger(__name__).info("Start to fetch {}/{} conversion rate from the Bitfinex"
-                                         .format(base_currency, reciprocal_currency))
-
-        bitfinex = Bitfinex()
-        ticker_data = bitfinex.get_ticker(symbol)
-
-        currency_pair = CurrencyPair.objects.filter(base_currency=base_currency,reciprocal_currency=reciprocal_currency).first()
-
-        if not currency_pair:
-            logging.getLogger(__name__).error("The currency pair '{}/{}' does not exists."
-                                              .format(base_currency, reciprocal_currency))
-        elif "bid" in ticker_data.keys() and "timestamp" in ticker_data.keys():
-            price_datetime = datetime.utcfromtimestamp(ticker_data["timestamp"])
-            price_value = float(ticker_data["bid"])
-
-            with transaction.atomic():
-                currency_pair_rate = CurrencyPairRate.objects.create(currency_pair=currency_pair,
-                                                                     value=price_value,
-                                                                     created_at=price_datetime)
-                currency_pair_rate.save()
-
-            logging.getLogger(__name__).info("Success for symbol '{}'.".format(symbol))
-        else:
-            logging.getLogger(__name__).error("Invalid response from Bitfinex API for symbol '{}'."
-                                              .format(symbol))
-
-        logging.getLogger(__name__).info("Finished to fetch {}/{} conversion rate from the Bitfinex"
-                                         .format(base_currency, reciprocal_currency))
-
-    except Exception:
-        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-        logging.getLogger(__name__).error("Finished to fetch {}/{} conversion rate from the Bitfinex due to error:\n{}"
-                                          .format(base_currency, reciprocal_currency, exception_str))
-
-
-def fetch_fx_price(base_currency: str, reciprocal_currency: str):
-    """
-    Fetch currency price from alphavantage.
-    :param base_currency:
-    :param reciprocal_currency:
-    """
-    # noinspection PyBroadException
-    try:
-        logging.getLogger(__name__).info("Start to fetch {}/{} conversion rate from the Alphavantage"
-                                         .format(base_currency, reciprocal_currency))
-
-        alphavanatage = Alphavantage()
-        ticker_data = alphavanatage.get_price(base_currency, reciprocal_currency)
-
-        currency_pair = CurrencyPair.objects.filter(base_currency=base_currency,
-                                                    reciprocal_currency=reciprocal_currency).first()
-
-        if not currency_pair:
-            logging.getLogger(__name__).error("The currency pair '{}/{}' does not exists."
-                                              .format(base_currency, reciprocal_currency))
-        else:
-            with transaction.atomic():
-                currency_pair_rate = CurrencyPairRate.objects.create(currency_pair=currency_pair,
-                                                                     created_at=ticker_data[0],
-                                                                     value=float(ticker_data[1]))
-                currency_pair_rate.save()
-
-        logging.getLogger(__name__).info("Success for symbol '{}/{}'.".format(base_currency, reciprocal_currency))
-
-        logging.getLogger(__name__).info("Finished to fetch '{}/{}' conversion rate from the Alphavantage"
-                                         .format(base_currency, reciprocal_currency))
-
-    except Exception:
-        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-        logging.getLogger(__name__).error("Finished to fetch {}/{} conversion rate from the Bitfinex due to error:\n{}"
-                                          .format(base_currency, reciprocal_currency, exception_str))
-
-
 def feth_currency_price():
     currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
     for pair in currency_pairs:
@@ -138,12 +56,14 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
         price_value_recip = float(ticker_data_recip[1])
         price_pair_datetime = max(price_datetime_base, price_datetime_recip)
         price_pair_value = price_value_base * price_value_recip
+        price_pair_value_buy = price_pair_value + 10;  # todo: calc rate
+        price_pair_value_sell = price_pair_value - 10;  # todo: calc rate
 
         with transaction.atomic():
             currency_pair_rate = CurrencyPairRate.objects.create(currency_pair=currency_pair,
                                                                  created_at=price_pair_datetime,
-                                                                 buy_price=price_pair_value,
-                                                                 sell_price=price_pair_value)  # todo: calc rate
+                                                                 buy_price=price_pair_value_buy,
+                                                                 sell_price=price_pair_value_sell)
             currency_pair_rate.save()
 
         logging.getLogger(__name__).info("Finished to fetch {}/{} conversion rate"
