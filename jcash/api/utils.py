@@ -30,15 +30,26 @@ def custom_exception_handler(exc, context):
             response is not None and \
             isinstance(response.data, dict):
 
-        error = " ".join("{}: {}".format(force_text(field), force_text("".join(value))) for field, value in response.data.items())
+        error = None
+        errors = None
+        if ("non_field_errors" in response.data.keys() or "detail" in response.data.keys()) \
+                and len(response.data.keys())==1:
+            error = " ".join("{}".format(force_text("".join(value))) for field, value in response.data.items())
+        else:
+            errors = response.data
 
         if 'view' in context and \
             isinstance(context['view'], AccountView) and \
             context['request'].method=="PUT":
-
-            response.data = {'error': error}
+            if error:
+                response.data = {'error': error}
+            else:
+                response.data = {'errors': errors}
         else:
-            response.data = {'success': False, 'error': error}
+            if error:
+                response.data = {'success': False, 'error': error}
+            else:
+                response.data = {'success': False, 'errors': errors}
 
     return response
 

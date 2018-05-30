@@ -343,11 +343,9 @@ class AccountAddress(models.Model):
 # ApplicationStatus
 class ApplicationStatus:
     created = ObjStatus('created', 'new application')
-    rejected = ObjStatus('rejected', 'we received unexpected value (and CAN NOT go further)')
     cancelled = ObjStatus('cancelled', 'user clicked back')
     waiting = ObjStatus('waiting', 'waiting for user tx')
     confirming = ObjStatus('confirming', 'we received unexpected value (and CAN go further)')
-    confirmed = ObjStatus('confirmed', 'clicked "Yes, convert"')
     converting = ObjStatus('converting', 'we sent tx but it was not mined')
     converted = ObjStatus('converted', 'converted, tx is mined')
     refunding = ObjStatus('refunding', 'clicked "No, refund" (tx is in progress, not mined yet)')
@@ -376,6 +374,7 @@ class Application(models.Model):
     reciprocal_amount = models.FloatField()
 
     created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=False)
     status = models.CharField(max_length=10, default=str(ApplicationStatus.created))
     meta = JSONField(default=dict)
 

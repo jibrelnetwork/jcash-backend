@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from dateutil.tz import tzlocal
 
 from django.db import transaction
 from django import forms
@@ -580,6 +581,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "base_amount": 1.0,
         "reciprocal_amount": 1810.0,
         "rate": 1810.0,
+        "is_active": true
         "status": "created",
     }]
     """
@@ -595,7 +597,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         fields = ('app_uuid', 'created_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency',
-                  'reciprocal_amount', 'rate', 'status')
+                  'reciprocal_amount', 'rate', 'is_active', 'status')
 
     def get_app_uuid(self, obj):
         return obj.id
@@ -633,8 +635,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
             except:
                 return None
         elif obj.status == str(ApplicationStatus.refunding) or \
-                obj.status == str(ApplicationStatus.refunded) or \
-                obj.status == str(ApplicationStatus.rejected):
+                obj.status == str(ApplicationStatus.refunded):
             try:
                 txs = Refund.objects.filter(application=obj)
                 return txs[0] if len(txs) > 0 else None
@@ -801,6 +802,10 @@ class ApplicationSerializer(serializers.Serializer):
         if user.account.is_blocked:
             raise exceptions.ValidationError(_('Account is blocked.'))
 
+        active_application = user.applications.filter(is_active=True).first()
+        if active_application:
+            raise exceptions.ValidationError(_('There can only be one active application.'))
+
         address_attr = attrs.get('address')
         base_currency_attr = attrs.get('base_currency')
         rec_currency_attr = attrs.get('rec_currency')
@@ -844,6 +849,9 @@ class ApplicationSerializer(serializers.Serializer):
         if currency_pair_rate.currency_pair.pk != currency_pair.pk:
             raise serializers.ValidationError(_('Wrong currency price.'))
 
+        #!!if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > 10*60:
+        #!!    raise serializers.ValidationError(_('Сurrency price is out of date.'))
+
         currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else currency_pair_rate.buy_price
         if is_reverse_operation:
             currency_pair_rate_price = 1.0 / currency_pair_rate_price
@@ -858,6 +866,7 @@ class ApplicationSerializer(serializers.Serializer):
         user = self.context['user']
         with transaction.atomic():
             application = Application.objects.create(user=user,
+                                                     is_active=True,
                                                      address_id=self.validated_data['address_id'],
                                                      currency_pair_id=self.validated_data['currency_pair_id'],
                                                      currency_pair_rate_id=self.validated_data['currency_pair_rate_id'],
@@ -880,6 +889,10 @@ class ApplicationRefundSerializer(serializers.Serializer):
         except Application.DoesNotExist:
             raise serializers.ValidationError(_('Application does not exists.'))
 
+        if not self.application.is_active or \
+                not self.application.status == str(ApplicationStatus.confirming):
+            raise serializers.ValidationError(_('This operation is not possible now.'))
+
         return data
 
     def save(self):
@@ -898,10 +911,60 @@ class ApplicationConfirmSerializer(serializers.Serializer):
         except Application.DoesNotExist:
             raise serializers.ValidationError(_('Application does not exists.'))
 
+        if not self.application.is_active or \
+                not self.application.status == str(ApplicationStatus.confirming):
+            raise serializers.ValidationError(_('This operation is not possible now.'))
+
         return data
 
     def save(self):
         with transaction.atomic():
             if self.application:
                 self.application.status = str(ApplicationStatus.converting)
+                self.application.save()
+
+
+class ApplicationFinishSerializer(serializers.Serializer):
+    app_uuid = serializers.UUIDField(required=True)
+
+    def validate(self, data):
+        try:
+            self.application = Application.objects.get(id=data['app_uuid'])
+        except Application.DoesNotExist:
+            raise serializers.ValidationError(_('Application does not exists.'))
+
+        if not self.application.is_active or \
+                not (self.application.status == str(ApplicationStatus.refunded) or \
+                     self.application.status == str(ApplicationStatus.converted)):
+            raise serializers.ValidationError(_('This operation is not possible now.'))
+
+        return data
+
+    def save(self):
+        with transaction.atomic():
+            if self.application:
+                self.application.is_active = False
+                self.application.save()
+
+
+class ApplicationCancelSerializer(serializers.Serializer):
+    app_uuid = serializers.UUIDField(required=True)
+
+    def validate(self, data):
+        try:
+            self.application = Application.objects.get(id=data['app_uuid'])
+        except Application.DoesNotExist:
+            raise serializers.ValidationError(_('Application does not exists.'))
+
+        if not self.application.is_active or \
+                not self.application.status == str(ApplicationStatus.created):
+            raise serializers.ValidationError(_('This operation is not possible now.'))
+
+        return data
+
+    def save(self):
+        with transaction.atomic():
+            if self.application:
+                self.application.status = str(ApplicationStatus.cancelled)
+                self.application.is_active = False
                 self.application.save()

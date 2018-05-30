@@ -16,4 +16,6 @@ urlpatterns = [
     url(r'^application/$', views.ApplicationView.as_view()),
     url(r'^application-confirm/', views.ApplicationConfirmView.as_view()),
     url(r'^application-refund/', views.ApplicationRefundView.as_view()),
+    url(r'^application-cancel/', views.ApplicationCancelView.as_view()),
+    url(r'^application-finish/', views.ApplicationFinishView.as_view()),
 ]

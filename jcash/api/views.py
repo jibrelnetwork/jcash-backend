@@ -57,6 +57,8 @@ from jcash.api.serializers import (
     ApplicationsSerializer,
     ApplicationConfirmSerializer,
     ApplicationRefundSerializer,
+    ApplicationFinishSerializer,
+    ApplicationCancelSerializer,
     ResendEmailConfirmationSerializer,
 )
 from jcash.commonutils import currencyrates
@@ -132,9 +134,9 @@ class AccountView(GenericAPIView):
 
     or
 
-    ```
-    {{"success": false, "error": "error description"}}
-    ```
+    ```{{"success": false, "error": "error description"}}```
+
+    ```{{"success": false, "errors": {{"field_name":"error_description"}}}}```
 
     post:
     Set account info for current user.
@@ -306,8 +308,8 @@ class CurrencyRateView(GenericAPIView):
         serializer = CurrencyRateSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             is_reverse_operation = False
-            currency_pair = CurrencyPair.objects.filter(base_currency__display_name=serializer.validated_data['base_currency'],
-                                                         reciprocal_currency__display_name=serializer.validated_data['rec_currency']) \
+            currency_pair = CurrencyPair.objects.filter(base_currency__display_name__iexact=serializer.validated_data['base_currency'],
+                                                         reciprocal_currency__display_name__iexact=serializer.validated_data['rec_currency']) \
                 .first()
 
             if not currency_pair:
@@ -320,7 +322,7 @@ class CurrencyRateView(GenericAPIView):
             if not currency_pair:
                 return Response({'success': False, 'error': "Currency does not exists."}, status=400)
 
-            currency_pair_rate = currency_pair.currency_pair_rates.last()
+            currency_pair_rate = currency_pair.currency_pair_rates.latest('created_at')
 
             if not currency_pair_rate:
                 return Response({'success': False, 'error': "Currency price does not exists."}, status=400)
@@ -378,9 +380,9 @@ class AddressVerifyView(GenericAPIView):
 
     or
 
-    ```
-    {"success": false, "error": "error description"}
-    ```
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
 
     * Requires token authentication.
     """
@@ -433,9 +435,9 @@ class AddressView(GenericAPIView):
 
     or
 
-    ```
-    {"success": false, "error": "error description"}
-    ```
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
 
     * Requires token authentication.
     """
@@ -491,9 +493,9 @@ class RemoveAddressView(GenericAPIView):
 
     or
 
-    ```
-    {"success": false, "error": "error description"}
-    ```
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
 
     * Requires token authentication.
     """
@@ -562,6 +564,7 @@ class ApplicationView(GenericAPIView):
     "reciprocal_currency": "jAED",
     "reciprocal_amount": 1799,
     "rate": 1799,
+    "is_active": true,
     "status": "converting"
     }}]}}
     ```
@@ -599,7 +602,8 @@ class ApplicationConfirmView(GenericAPIView):
     Accepts POST method.
 
     post:
-    Changes status of application to perform exchange operation.
+    Changes status of application to perform exchange operation <mark>"converting"</mark>.
+    It might be possible if application status is <mark>"confirming"</mark>
 
     Returns the success/fail message.
 
@@ -611,9 +615,9 @@ class ApplicationConfirmView(GenericAPIView):
 
     or
 
-    ```
-    {"success": false, "error": "error description"}
-    ```
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
 
     * Requires token authentication.
     """
@@ -637,7 +641,8 @@ class ApplicationRefundView(GenericAPIView):
     Accepts POST method.
 
     post:
-    Changes status of application to cancel exchange operation end refund.
+    Changes status of application to cancel exchange operation and refund <mark>"refunding"</mark>.
+    It might be possible if application status is <mark>"confirming"</mark>
 
     Returns the success/fail message.
 
@@ -649,14 +654,90 @@ class ApplicationRefundView(GenericAPIView):
 
     or
 
-    ```
-    {"success": false, "error": "error description"}
-    ```
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
 
     * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = ApplicationRefundSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({"success":True})
+
+        return Response({"success":False, "error":serializer.errors}, status=400)
+
+
+class ApplicationCancelView(GenericAPIView):
+    """
+    Cancel exchange application by user.
+    Accepts POST method.
+
+    post:
+    Changes status of application to cancel exchange operation by user.
+    It might be possible if application status is <mark>"created"</mark>
+
+    Returns the success/fail message.
+
+    Response example:
+
+    ```
+    {"success":true}
+    ```
+
+    or
+
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = ApplicationCancelSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({"success":True})
+
+        return Response({"success":False, "error":{serializer.errors}}, status=400)
+
+
+class ApplicationFinishView(GenericAPIView):
+    """
+    Finish exchange application.
+    Accepts POST method.
+
+    post:
+    Changes status of application to finish exchange operation.
+    It might be possible if application status is <mark>"converted","refunded"</mark>
+
+    Returns the success/fail message.
+
+    Response example:
+
+    ```
+    {"success":true}
+    ```
+
+    or
+
+    ```{"success": false, "error": "error description"}```
+
+    ```{"success": false, "errors": {"field_name":"error_description"}}```
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = ApplicationFinishSerializer
     parser_classes = (JSONParser,)
 
     def post(self, request):
