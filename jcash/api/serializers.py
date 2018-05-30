@@ -317,13 +317,17 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         """Override this method to change default e-mail options"""
         return {}
 
-    def validate_email(self, value):
+    def validate_email(self, email):
+        try:
+            user = UserModel._default_manager.get(email=email)
+        except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            raise exceptions.ValidationError(_('Invalid email.'))
         # Create PasswordResetForm with the serializer
         self.reset_form = self.password_reset_form_class(data=self.initial_data)
         if not self.reset_form.is_valid():
             raise serializers.ValidationError(self.reset_form.errors)
 
-        return value
+        return email
 
     def validate_captcha(self, captcha_token):
         CaptchaHelper.validate_captcha(captcha_token)
