@@ -603,10 +603,10 @@ class ApplicationDetailView(GenericAPIView):
     """
     View get exchange application.
 
-    * Requires token authentication.
-
     get:
-    Returns an application.
+    Returns application detail.
+
+    * Requires token authentication.
 
     Response example:
 
