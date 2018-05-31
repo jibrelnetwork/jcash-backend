@@ -293,18 +293,7 @@ class CurrencyRateView(GenericAPIView):
     serializer_class = CurrencyRateSerializer
     parser_classes = (JSONParser,)
 
-    def get_param_fields(self, view):
-        fields = [
-            coreapi.Field(name='base_currency', required=True, location='form',
-                          schema=coreschema.String(title='Base currency')),
-            coreapi.Field(name='base_amount', required=True, location='form',
-                          schema=coreschema.String(title='Base amount')),
-            coreapi.Field(name='rec_currency', required=True, location='form',
-                          schema=coreschema.String(title='Reciprocal currency')),
-        ]
-        return fields
-
-    def get(self, request):
+    def post(self, request):
         serializer = CurrencyRateSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             is_reverse_operation = False
