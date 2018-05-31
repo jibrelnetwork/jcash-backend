@@ -276,7 +276,7 @@ class CurrencyView(APIView):
 
 class CurrencyRateView(GenericAPIView):
     """
-    get:
+    post:
     Get currency rate info.
     Response example:
 
