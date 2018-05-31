@@ -14,6 +14,7 @@ urlpatterns = [
     url(r'^currency-rates/', views.CurrencyRatesView.as_view()),
     url(r'^currency-rate/', views.CurrencyRateView.as_view()),
     url(r'^application/$', views.ApplicationView.as_view()),
+    url(r'^application/(?P<uuid>[0-9A-Fa-f\-]+)/$', views.ApplicationDetailView.as_view()),
     url(r'^application-confirm/', views.ApplicationConfirmView.as_view()),
     url(r'^application-refund/', views.ApplicationRefundView.as_view()),
     url(r'^application-cancel/', views.ApplicationCancelView.as_view()),

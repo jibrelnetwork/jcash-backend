@@ -598,6 +598,56 @@ class ApplicationView(GenericAPIView):
             return Response({"success": False, "error": serializer.errors})
 
 
+@docstring_parameter(get_status_class_members(ApplicationStatus))
+class ApplicationDetailView(GenericAPIView):
+    """
+    View get exchange application.
+
+    * Requires token authentication.
+
+    get:
+    Returns an application.
+
+    Response example:
+
+    ```
+    {{"success":true, "application":{{
+    "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b",
+    "created_at": "2018-05-22T16:08:21.132030Z",
+    "incoming_tx_id": "0x1234543431",
+    "outgoing_tx_id": "",
+    "incoming_tx_value": 2,
+    "outgoing_tx_value": 0,
+    "source_address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
+    "exchanger_address": "0x55555555",
+    "base_currency": "ETH",
+    "base_amount": 1,
+    "reciprocal_currency": "jAED",
+    "reciprocal_amount": 1799,
+    "rate": 1799,
+    "is_active": true,
+    "status": "converting"
+    }}}}
+    ```
+
+    **Statuses**
+
+    {0}
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = ApplicationSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, uuid=None):
+        try:
+            app = Application.objects.filter(user=request.user, id=uuid).first()
+        except:
+            return Response({"success": False, "error": "no such application"}, status=400)
+        application = ApplicationsSerializer(app, many=False).data
+        return Response({"success": True, "application": application})
+
+
 class ApplicationConfirmView(GenericAPIView):
     """
     Confirm exchange application if incoming transaction amount less than exchange amount
