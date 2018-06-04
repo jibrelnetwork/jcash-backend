@@ -474,9 +474,7 @@ class OperationConfirmSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
-class DocumentPutSerializer(serializers.Serializer):
-    passport = serializers.FileField(required=False)
-    utilitybills = serializers.FileField(required=False)
+class AccountUpdateSerializer(serializers.Serializer):
     first_name = serializers.CharField(required=False)
     last_name = serializers.CharField(required=False)
     birthday = serializers.DateField(required=False)
@@ -490,6 +488,40 @@ class DocumentPutSerializer(serializers.Serializer):
         return "{}://{}{}".format("https" if request.is_secure() else "http",
                                   request.get_host(),
                                   path)
+
+    def save(self, account):
+        current_site = Site.objects.get_current()
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('first_name') and self.validated_data.get('first_name'):
+                is_updated = True
+                account.first_name = self.validated_data['first_name']
+            if serializer_fields.get('last_name') and self.validated_data.get('last_name'):
+                is_updated = True
+                account.last_name = self.validated_data['last_name']
+            if serializer_fields.get('birthday') and self.validated_data.get('birthday'):
+                is_updated = True
+                account.birthday = self.validated_data['birthday']
+            if is_updated:
+                account.last_updated_at = timezone.now()
+            account.save()
+
+
+class AccountInitSerializer(serializers.Serializer):
+    passport = serializers.FileField(required=True)
+    utilitybills = serializers.FileField(required=True)
+    first_name = serializers.CharField(required=True)
+    last_name = serializers.CharField(required=True)
+    birthday = serializers.DateField(required=True)
+    citizenship = serializers.CharField(required=True)
+    residency = serializers.CharField(required=True)
+
+    class Meta:
+        model = Document
+        fields = ('passport', 'utilitybills', 'first_name'
+                  'last_name', 'birthday', 'citizenship', 'residency')
 
     def save(self, account):
         current_site = Site.objects.get_current()
@@ -529,27 +561,6 @@ class DocumentPutSerializer(serializers.Serializer):
             if is_updated:
                 account.last_updated_at = timezone.now()
             account.save()
-
-
-class DocumentPostSerializer(DocumentPutSerializer):
-    passport = serializers.FileField(required=True)
-    utilitybills = serializers.FileField(required=True)
-    first_name = serializers.CharField(required=True)
-    last_name = serializers.CharField(required=True)
-    birthday = serializers.DateField(required=True)
-    citizenship = serializers.CharField(required=True)
-    residency = serializers.CharField(required=True)
-
-    class Meta:
-        model = Document
-        fields = ('passport', 'utilitybills', 'first_name'
-                  'last_name', 'birthday', 'citizenship',
-                  'residency')
-
-    def get_document_url(self, request, path):
-        return "{}://{}{}".format("https" if request.is_secure() else "http",
-                                  request.get_host(),
-                                  path)
 
 
 class AddressesSerializer(serializers.ModelSerializer):

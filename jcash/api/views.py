@@ -48,8 +48,8 @@ from jcash.api.serializers import (
     AddressSerializer,
     RemoveAddressSerializer,
     AddressVerifySerializer,
-    DocumentPutSerializer,
-    DocumentPostSerializer,
+    AccountInitSerializer,
+    AccountUpdateSerializer,
     CurrencyRateSerializer,
     OpenCurrencyRateSerializer,
     CurrencySerializer,
@@ -86,7 +86,100 @@ def docstring_parameter(*sub):
 
 
 @docstring_parameter(get_status_class_members(AccountStatus))
-class AccountView(GenericAPIView):
+class AccountUpdateView(GenericAPIView):
+    """
+    post:
+    Updates account info for current user.
+
+    Response example:
+
+    ```
+    {{"success":true,
+     "username":"ivan.ivanov@example.com",
+     "first_name":"Ivan",
+     "last_name":"Ivanov",
+     "birthday":"1971-01-01",
+     "citizenship":"Russia",
+     "residency":"Russia",
+     "is_identity_verified":true,
+     "is_identity_declined":false,
+     "is_email_confirmed":true,
+     "status":"verified"}}
+    ```
+
+    or
+
+    ```{{"success": false, "error": "error description"}}```
+
+    ```{{"success": false, "errors": {{"field_name":"error_description"}}}}```
+
+    post:
+    Set account info for current user.
+
+    Response example:
+
+    ```
+    {{"success":true,
+     "username":"ivan.ivanov@example.com",
+     "first_name":"Ivan",
+     "last_name":"Ivanov",
+     "birthday":"1971-01-01",
+     "citizenship":"Russia",
+     "residency":"Russia",
+     "is_identity_verified":true,
+     "is_identity_declined":false,
+     "is_email_confirmed":true,
+     "status":"verified"}}
+     ```
+
+    **Statuses**
+
+    {0}
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_classes = {
+        'get': AccountSerializer,
+        'post': AccountUpdateSerializer
+    }
+    parser_classes = (JSONParser,)
+
+    def get_serializer_class(self):
+        return AccountUpdateSerializer
+
+    def ensure_account(self, request):
+        try:
+            account = request.user.account
+        except ObjectDoesNotExist:
+            account = Account.objects.create(user=request.user)
+        return account
+
+    def update_account_info(self, request):
+        account = self.ensure_account(request)
+        self.action = request.method.lower()
+        serializer_class = self.serializer_classes.get(self.action)
+        serializer = serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save(account)
+            self.maybe_start_identity_verification(account)
+            serializer_get = self.serializer_classes.get('get')(account)
+
+            return Response(serializer_get.data, 201)
+
+    def post(self, request):
+        return self.update_account_info(request)
+
+    def maybe_start_identity_verification(self, account):
+        #if account.document_url and not account.onfido_check_id:
+        #    ga_integration.on_status_registration_complete(account)
+        #    tasks.verify_user.delay(account.user.pk)
+        # todo:
+        pass
+
+
+@docstring_parameter(get_status_class_members(AccountStatus))
+class AccountView(AccountUpdateView):
     """
     get:
     Returns account info for current user.
@@ -162,10 +255,9 @@ class AccountView(GenericAPIView):
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_classes = {
         'get': AccountSerializer,
-        'put': DocumentPutSerializer,
-        'post': DocumentPostSerializer
+        'post': AccountInitSerializer
     }
-    parser_classes = (MultiPartParser, FormParser, JSONParser,)
+    parser_classes = (MultiPartParser,)
 
     def get_serializer_class(self):
         """
@@ -183,43 +275,14 @@ class AccountView(GenericAPIView):
 
         return self.serializer_classes.get(action, AccountSerializer)
 
-    def ensure_account(self, request):
-        try:
-            account = request.user.account
-        except ObjectDoesNotExist:
-            account = Account.objects.create(user=request.user)
-        return account
-
-    def update_account_info(self, request):
-        account = self.ensure_account(request)
-        self.action = request.method.lower()
-        serializer_class = self.serializer_classes.get(self.action)
-        serializer = serializer_class(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save(account)
-            self.maybe_start_identity_verification(account)
-            serializer_get = self.serializer_classes.get('get')(account)
-
-            return Response(serializer_get.data, 201)
-
     def get(self, request):
         account = self.ensure_account(request)
         self.action = request.method.lower()
         serializer = AccountSerializer(account)
         return Response(serializer.data)
 
-    def put(self, request):
-        return self.update_account_info(request)
-
     def post(self, request):
         return self.update_account_info(request)
-
-    def maybe_start_identity_verification(self, account):
-        #if account.document_url and not account.onfido_check_id:
-        #    ga_integration.on_status_registration_complete(account)
-        #    tasks.verify_user.delay(account.user.pk)
-        # todo:
-        pass
 
 
 class ResendEmailConfirmationView(GenericAPIView):
