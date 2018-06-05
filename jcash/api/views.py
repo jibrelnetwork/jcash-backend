@@ -62,7 +62,7 @@ from jcash.api.serializers import (
     ResendEmailConfirmationSerializer,
 )
 from jcash.commonutils import currencyrates
-from jcash.settings import ACCOUNT__MAX_ADDRESSES_COUNT
+from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
 
 
 logger = logging.getLogger(__name__)
@@ -346,7 +346,7 @@ class CurrencyRateView(GenericAPIView):
     ```
     {"success":true,
     "uuid":"eb5c4978-c70a-4572-9f58-72250fce6b3f",
-    "rate":1799.0,"rec_amount":0.0}
+    "rate":1799.0, "base_amount":1.0, "rec_amount":1799.0}
     ```
 
     * Requires token authentication.
@@ -383,13 +383,23 @@ class CurrencyRateView(GenericAPIView):
             if is_reverse_operation:
                 currency_pair_rate_price = 1.0 / currency_pair_rate_price
 
+            base_amount = 0.0
+            rec_amount = 0.0
+
+            if serializer.validated_data.get('base_amount'):
+                base_amount = serializer.validated_data['base_amount']
+                rec_amount = base_amount * currency_pair_rate_price
+
+            if serializer.validated_data.get('rec_amount'):
+                rec_amount = serializer.validated_data['rec_amount']
+                base_amount = rec_amount / currency_pair_rate_price
+
             data = {"success": True,
                     "uuid": currency_pair_rate.id,
                     "rate": currency_pair_rate_price,
-                    "rec_amount": currency_pair_rate_price * serializer.validated_data['base_amount']}
+                    "rec_amount": rec_amount,
+                    "base_amount": base_amount}
             return Response(data)
-        else:
-            return Response({'success': False, 'error': serializer.errors}, status=400)
 
 
 class CurrencyRatesView(GenericAPIView):
@@ -529,7 +539,7 @@ class AddressView(GenericAPIView):
             return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
 
         addresses = Address.objects.filter(user=request.user, is_removed=False)
-        if len(addresses) >= ACCOUNT__MAX_ADDRESSES_COUNT:
+        if len(addresses) >= LOGIC__MAX_ADDRESSES_NUM:
             return Response({"success": False, "error": "Too many addresses."}, status=400)
 
         serializer = self.serializer_class(data=request.data)

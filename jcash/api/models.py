@@ -374,7 +374,9 @@ class Application(models.Model):
     reciprocal_amount = models.FloatField()
 
     created_at = models.DateTimeField(auto_now_add=True)
+    expired_at = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
+    is_reverse = models.BooleanField(default=False)
     status = models.CharField(max_length=10, default=str(ApplicationStatus.created))
     meta = JSONField(default=dict)
 
@@ -393,6 +395,7 @@ class TransactionStatus:
     pending = 'pending'
     fail = 'fail'
     success = 'success'
+    rejected = 'rejected'
 
 
 # IncomingTransaction
@@ -406,6 +409,7 @@ class IncomingTransaction(models.Model):
     to_address = models.CharField(max_length=120, null=True, blank=True)
     value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
+    is_linked = models.BooleanField(default=False)
     meta = JSONField(default=dict)
 
     class Meta:

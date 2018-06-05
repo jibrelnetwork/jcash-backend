@@ -295,8 +295,15 @@ MAILGUN__API_EVENTS_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/eve
 SENDGRID__API_MESSAGES_URL = "https://api.sendgrid.com/api/mail.send.json"
 SENDGRID__API_KEY = ""
 
-# accounts settings
-ACCOUNT__MAX_ADDRESSES_COUNT = 5
+# Logics settings
+LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)
+LOGIC__MAX_VERIFICATION_ATTEMPTS = os.getenv('LOGIC_MAX_VERIFICATION_ATTEMPTS', 3)
+LOGIC__BLOCKS_CONFIRM_NUM = os.getenv('LOGIC_BLOCKS_CONFIRM_NUM', 5)
+LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1.0)
+LOGIC__MAX_ADDRESSES_NUM = os.getenv('LOGIC_MAX_ADDRESSES_NUM', 5)
+
+# Front settings
+FRONT__URL = os.getenv('FRONT_URL', 'https://example.com')
 
 # Alphavantage.co API
 ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')
@@ -313,6 +320,13 @@ LOGIN_REDIRECT_URL = '/'
 
 # Bitfinex config
 BITFINEX__TIMEOUT = 1
+
+# Ethereum settings
+ETH_NODE__URL = os.getenv('ETH_NODE_URL', '')
+ETH_MANAGER__PRIVATE_KEY = os.getenv('ETH_MANAGER_PRIVATE_KEY', '')
+ETH_MANAGER__ADDRESS = os.getenv('ETH_MANAGER_ADDRESS', '')
+ETH_EXCHANGER__PRIVATE_KEY = os.getenv('ETH_EXCHANGER_PRIVATE_KEY', '')
+ETH_EXCHANGER__ADDRESS = os.getenv('ETH_EXCHANGER_ADDRESS', '')
 
 # Proxies
 CRAWLER_PROXY__ENABLED = True

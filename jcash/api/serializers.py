@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 
 from django.db import transaction
@@ -30,6 +30,7 @@ from jcash.api.models import (
 )
 from jcash.commonutils import eth_sign, eth_address
 from jcash.commonutils.notify import send_email_reset_password
+from jcash.settings import LOGIC__EXPIRATION_LIMIT_SEC
 
 
 logger = logging.getLogger(__name__)
@@ -605,7 +606,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Application
-        fields = ('app_uuid', 'created_at', 'incoming_tx_id', 'outgoing_tx_id',
+        fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency',
                   'reciprocal_amount', 'rate', 'is_active', 'status')
@@ -709,7 +710,17 @@ class AddressVerifySerializer(serializers.Serializer):
 class CurrencyRateSerializer(serializers.Serializer):
     base_currency = serializers.CharField(required=True, allow_blank=False)
     rec_currency = serializers.CharField(required=True, allow_blank=False)
-    base_amount = serializers.FloatField(required=True)
+    base_amount = serializers.FloatField(required=False)
+    rec_amount = serializers.FloatField(required=False)
+
+    def validate(self, attrs):
+        base_amount = attrs.get('base_amount')
+        rec_amount = attrs.get('rec_amount')
+        if (base_amount is None and rec_amount is None) or \
+                (base_amount is not None and rec_amount is not None):
+            raise exceptions.ValidationError(_('base_amount or rec_amount required.'))
+
+        return attrs
 
 
 class OpenCurrencyRateSerializer(serializers.Serializer):
@@ -870,6 +881,7 @@ class ApplicationSerializer(serializers.Serializer):
         attrs['currency_pair_rate_id'] = currency_pair_rate.pk
         attrs['rate'] = currency_pair_rate_price
         attrs['reciprocal_amount'] = base_amount_attr * currency_pair_rate_price
+        attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs
 
@@ -878,6 +890,7 @@ class ApplicationSerializer(serializers.Serializer):
         with transaction.atomic():
             application = Application.objects.create(user=user,
                                                      is_active=True,
+                                                     is_reverse=self.validated_data['is_reverse_operation'],
                                                      address_id=self.validated_data['address_id'],
                                                      currency_pair_id=self.validated_data['currency_pair_id'],
                                                      currency_pair_rate_id=self.validated_data['currency_pair_rate_id'],
@@ -886,7 +899,8 @@ class ApplicationSerializer(serializers.Serializer):
                                                      rate=self.validated_data['rate'],
                                                      base_amount=self.validated_data['base_amount'],
                                                      reciprocal_amount=self.validated_data['reciprocal_amount'],
-                                                     exchanger_address=self.validated_data['exchanger_address'])
+                                                     exchanger_address=self.validated_data['exchanger_address'],
+                                                     expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC))
             application.save()
             self.validated_data['application_id'] = application.pk
 
