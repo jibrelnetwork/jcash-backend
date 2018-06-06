@@ -542,7 +542,7 @@ class AddressView(GenericAPIView):
         if len(addresses) >= LOGIC__MAX_ADDRESSES_NUM:
             return Response({"success": False, "error": "Too many addresses."}, status=400)
 
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={'user': request.user})
         if serializer.is_valid(raise_exception=True):
             serializer.save(request.user)
             return Response(serializer.validated_data)
@@ -628,6 +628,7 @@ class ApplicationView(GenericAPIView):
     [{{
     "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b",
     "created_at": "2018-05-22T16:08:21.132030Z",
+    "expired_at": "2018-05-22T16:38:21.132030Z",
     "incoming_tx_id": "0x1234543431",
     "outgoing_tx_id": "",
     "incoming_tx_value": 2,
@@ -687,6 +688,7 @@ class ApplicationDetailView(GenericAPIView):
     {{"success":true, "application":{{
     "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b",
     "created_at": "2018-05-22T16:08:21.132030Z",
+    "expired_at": "2018-05-22T16:38:21.132030Z",
     "incoming_tx_id": "0x1234543431",
     "outgoing_tx_id": "",
     "incoming_tx_value": 2,

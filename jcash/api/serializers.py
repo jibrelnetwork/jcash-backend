@@ -783,13 +783,22 @@ class AddressSerializer(serializers.Serializer):
         with transaction.atomic():
             if not address:
                 address = Address.objects.create(user=user, **self.validated_data)
+            else:
+                if address.is_removed or address.is_rejected:
+                    address.is_removed = False
+                    address.is_rejected = False
+                    address.is_verified = False
+            address.save()
             address_verify = AddressVerify.objects.create(address=address,
                                                           message=self.generate_message(address))
+            address_verify.save()
+
         self.validated_data['message'] = address_verify.message
         self.validated_data['uuid'] = address_verify.id
         self.validated_data['success'] = True
 
     def validate(self, attrs):
+        user = self.context.get('user')
         address = attrs.get('address')
         type = attrs.get('type')
 
@@ -802,6 +811,15 @@ class AddressSerializer(serializers.Serializer):
             raise serializers.ValidationError(_('Must include "type".'))
         elif type != 'eth':
             raise serializers.ValidationError(_('The type of address must be "eth".'))
+
+        try:
+            address_obj = Address.objects.get(address__iexact=address)
+            if address_obj.user_id != user.pk:
+                raise serializers.ValidationError(_('This address already used.'))
+            elif not address_obj.is_removed and not address_obj.is_rejected:
+                raise serializers.ValidationError(_('This address already exists.'))
+        except Address.DoesNotExist:
+            pass
 
         attrs['address'] = address
         attrs['type'] = type
