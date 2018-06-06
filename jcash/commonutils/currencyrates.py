@@ -10,9 +10,32 @@ from jcash.api.models import Currency, CurrencyPair, CurrencyPairRate
 
 
 def feth_currency_price():
+    """
+    Fetch currency prices
+    """
     currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
     for pair in currency_pairs:
         fetch_exchangeable_currency_price(pair)
+
+
+def calc_buy_rate(base_rate: float, fee_percent: float) -> float:
+    """
+    Calculate currency pair buy rate
+    :param base_rate: rate w/o fee
+    :param fee_percent: borrow fee in percent
+    :return: buy rate
+    """
+    return (1 + fee_percent/100.0) * base_rate
+
+
+def calc_sell_rate(base_rate: float, fee_percent: float) -> float:
+    """
+    Calculate currency pair sell rate
+    :param base_rate: rate w/o fee
+    :param fee_percent: borrow fee in percent
+    :return: sell rate
+    """
+    return (1 - fee_percent/100.0) * base_rate
 
 
 def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
@@ -56,8 +79,8 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
         price_value_recip = float(ticker_data_recip[1])
         price_pair_datetime = max(price_datetime_base, price_datetime_recip)
         price_pair_value = price_value_base * price_value_recip
-        price_pair_value_buy = price_pair_value + 10;  # todo: calc rate
-        price_pair_value_sell = price_pair_value - 10;  # todo: calc rate
+        price_pair_value_buy = calc_buy_rate(price_pair_value, currency_pair.buy_fee_percent)
+        price_pair_value_sell = calc_sell_rate(price_pair_value, currency_pair.sell_fee_percent)
 
         with transaction.atomic():
             currency_pair_rate = CurrencyPairRate.objects.create(currency_pair=currency_pair,

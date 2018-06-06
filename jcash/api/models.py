@@ -306,6 +306,8 @@ class CurrencyPair(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_buyable = models.BooleanField(default=False)
     is_sellable = models.BooleanField(default=False)
+    buy_fee_percent = models.FloatField(default=0.0)
+    sell_fee_percent = models.FloatField(default=0.0)
 
     rel_currency_pair_rates = 'currency_pair_rates'
     rel_applications = 'applications'
