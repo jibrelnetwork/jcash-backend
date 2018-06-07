@@ -12,6 +12,8 @@ uwsgi:
   max-requests: 5000
 
   static-map: /static=/app/static/
+  static-map: /media=/app/uploads
+  static-map: /uploads=/app/uploads
 
   static-skip-ext: .po
   static-skip-ext: .py
