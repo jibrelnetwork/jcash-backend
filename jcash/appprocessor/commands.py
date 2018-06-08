@@ -336,7 +336,7 @@ def check_outgoing_transactions():
                                  .order_by('id')  # type: List[Exchange]
 
         for exchange in exchanges:
-            tx_info = eth_utils.getTransactionInfo(exchange.transaction_id)
+            tx_info, block_number = eth_events.get_tx_info(exchange.transaction_id)
 
             if tx_info and tx_info.get("status"):
                 with transaction.atomic():
