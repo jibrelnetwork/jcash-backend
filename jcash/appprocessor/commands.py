@@ -138,7 +138,8 @@ def process_unlinked_unconfirmed_events():
             with transaction.atomic():
                 if tx_info[0] is not None and tx_info[1] >= in_tx.block_height + ETH_TX__BLOCKS_CONFIRM_NUM:
                     in_tx.status = TransactionStatus.confirmed
-                    refund = Refund.objects.create(value=in_tx.value - get_borrow_fee(),
+                    refund = Refund.objects.create(created_at=datetime.now(tzlocal()),
+                                                   value=in_tx.value - get_borrow_fee(),
                                                    status=TransactionStatus.confirmed)
                     refund.save()
                 elif tx_info[0] is None:
