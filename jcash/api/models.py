@@ -437,7 +437,7 @@ class Exchange(models.Model):
 # Refund
 class Refund(models.Model):
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
-    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_refundes)
+    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_refundes, null=True)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
