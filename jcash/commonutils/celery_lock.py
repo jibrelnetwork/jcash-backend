@@ -11,7 +11,7 @@ from jcash.settings import CELERY_BROKER_URL
 REDIS_CLIENT = redis.StrictRedis().from_url(CELERY_BROKER_URL)
 
 
-def locked_task(name=None, timeout=5*60):
+def locked_task(name=None, timeout=10*60):
     """Enforce only one celery task at a time."""
 
     def _dec(run_func):

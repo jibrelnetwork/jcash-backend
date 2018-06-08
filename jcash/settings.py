@@ -222,11 +222,6 @@ REST_AUTH_REGISTER_SERIALIZERS = {
     'REGISTER_SERIALIZER': 'jcash.api.serializers.RegisterSerializer',
 }
 
-#from sqlalchemy.types import CHAR
-#ALDJEMY_DATA_TYPES = {
-#    'UUIDField': CHAR,
-#}
-
 CORS_ORIGIN_ALLOW_ALL = True
 
 ONFIDO_API_KEY = os.getenv('ONFIDO_API_KEY')
@@ -298,12 +293,8 @@ SENDGRID__API_KEY = ""
 # Logics settings
 LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)
 LOGIC__MAX_VERIFICATION_ATTEMPTS = os.getenv('LOGIC_MAX_VERIFICATION_ATTEMPTS', 3)
-LOGIC__BLOCKS_CONFIRM_NUM = os.getenv('LOGIC_BLOCKS_CONFIRM_NUM', 5)
-LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1.0)
+LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1000.0)
 LOGIC__MAX_ADDRESSES_NUM = os.getenv('LOGIC_MAX_ADDRESSES_NUM', 5)
-
-# Front settings
-FRONT__URL = os.getenv('FRONT_URL', 'https://example.com')
 
 # Alphavantage.co API
 ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')
@@ -322,11 +313,31 @@ LOGIN_REDIRECT_URL = '/'
 BITFINEX__TIMEOUT = 1
 
 # Ethereum settings
-ETH_NODE__URL = os.getenv('ETH_NODE_URL', '')
+ETH_NODE__CHAIN_ID = os.getenv('ETH_NODE__CHAIN_ID', 3)
+ETH_NODE__URL = os.getenv('ETH_NODE_URL', 'https://ropsten-node.jwallet.network')
 ETH_MANAGER__PRIVATE_KEY = os.getenv('ETH_MANAGER_PRIVATE_KEY', '')
 ETH_MANAGER__ADDRESS = os.getenv('ETH_MANAGER_ADDRESS', '')
 ETH_EXCHANGER__PRIVATE_KEY = os.getenv('ETH_EXCHANGER_PRIVATE_KEY', '')
 ETH_EXCHANGER__ADDRESS = os.getenv('ETH_EXCHANGER_ADDRESS', '')
+ETH_TX__GAZ_MULTIPLICATOR = os.getenv('ETH_TX_GAZ_MULTIPLICATOR', 1.2)
+ETH_TX__BLOCKS_CONFIRM_NUM = os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5)
+ETH_TX__MAX_PENDING_TX_COUNT = os.getenv('ETH_TX_MAX_PENDING_TX_COUNT', 1)
+ETH_LICENSE_REGISTRY_MANAGEMENT__ABI = b'[{"constant": false, ' \
+                                       b'   "inputs": [{"name": "_userAddress","type": "address"},' \
+                                       b'              {"name": "_licenseName","type": "string"},' \
+                                       b'              {"name": "_expirationTimestamp","type": "uint256"}],' \
+                                       b'   "name": "grantUserLicense",' \
+                                       b'   "outputs": [],' \
+                                       b'   "payable": false,' \
+                                       b'    "stateMutability": "nonpayable",' \
+                                       b'   "type": "function"},' \
+                                       b' {"constant": false, ' \
+                                       b'  "inputs": [{"name": "_userAddress","type": "address"}],' \
+                                       b'  "name": "admitUser",' \
+                                       b'  "outputs": [],' \
+                                       b'  "payable": false,' \
+                                       b'  "stateMutability": "nonpayable",' \
+                                       b'  "type": "function"}]'
 
 # Proxies
 CRAWLER_PROXY__ENABLED = True

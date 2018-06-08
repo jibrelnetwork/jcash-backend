@@ -284,6 +284,7 @@ class Currency(models.Model):
     exchanger_address = models.CharField(max_length=255, blank=True, null=True)
     view_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     controller_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
+    license_registry_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     is_erc20_token = models.BooleanField(default=False)
     balance = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)

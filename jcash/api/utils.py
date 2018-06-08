@@ -62,7 +62,7 @@ class AccountAdapter(DefaultAccountAdapter):
         confirmations are sent outside of the request context `request`
         can be `None` here.
         """
-        return build_absolute_uri(None, '/') + '#/auth/signup/verify/' + emailconfirmation.key
+        return build_absolute_uri(None, '/') + 'auth/signup/email-verify/' + emailconfirmation.key
 
     def send_confirmation_mail(self, request, emailconfirmation, signup):
         activate_url = self.get_email_confirmation_url(

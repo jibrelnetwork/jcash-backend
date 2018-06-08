@@ -301,7 +301,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         Send a django.core.mail.EmailMultiAlternatives to `to_email`.
         """
-        activate_url = '{protocol}://{domain}/#/auth/recovery/confirm/{uid}/{token}'.format(**context)
+        activate_url = '{protocol}://{domain}/auth/recovery/confirm/{uid}/{token}'.format(**context)
         logger.info("{} {}".format(to_email, activate_url))
         send_email_reset_password(to_email, activate_url, None)
 
@@ -889,8 +889,8 @@ class ApplicationSerializer(serializers.Serializer):
         if currency_pair_rate.currency_pair.pk != currency_pair.pk:
             raise serializers.ValidationError(_('Wrong currency price.'))
 
-        #!!if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > 10*60:
-        #!!    raise serializers.ValidationError(_('Сurrency price is out of date.'))
+        if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > 10*60:
+            raise serializers.ValidationError(_('Сurrency price is out of date.'))
 
         currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else currency_pair_rate.buy_price
         if is_reverse_operation:
@@ -957,6 +957,9 @@ class ApplicationConfirmSerializer(serializers.Serializer):
         if not self.application.is_active or \
                 not self.application.status == str(ApplicationStatus.confirming):
             raise serializers.ValidationError(_('This operation is not possible now.'))
+
+        if self.application.expired_at < datetime.now(tzlocal()):
+            raise serializers.ValidationError(_('Application expired.'))
 
         return data
 
