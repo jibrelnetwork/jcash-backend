@@ -876,7 +876,7 @@ class ApplicationSerializer(serializers.Serializer):
         if not currency_pair:
             raise serializers.ValidationError(_('specified "currency" not found.'))
 
-        attrs['exchanger_address'] = currency_pair.base_currency.exchanger_address if is_reverse_operation else \
+        attrs['exchanger_address'] = currency_pair.base_currency.exchanger_address if not is_reverse_operation else \
             currency_pair.reciprocal_currency.exchanger_address
 
         attrs['currency_pair_id'] = currency_pair.pk
