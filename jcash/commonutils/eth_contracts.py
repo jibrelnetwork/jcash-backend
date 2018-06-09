@@ -32,15 +32,19 @@ def __waitTxConfirmation(tx_id):
         transactionReceipt = web3.eth.getTransactionReceipt(tx_id)
         currentBlockNumber = web3.eth.blockNumber
 
+        if transactionReceipt is not None and transactionReceipt.status == 0:
+            raise Exception("Transaction {} failed".format(tx_id))
+
         if not transactionReceipt is None and \
                 (currentBlockNumber - transactionReceipt.blockNumber >= ETH_TX__BLOCKS_CONFIRM_NUM - 1):
-            return
+            if transactionReceipt.status == 1:
+                return
 
         if time.time() > startTime + maxTimeoutSec:
-            raise Exception("Transaction not minted in {} seconds".format(maxTimeoutSec))
+            raise Exception("Transaction {} not minted in {} seconds".format(tx_id, maxTimeoutSec))
 
         if currentBlockNumber > startBlock + maxTimeoutBlocks:
-            raise Exception("Transaction not minted in {} blocks".format(maxTimeoutBlocks))
+            raise Exception("Transaction {} not minted in {} blocks".format(tx_id, maxTimeoutBlocks))
 
         time.sleep(pollingInterval)
 
@@ -77,7 +81,7 @@ def admitUser(license_registry_address, user_address):
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
                                 "admitUser",
-                                ( w3.toChecksumAddress(user_address) ),
+                                ( w3.toChecksumAddress(user_address), ),
                                 ETH_MANAGER__PRIVATE_KEY)
 
 
@@ -107,6 +111,7 @@ def licenseUser(license_registry_address, user_address, expiration_time):
                          expiration_time)
 
     admitUser(license_registry_address, user_address)
+
     logging.getLogger(__name__).info("licensed address {} expiration {}".format(user_address, expiration_time))
 
 

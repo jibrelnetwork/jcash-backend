@@ -683,7 +683,7 @@ class AddressVerifySerializer(serializers.Serializer):
         sig = attrs.get('sig')
         message_uuid = attrs.get('message_uuid')
 
-        address_verify = AddressVerify.objects.filter(id=message_uuid).first()
+        address_verify = AddressVerify.objects.filter(id=message_uuid).latest('created_at')
         if address_verify is None:
             raise exceptions.ValidationError(_('Address does not exists.'))
 
