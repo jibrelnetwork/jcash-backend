@@ -18,6 +18,7 @@ from allauth.account.models import EmailAddress
 
 from jcash.api.models import (
     Address,
+    AddressVerify,
     Account,
     Document,
     Currency,
@@ -114,6 +115,12 @@ class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['created_at', 'address', 'type', 'is_verified', 'is_rejected']
     search_fields = ['user__username', 'address']
     list_select_related = ('user__account',)
+
+
+@admin.register(AddressVerify)
+class AddressVerifyAdmin(ReadonlyMixin, admin.ModelAdmin):
+    list_display = ['id', 'created_at', 'message', 'sig', 'is_verified']
+    search_fields = ['id']
 
 
 @admin.register(Document)
