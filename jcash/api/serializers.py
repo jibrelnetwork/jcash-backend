@@ -684,7 +684,7 @@ class AddressVerifySerializer(serializers.Serializer):
         message_uuid = attrs.get('message_uuid')
 
         address_verify = AddressVerify.objects.filter(id=message_uuid).first()
-        if not address_verify:
+        if address_verify is None:
             raise exceptions.ValidationError(_('Address does not exists.'))
 
         if not address == address_verify.address.address:
@@ -786,7 +786,7 @@ class AddressSerializer(serializers.Serializer):
             if not address:
                 address = Address.objects.create(user=user, **self.validated_data)
             else:
-                if address.is_removed or address.is_rejected:
+                if address.is_removed or address.is_rejected or not address.is_verified:
                     address.is_removed = False
                     address.is_rejected = False
                     address.is_verified = False
@@ -818,7 +818,7 @@ class AddressSerializer(serializers.Serializer):
             address_obj = Address.objects.get(address__iexact=address)
             if address_obj.user_id != user.pk:
                 raise serializers.ValidationError(_('This address already used.'))
-            elif not address_obj.is_removed and not address_obj.is_rejected:
+            elif not address_obj.is_removed and not address_obj.is_rejected and address_obj.is_verified:
                 raise serializers.ValidationError(_('This address already exists.'))
         except Address.DoesNotExist:
             pass
