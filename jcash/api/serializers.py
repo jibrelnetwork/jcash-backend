@@ -126,6 +126,8 @@ class AccountSerializer(serializers.ModelSerializer):
             not obj.is_identity_verified and \
             obj.is_identity_declined:
             return str(AccountStatus.declined)
+        elif obj.is_identity_verified:
+            return str(AccountStatus.verified)
         else:
             return str(AccountStatus.created)
 
