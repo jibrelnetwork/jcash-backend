@@ -140,7 +140,7 @@ def process_unlinked_unconfirmed_events():
             with transaction.atomic():
                 if tx_info[0] is not None and tx_info[1] >= in_tx.block_height + ETH_TX__BLOCKS_CONFIRM_NUM:
                     in_tx.status = TransactionStatus.confirmed
-                    refund_value = in_tx.value - get_borrow_fee()
+                    refund_value = in_tx.value - get_borrow_fee(in_tx.value)
                     if refund_value < 0:
                         logger.error('outgoing tx value < 0')
                     refund = Refund.objects.create(created_at=datetime.now(tzlocal()),
@@ -272,12 +272,15 @@ def process_applications():
                         application.save()
                 elif application.status == str(ApplicationStatus.refunding):
                     in_tx = application.incoming_txs.first()
+                    refund_value = in_tx.value - get_borrow_fee(in_tx.value)
+                    if refund_value < 0:
+                        logger.error('outgoing tx value < 0')
                     if in_tx is not None:
                         refund = Refund.objects.create(application_id=application.pk,
                                                        incoming_transaction_id=in_tx.pk,
                                                        to_address=application.address.address,
                                                        created_at=datetime.now(tzlocal()),
-                                                       value=application.incomingtransaction_set.first().value - get_borrow_fee(),
+                                                       value=application.incomingtransaction_set.first().value - get_borrow_fee(refund_value),
                                                        status=TransactionStatus.confirmed)
                         refund.save()
                 elif application.status == str(ApplicationStatus.converting):
