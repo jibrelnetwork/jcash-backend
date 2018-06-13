@@ -70,7 +70,14 @@ def celery_process_applications():
 @locked_task()
 @initialize_app
 def celery_check_outgoing_transactions():
-    return commands.check_outgoing_transactions()
+    return commands.check_outgoing_transactions_runner()
+
+
+@celery_app.task()
+@locked_task()
+@initialize_app
+def celery_process_outgoing_transactions():
+    return commands.process_outgoing_transactions_runner()
 
 
 @celery_app.on_after_finalize.connect
@@ -107,7 +114,11 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_process_applications,
                              expires=1 * 60,
                              name='process_applications')
-    sender.add_periodic_task(crontab(minute='*/1'),
+    sender.add_periodic_task(30,
                              celery_check_outgoing_transactions,
                              expires=1 * 60,
                              name='check_outgoing_transactions')
+    sender.add_periodic_task(30,
+                             celery_process_outgoing_transactions,
+                             expires=1 * 60,
+                             name='process_outgoing_transactions')

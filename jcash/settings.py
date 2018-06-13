@@ -295,6 +295,7 @@ LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)
 LOGIC__MAX_VERIFICATION_ATTEMPTS = os.getenv('LOGIC_MAX_VERIFICATION_ATTEMPTS', 3)
 LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1000.0)
 LOGIC__MAX_ADDRESSES_NUM = os.getenv('LOGIC_MAX_ADDRESSES_NUM', 5)
+LOGIC__REFUND_FEE_PERCENT = os.getenv('LOGIC_REFUND_FEE_PERCENT', 1)
 
 # Alphavantage.co API
 ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')
@@ -321,7 +322,7 @@ ETH_EXCHANGER__PRIVATE_KEY = os.getenv('ETH_EXCHANGER_PRIVATE_KEY', '')
 ETH_EXCHANGER__ADDRESS = os.getenv('ETH_EXCHANGER_ADDRESS', '')
 ETH_TX__GAZ_MULTIPLICATOR = os.getenv('ETH_TX_GAZ_MULTIPLICATOR', 1.2)
 ETH_TX__BLOCKS_CONFIRM_NUM = os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5)
-ETH_TX__MAX_PENDING_TX_COUNT = os.getenv('ETH_TX_MAX_PENDING_TX_COUNT', 1)
+ETH_TX__MAX_PENDING_TX_COUNT = os.getenv('ETH_TX_MAX_PENDING_TX_COUNT', 10)
 ETH_LICENSE_REGISTRY_MANAGEMENT__ABI = b'[{"constant": false, ' \
                                        b'   "inputs": [{"name": "_userAddress","type": "address"},' \
                                        b'              {"name": "_licenseName","type": "string"},' \

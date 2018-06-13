@@ -24,11 +24,13 @@ from jcash.api.models import (
     Exchange
 )
 from jcash.commonutils import notify, person_verify, eth_events, eth_contracts, eth_utils
+from jcash.api.tasks import celery_refund, celery_transfer
 from jcash.settings import (
     LOGIC__MAX_VERIFICATION_ATTEMPTS,
     ETH_TX__BLOCKS_CONFIRM_NUM,
     LOGIC__MAX_DIFF_PERCENT,
     LOGIC__EXPIRATION_LIMIT_SEC,
+    LOGIC__REFUND_FEE_PERCENT,
     ETH_TX__MAX_PENDING_TX_COUNT
 )
 
@@ -121,8 +123,8 @@ def process_all_uncomplete_verifications():
     logger.info('Finished process uncomplete verifications')
 
 
-def get_borrow_fee():
-    return 0.01
+def get_borrow_fee(in_value):
+    return LOGIC__REFUND_FEE_PERCENT * in_value / 100
 
 
 def process_unlinked_unconfirmed_events():
@@ -138,8 +140,13 @@ def process_unlinked_unconfirmed_events():
             with transaction.atomic():
                 if tx_info[0] is not None and tx_info[1] >= in_tx.block_height + ETH_TX__BLOCKS_CONFIRM_NUM:
                     in_tx.status = TransactionStatus.confirmed
+                    refund_value = in_tx.value - get_borrow_fee()
+                    if refund_value < 0:
+                        logger.error('outgoing tx value < 0')
                     refund = Refund.objects.create(created_at=datetime.now(tzlocal()),
-                                                   value=in_tx.value - get_borrow_fee(),
+                                                   incoming_transaction_id=in_tx.pk,
+                                                   to_address=in_tx.to_address,
+                                                   value=refund_value,
                                                    status=TransactionStatus.confirmed)
                     refund.save()
                 elif tx_info[0] is None:
@@ -267,6 +274,8 @@ def process_applications():
                     in_tx = application.incoming_txs.first()
                     if in_tx is not None:
                         refund = Refund.objects.create(application_id=application.pk,
+                                                       incoming_transaction_id=in_tx.pk,
+                                                       to_address=application.address.address,
                                                        created_at=datetime.now(tzlocal()),
                                                        value=application.incomingtransaction_set.first().value - get_borrow_fee(),
                                                        status=TransactionStatus.confirmed)
@@ -276,6 +285,8 @@ def process_applications():
                     if in_tx is not None:
                         exchange = Exchange.objects \
                             .create(application_id=application.pk,
+                                    incoming_transaction_id=in_tx.pk,
+                                    to_address=application.address.address,
                                     created_at=datetime.now(tzlocal()),
                                     value=in_tx.value * application.rate \
                                             if application.is_reverse else \
@@ -323,7 +334,102 @@ def process_license_users_addresses():
                                           .format(exception_str))
 
 
-def check_outgoing_transactions():
+def get_currency_contract_params(currency, is_refund = False):
+    contract_address = currency.view_address if currency.is_erc20_token \
+               else currency.exchanger_address
+    fn = celery_refund if is_refund and not currency.is_erc20_token \
+        else celery_transfer
+    abi = currency.abi
+
+    return abi, contract_address, fn
+
+
+def get_currency_contract_params_by_address(contract_address, is_refund = False):
+    currency = Currency.objects.get(exchanger_address=contract_address)
+    return get_currency_contract_params(currency, is_refund)
+
+
+def get_transaction_params(tx, is_refund = False):
+    return get_currency_contract_params_by_address(tx.incoming_transaction.to_address, is_refund)
+
+
+def process_outgoing_transactions(txs, start_nonce, is_refund = False):
+    nonce = start_nonce + 1
+    for tx in txs:
+        try:
+            abi, contract_address, celery_fn = get_transaction_params(tx, is_refund)
+
+            celery_fn(tx.pk, abi, contract_address, tx.to_address, tx.value, nonce, is_refund)
+            nonce+=1
+        except Exception:
+            exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+            logging.getLogger(__name__).error(
+                "Failed to process outgoing transaction {} is_refund:{} due to exception:\n{}".format(tx.pk,
+                                                                                                      is_refund,
+                                                                                                      exception_str))
+
+
+def process_outgoing_transactions_runner():
+    # noinspection PyBroadException
+    try:
+        logger.info('Start to process outgoing transactions')
+
+        pending_exchanges = Exchange.objects.filter(Q(status=TransactionStatus.pending) &
+                                                    ~Q(transaction_id="")) \
+                                            .order_by('id')  # type: List[Exchange]
+        pending_refundes = Refund.objects.filter(Q(status=TransactionStatus.pending) &
+                                                 ~Q(transaction_id="")) \
+                                         .order_by('id')  # type: List[Refund]
+
+        overall_limit_count = ETH_TX__MAX_PENDING_TX_COUNT - pending_exchanges.count() - pending_refundes.count()
+        if overall_limit_count <= 0:
+            logger.info('Finished to process new outgoing transactions. Over the limit.')
+            return
+
+        exchange_limit_count = int(overall_limit_count * 2 / 3)
+        refund_limit_count = overall_limit_count - exchange_limit_count
+
+        if exchange_limit_count <= 0:
+            logger.info('Finished to process new transfer transactions. Over the limit.')
+            return
+
+        exchanges = Exchange.objects.filter(Q(status=TransactionStatus.confirmed) &
+                                            (Q(transaction_id="") | Q(transaction_id=None))) \
+                                    .order_by('id')[:exchange_limit_count]  # type: List[Exchange]
+        nonce = eth_utils.get_exchanger_nonce()
+        process_outgoing_transactions(exchanges, nonce)
+
+        if refund_limit_count <= 0:
+            logger.info('Finished to process new refund transactions. Over the limit.')
+            return
+
+        refunds = Refund.objects.filter(Q(status=TransactionStatus.confirmed) &
+                                            (Q(transaction_id="") | Q(transaction_id=None))) \
+                                    .order_by('id')[:exchange_limit_count]  # type: List[Refund]
+        nonce = eth_utils.get_exchanger_nonce()
+        process_outgoing_transactions(refunds, nonce, True)
+
+        logger.info('Finished process outgoing transactions')
+    except Exception:
+        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+        logging.getLogger(__name__).error("Failed to process withdraws due to exception:\n{}"
+                                          .format(exception_str))
+
+
+def check_outgoing_transactions(txs):
+    for tx in txs:
+        tx_info, block_number = eth_events.get_tx_info(tx.transaction_id)
+
+        if tx_info and tx_info.get("status"):
+            with transaction.atomic():
+                if tx_info["status"] == '0x1':
+                    tx.status = TransactionStatus.success
+                elif tx_info["status"] == '0x0':
+                    tx.status = TransactionStatus.fail
+                tx.save()
+
+
+def check_outgoing_transactions_runner():
     # noinspection PyBroadException
     try:
         logging.getLogger(__name__).info("Start to check outgoing transactions")
@@ -335,16 +441,8 @@ def check_outgoing_transactions():
                                         ~Q(transaction_id="")) \
                                  .order_by('id')  # type: List[Exchange]
 
-        for exchange in exchanges:
-            tx_info, block_number = eth_events.get_tx_info(exchange.transaction_id)
-
-            if tx_info and tx_info.get("status"):
-                with transaction.atomic():
-                    if tx_info["status"] == '0x1':
-                        exchange.status = TransactionStatus.success
-                    elif tx_info["status"] == '0x0':
-                        exchange.status = TransactionStatus.fail
-                    exchange.save()
+        check_outgoing_transactions(exchanges)
+        check_outgoing_transactions(refunds)
 
         logging.getLogger(__name__).info("Finished checking outgoing transactions")
     except Exception:

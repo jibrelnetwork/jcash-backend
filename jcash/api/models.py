@@ -415,6 +415,9 @@ class IncomingTransaction(models.Model):
     is_linked = models.BooleanField(default=False)
     meta = JSONField(default=dict)
 
+    rel_refundes = 'refundes'
+    rel_exchanges = 'exchanges'
+
     class Meta:
         db_table = 'incoming_transaction'
 
@@ -423,6 +426,9 @@ class IncomingTransaction(models.Model):
 class Exchange(models.Model):
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
     application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_exchanges)
+    incoming_transaction = models.ForeignKey(IncomingTransaction, models.DO_NOTHING,
+                                             related_name=IncomingTransaction.rel_refundes, null=True)
+    to_address = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
@@ -438,6 +444,9 @@ class Exchange(models.Model):
 class Refund(models.Model):
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
     application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_refundes, null=True)
+    incoming_transaction = models.ForeignKey(IncomingTransaction, models.DO_NOTHING,
+                                             related_name=IncomingTransaction.rel_exchanges, null=True)
+    to_address = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)

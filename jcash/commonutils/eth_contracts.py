@@ -2,6 +2,8 @@ import time
 import logging
 import json
 
+from django.db import transaction
+
 from .eth_utils import create_web3
 from jcash.settings import (
     ETH_TX__BLOCKS_CONFIRM_NUM,
@@ -13,6 +15,7 @@ from jcash.settings import (
     ETH_EXCHANGER__ADDRESS,
     ETH_LICENSE_REGISTRY_MANAGEMENT__ABI
 )
+from jcash.api.models import Refund, Exchange, TransactionStatus
 
 
 def __waitTxConfirmation(tx_id):
@@ -49,15 +52,17 @@ def __waitTxConfirmation(tx_id):
         time.sleep(pollingInterval)
 
 
-def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key) -> str:
+def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce = None) -> str:
     web3 = create_web3()
 
-    contract = web3.eth.contract(address=web3.toChecksumAddress(_to), abi=json.loads(_abi))
+    contract = web3.eth.contract(address=web3.toChecksumAddress(_to), abi=_abi)
     contract_func = getattr(contract.functions, _functionName)
 
     _tx_gas_price = int(web3.eth.gasPrice  * ETH_TX__GAZ_MULTIPLICATOR)
     _tx_gas_limit = 100000 #contract_func(*_args).estimateGas()
-    _nonce = web3.eth.getTransactionCount(_from)
+
+    if _nonce is None:
+        _nonce = web3.eth.getTransactionCount(_from)
 
     _txn = contract_func(*_args).buildTransaction({'chainId': ETH_NODE__CHAIN_ID,
                                                   'gas': _tx_gas_limit,
@@ -77,7 +82,7 @@ def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -
 
 def admitUser(license_registry_address, user_address):
     from web3.auto import w3
-    _tx_id = __sendRawTxAndWait(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI,
+    _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
                                 "admitUser",
@@ -87,7 +92,7 @@ def admitUser(license_registry_address, user_address):
 
 def grantUserLicense(license_registry_address, user_address, license_name, expiration_time):
     from web3.auto import w3
-    _tx_id = __sendRawTxAndWait(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI,
+    _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
                                 "grantUserLicense",
@@ -115,7 +120,7 @@ def licenseUser(license_registry_address, user_address, expiration_time):
     logging.getLogger(__name__).info("licensed address {} expiration {}".format(user_address, expiration_time))
 
 
-def transfer(abi, controller_address, to_address, value: float) -> str:
+def __transfer(abi, controller_address, to_address, value: float, nonce: int) -> str:
     from web3.auto import w3
 
     _value_wei = w3.toWei(value, 'ether')
@@ -124,11 +129,12 @@ def transfer(abi, controller_address, to_address, value: float) -> str:
                          ETH_EXCHANGER__ADDRESS,
                          "transfer",
                          ( w3.toChecksumAddress(to_address), _value_wei ),
-                         ETH_EXCHANGER__PRIVATE_KEY)
+                         ETH_EXCHANGER__PRIVATE_KEY,
+                         nonce)
     return _tx_id
 
 
-def refund(abi, controller_address, to_address, value: float) -> str:
+def __refund(abi, controller_address, to_address, value: float, nonce: int) -> str:
     from web3.auto import w3
 
     _value_wei = w3.toWei(value, 'ether')
@@ -137,5 +143,65 @@ def refund(abi, controller_address, to_address, value: float) -> str:
                          ETH_EXCHANGER__ADDRESS,
                          "refund",
                          ( w3.toChecksumAddress(to_address), _value_wei),
-                         ETH_EXCHANGER__PRIVATE_KEY)
+                         ETH_EXCHANGER__PRIVATE_KEY,
+                         nonce)
     return _tx_id
+
+
+def send_outgoing_transaction(tx_pk: int,
+                              contract_abi: str,
+                              contract_address: str,
+                              to_address: str,
+                              value: float,
+                              nonce: int,
+                              is_refund=False,
+                              tx_fn=None):
+    try:
+        if is_refund:
+            entry = Refund.objects.get(pk=tx_pk)
+        else:
+            entry = Exchange.objects.get(pk=tx_pk)
+
+    except Refund.DoesNotExist:
+        logging.getLogger(__name__).info("outgoing with id {} does not exist".format(tx_pk))
+        return
+    with transaction.atomic():
+        tx_hash = tx_fn(contract_abi, contract_address, to_address, value, nonce)
+        entry.status = TransactionStatus.pending
+        entry.transaction_id = tx_hash
+        entry.save()
+        logging.getLogger(__name__).info("outgoing tx with id {} successfully processed".format(tx_pk))
+
+
+def transfer(tx_pk: int,
+             contract_abi: str,
+             contract_address: str,
+             to_address: str,
+             value: float,
+             nonce: int,
+             is_refund=False):
+    send_outgoing_transaction(tx_pk,
+                              contract_abi,
+                              contract_address,
+                              to_address.lower(),
+                              value,
+                              nonce,
+                              is_refund,
+                              __transfer)
+
+
+def refund(tx_pk: int,
+           contract_abi: str,
+           contract_address: str,
+           to_address: str,
+           value: float,
+           nonce: int,
+           is_refund=True):
+    send_outgoing_transaction(tx_pk,
+                              contract_abi,
+                              contract_address,
+                              to_address.lower(),
+                              value,
+                              nonce,
+                              is_refund,
+                              __refund)

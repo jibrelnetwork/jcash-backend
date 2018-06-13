@@ -155,19 +155,19 @@ class ApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(IncomingTransaction)
 class IncomingTransactionAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'application', 'mined_at',
+    list_display = ['id', 'created_at', 'transaction_id', 'application', 'to_address', 'mined_at',
                     'block_height', 'status']
 
 
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'application', 'mined_at',
+    list_display = ['id', 'created_at', 'transaction_id', 'application', 'to_address', 'mined_at',
                     'block_height', 'status']
 
 
 @admin.register(Refund)
 class RefundAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'application', 'mined_at',
+    list_display = ['id', 'created_at', 'transaction_id', 'application', 'to_address', 'mined_at',
                     'block_height', 'status']
 
 
