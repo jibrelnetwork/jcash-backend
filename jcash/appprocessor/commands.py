@@ -352,8 +352,16 @@ def get_currency_contract_params_by_address(contract_address, is_refund = False)
     return get_currency_contract_params(currency, is_refund)
 
 
+def get_reciprocal_currency_by_application(application):
+    if application.is_reverse:
+        return application.currency_pair.base_currency
+    else:
+        return application.currency_pair.reciprocal_currency
+
+
 def get_transaction_params(tx, is_refund = False):
-    return get_currency_contract_params_by_address(tx.incoming_transaction.to_address, is_refund)
+    return get_currency_contract_params_by_address(tx.incoming_transaction.to_address, is_refund) if is_refund else \
+        get_currency_contract_params(get_reciprocal_currency_by_application(tx.application), is_refund)
 
 
 def process_outgoing_transactions(txs, start_nonce, is_refund = False):
@@ -423,11 +431,11 @@ def check_outgoing_transactions(txs):
     for tx in txs:
         tx_info, block_number = eth_events.get_tx_info(tx.transaction_id)
 
-        if tx_info and tx_info.get("status"):
+        if tx_info is not None:
             with transaction.atomic():
-                if tx_info["status"] == '0x1':
+                if tx_info.status == 1:
                     tx.status = TransactionStatus.success
-                elif tx_info["status"] == '0x0':
+                elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail
                 tx.save()
 

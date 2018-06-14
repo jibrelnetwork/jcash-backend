@@ -103,7 +103,7 @@ def grantUserLicense(license_registry_address, user_address, license_name, expir
 def licenseUser(license_registry_address, user_address, expiration_time):
     license_names_list = [
         'transfer_funds',
-        #'receive_funds',
+        'receive_funds',
         #'grant_approval',
         #'get_approval',
         #'spend_funds',
