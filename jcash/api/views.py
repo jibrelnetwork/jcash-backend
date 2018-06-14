@@ -60,6 +60,15 @@ from jcash.api.serializers import (
     ApplicationFinishSerializer,
     ApplicationCancelSerializer,
     ResendEmailConfirmationSerializer,
+    PersonalContactInfoSerializer,
+    PersonalAddressSerializer,
+    PersonalIncomeInfoSerializer,
+    PersonalDocumentsSerializer,
+    CorporateCompanyInfoSerializer,
+    CorporateAddressSerializer,
+    CorporateIncomeInfoSerializer,
+    CorporateContactInfoSerializer,
+    CorporateDocumentsSerializer,
 )
 from jcash.commonutils import currencyrates
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
@@ -1007,3 +1016,219 @@ class CustomLoginView(LoginView):
         response.data['success'] = True
 
         return response
+
+
+class PersonalContactInfoView(GenericAPIView):
+    """
+    get:
+    Get personal contact information.
+
+    * Requires token authentication.
+
+    post:
+    Updates personal contact information.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = PersonalContactInfoSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class PersonalAddressView(GenericAPIView):
+    """
+    get:
+    Get personal residential / address.
+
+    * Requires token authentication.
+
+    post:
+    Updates personal residential / address.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = PersonalAddressSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class PersonalIncomeInfoView(GenericAPIView):
+    """
+    get:
+    Get personal income information.
+
+    * Requires token authentication.
+
+    post:
+    Updates personal income information.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = PersonalIncomeInfoSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class PersonalDocumentsView(GenericAPIView):
+    """
+    get:
+    Get personal documents.
+
+    * Requires token authentication.
+
+    post:
+    Uploads personal documents.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = PersonalDocumentsSerializer
+    parser_classes = (MultiPartParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class CorporateCompanyInfoView(GenericAPIView):
+    """
+    get:
+    Get company information.
+
+    * Requires token authentication.
+
+    post:
+    Updates company information.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CorporateCompanyInfoSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class CorporateAddressView(GenericAPIView):
+    """
+    get:
+    Get business address.
+
+    * Requires token authentication.
+
+    post:
+    Updates business address.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CorporateAddressSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class CorporateIncomeInfoView(GenericAPIView):
+    """
+    get:
+    Get company income information.
+
+    * Requires token authentication.
+
+    post:
+    Updates company income information.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CorporateIncomeInfoSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class CorporateContactInfoView(GenericAPIView):
+    """
+    get:
+    Get company's primary contact information.
+
+    * Requires token authentication.
+
+    post:
+    Updates company's primary contact information.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CorporateContactInfoSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})
+
+
+class CorporateDocumentsView(GenericAPIView):
+    """
+    get:
+    Get company documents.
+
+    * Requires token authentication.
+
+    post:
+    Uploads company documents.
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CorporateDocumentsSerializer
+    parser_classes = (MultiPartParser,)
+
+    def get(self, request):
+        return Response({'success': True})
+
+    def post(self, request):
+        return Response({'success': True})

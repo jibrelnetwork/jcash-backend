@@ -20,4 +20,13 @@ urlpatterns = [
     url(r'^application-refund/', views.ApplicationRefundView.as_view()),
     url(r'^application-cancel/', views.ApplicationCancelView.as_view()),
     url(r'^application-finish/', views.ApplicationFinishView.as_view()),
+    url(r'^customer/personal/contact-info/', views.PersonalContactInfoView.as_view()),
+    url(r'^customer/personal/address/', views.PersonalAddressView.as_view()),
+    url(r'^customer/personal/income-info/', views.PersonalIncomeInfoView.as_view()),
+    url(r'^customer/personal/documents/', views.PersonalDocumentsView.as_view()),
+    url(r'^customer/corporate/company-info/', views.CorporateCompanyInfoView.as_view()),
+    url(r'^customer/corporate/address/', views.CorporateAddressView.as_view()),
+    url(r'^customer/corporate/income-info/', views.CorporateIncomeInfoView.as_view()),
+    url(r'^customer/corporate/contact-info/', views.CorporateContactInfoView.as_view()),
+    url(r'^customer/corporate/documents/', views.CorporateDocumentsView.as_view()),
 ]

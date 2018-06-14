@@ -1016,3 +1016,87 @@ class ApplicationCancelSerializer(serializers.Serializer):
                 self.application.status = str(ApplicationStatus.cancelled)
                 self.application.is_active = False
                 self.application.save()
+
+
+class PersonalContactInfoSerializer(serializers.Serializer):
+    """
+    Serializer for update personal contact information.
+    """
+    fullname = serializers.CharField(required=False)
+    nationality = serializers.CharField(required=False)
+    birthday = serializers.DateField(required=False)
+    phone = serializers.DateField(required=False)
+    email = serializers.EmailField(required=False)
+
+
+class PersonalAddressSerializer(serializers.Serializer):
+    """
+    Serializer for update residential / address.
+    """
+    country = serializers.CharField(required=False)
+    street = serializers.CharField(required=False)
+    apartment = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
+    postcode = serializers.CharField(required=False)
+
+
+class PersonalIncomeInfoSerializer(serializers.Serializer):
+    """
+    Serializer for update income information.
+    """
+    profession = serializers.CharField(required=False)
+    income_source = serializers.CharField(required=False)
+    asstest_origin = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
+    jcash_use = serializers.CharField(required=False)
+
+
+class PersonalDocumentsSerializer(serializers.Serializer):
+    """
+    Serializer for upload documents.
+    """
+    passport = serializers.FileField(required=True)
+    utilitybills = serializers.FileField(required=True)
+    selfie = serializers.FileField(required=True)
+
+
+class CorporateCompanyInfoSerializer(serializers.Serializer):
+    """
+    Serializer for update company info.
+    """
+    name = serializers.CharField(required=False)
+    country = serializers.CharField(required=False)
+    phone = serializers.DateField(required=False)
+    email = serializers.EmailField(required=False)
+
+
+class CorporateAddressSerializer(serializers.Serializer):
+    """
+    Serializer for update business address.
+    """
+    country = serializers.CharField(required=False)
+    street = serializers.CharField(required=False)
+    apartment = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
+    postcode = serializers.CharField(required=False)
+
+
+class CorporateIncomeInfoSerializer(serializers.Serializer):
+    """
+    Serializer for update income information.
+    """
+    pass
+
+
+class CorporateContactInfoSerializer(serializers.Serializer):
+    """
+    Serializer for update primary contact info.
+    """
+    pass
+
+
+class CorporateDocumentsSerializer(serializers.Serializer):
+    """
+    Serializer for upload documents.
+    """
+    license = serializers.FileField(required=True)

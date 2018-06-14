@@ -145,7 +145,7 @@ def process_unlinked_unconfirmed_events():
                         logger.error('outgoing tx value < 0')
                     refund = Refund.objects.create(created_at=datetime.now(tzlocal()),
                                                    incoming_transaction_id=in_tx.pk,
-                                                   to_address=in_tx.to_address,
+                                                   to_address=in_tx.from_address,
                                                    value=refund_value,
                                                    status=TransactionStatus.confirmed)
                     refund.save()
