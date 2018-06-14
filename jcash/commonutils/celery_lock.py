@@ -23,7 +23,7 @@ def locked_task(arg_name=None, name=None, timeout=10*60):
             """Caller."""
             ret_value = None
             have_lock = False
-            key = name or 'celery:{}.{}'.format(run_func.__module__,
+            key = name or 'celery:{}.{}.{}'.format(run_func.__module__,
                                                 run_func.__name__,
                                                 getcallargs(run_func, *args, **kwargs)[arg_name] \
                                                     if arg_name else ''
