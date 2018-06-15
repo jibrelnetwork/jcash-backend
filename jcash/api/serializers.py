@@ -1046,8 +1046,7 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
     """
     profession = serializers.CharField(required=False)
     income_source = serializers.CharField(required=False)
-    asstest_origin = serializers.CharField(required=False)
-    city = serializers.CharField(required=False)
+    asstets_origin = serializers.CharField(required=False)
     jcash_use = serializers.CharField(required=False)
 
 
@@ -1085,14 +1084,27 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
     """
     Serializer for update income information.
     """
-    pass
+    industry = serializers.CharField(required=False)
+    currency_amount = serializers.CharField(required=False)
+    asstets_origin = serializers.CharField(required=False)
+    asstets_origin_description = serializers.CharField(required=False)
+    jcash_use = serializers.CharField(required=False)
 
 
 class CorporateContactInfoSerializer(serializers.Serializer):
     """
     Serializer for update primary contact info.
     """
-    pass
+    fullname = serializers.CharField(required=False)
+    birthday = serializers.DateField(required=False)
+    email = serializers.EmailField(required=False)
+    phone = serializers.DateField(required=False)
+    nationality = serializers.CharField(required=False)
+    country = serializers.CharField(required=False)
+    street = serializers.CharField(required=False)
+    apartment = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
+    postcode = serializers.CharField(required=False)
 
 
 class CorporateDocumentsSerializer(serializers.Serializer):

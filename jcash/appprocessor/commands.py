@@ -365,7 +365,7 @@ def get_transaction_params(tx, is_refund = False):
 
 
 def process_outgoing_transactions(txs, start_nonce, is_refund = False):
-    nonce = start_nonce + 1
+    nonce = start_nonce
     for tx in txs:
         try:
             abi, contract_address, celery_fn = get_transaction_params(tx, is_refund)
