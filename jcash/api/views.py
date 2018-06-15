@@ -668,7 +668,7 @@ class ApplicationView(GenericAPIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        applications_qs = Application.objects.filter(user=request.user)
+        applications_qs = Application.objects.filter(user=request.user).order_by('-created_at')
         applications = ApplicationsSerializer(applications_qs, many=True).data
         return Response({"success": True, "application": applications})
 
