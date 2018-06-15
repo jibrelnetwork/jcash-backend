@@ -605,6 +605,8 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     outgoing_tx_id = serializers.SerializerMethodField()
     outgoing_tx_value = serializers.SerializerMethodField()
     source_address = serializers.SerializerMethodField()
+    base_amount = serializers.SerializerMethodField()
+    reciprocal_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -612,6 +614,18 @@ class ApplicationsSerializer(serializers.ModelSerializer):
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency',
                   'reciprocal_amount', 'rate', 'is_active', 'status')
+
+    def get_base_amount(self, obj):
+        base_amount = obj.base_amount
+        if obj.incoming_txs.count() > 0 and obj.status != str(ApplicationStatus.confirming):
+            base_amount = obj.incoming_txs.first().valu
+        return base_amount
+
+    def get_reciprocal_amount(self, obj):
+        reciprocal_amount = obj.reciprocal_amount
+        if obj.incoming_txs.count() > 0 and obj.status != str(ApplicationStatus.confirming):
+            reciprocal_amount = obj.incoming_txs.first().value * obj.rate
+        return reciprocal_amount
 
     def get_app_uuid(self, obj):
         return obj.id

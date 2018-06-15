@@ -427,7 +427,7 @@ def process_outgoing_transactions_runner():
                                           .format(exception_str))
 
 
-def check_outgoing_transactions(txs):
+def check_outgoing_transactions(txs, is_refund = False):
     for tx in txs:
         tx_info, block_number = eth_events.get_tx_info(tx.transaction_id)
 
@@ -435,8 +435,16 @@ def check_outgoing_transactions(txs):
             with transaction.atomic():
                 if tx_info.status == 1:
                     tx.status = TransactionStatus.success
+                    if tx.application is not None:
+                        if is_refund:
+                            tx.application.status = str(ApplicationStatus.refunded)
+                        else:
+                            tx.application.status = str(ApplicationStatus.converted)
+                        tx.application.save()
                 elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail
+                    logger.info('outgoing transaction {} (is_refund: {}) failed'
+                                .format(tx.transaction_id, is_refund))
                 tx.save()
 
 
@@ -453,7 +461,7 @@ def check_outgoing_transactions_runner():
                                  .order_by('id')  # type: List[Exchange]
 
         check_outgoing_transactions(exchanges)
-        check_outgoing_transactions(refunds)
+        check_outgoing_transactions(refunds, True)
 
         logging.getLogger(__name__).info("Finished checking outgoing transactions")
     except Exception:

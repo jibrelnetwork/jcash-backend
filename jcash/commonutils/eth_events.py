@@ -55,7 +55,7 @@ def get_contract_events(
                            event_name,
                            evnt_args.args['from'].lower(),
                            evnt_args.args['to'].lower(),
-                           web3.fromWei(evnt_args.args.value)))
+                           web3.fromWei(evnt_args.args.value, 'ether')))
     return result
 
 
