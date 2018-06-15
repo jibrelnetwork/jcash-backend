@@ -6,7 +6,7 @@ django.setup()
 
 from jcash.commonutils.celery_lock import locked_task
 from jcash.celeryapp import celery_app
-from jcash.commonutils.currencyrates import feth_currency_price
+from jcash.commonutils.currencyrates import fetch_currency_price
 from jcash.appprocessor import commands
 
 
@@ -14,7 +14,7 @@ from jcash.appprocessor import commands
 @locked_task()
 @initialize_app
 def celery_fetch_tickers_price():
-    return feth_currency_price()
+    return fetch_currency_price()
 
 
 @celery_app.task()

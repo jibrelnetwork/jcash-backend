@@ -296,6 +296,9 @@ LOGIC__MAX_VERIFICATION_ATTEMPTS = os.getenv('LOGIC_MAX_VERIFICATION_ATTEMPTS', 
 LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1.0)
 LOGIC__MAX_ADDRESSES_NUM = os.getenv('LOGIC_MAX_ADDRESSES_NUM', 5)
 LOGIC__REFUND_FEE_PERCENT = os.getenv('LOGIC_REFUND_FEE_PERCENT', 1.0)
+LOGIC__OUT_OF_DATE_PRICE_SEC = os.getenv('LOGIC_OUT_OF_DATE_PRICE_SEC', 10*60)
+LOGIC__ADDRESS_VERIFY_TEXT = os.getenv('LOGIC_ADDRESS_VERIFY_TEXT',
+    "I, {} {}, hereby confirm that I and only I own and have access to the private key of the address {}. Date: {} UTC")
 
 # Alphavantage.co API
 ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')

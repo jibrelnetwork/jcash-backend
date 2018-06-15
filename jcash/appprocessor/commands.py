@@ -23,7 +23,7 @@ from jcash.api.models import (
     Refund,
     Exchange
 )
-from jcash.commonutils import notify, person_verify, eth_events, eth_contracts, eth_utils
+from jcash.commonutils import notify, person_verify, eth_events, eth_contracts, eth_utils, math
 from jcash.api.tasks import celery_refund, celery_transfer
 from jcash.settings import (
     LOGIC__MAX_VERIFICATION_ATTEMPTS,
@@ -172,8 +172,8 @@ def process_linked_unconfirmed_events():
             with transaction.atomic():
                 if tx_info[0] is not None and tx_info[1] >= in_tx.block_height + ETH_TX__BLOCKS_CONFIRM_NUM:
                     in_tx.status = TransactionStatus.confirmed
-                    if abs(in_tx.value - in_tx.application.base_amount) / in_tx.application.base_amount * 100 > \
-                            LOGIC__MAX_DIFF_PERCENT:
+                    if math.calc_absolute_difference(in_tx.value,
+                                                     in_tx.application.base_amount) > LOGIC__MAX_DIFF_PERCENT:
                         in_tx.application.status = str(ApplicationStatus.confirming)
                     elif in_tx.application.is_reverse and \
                             in_tx.application.currency_pair.base_currency.balance < in_tx.value:

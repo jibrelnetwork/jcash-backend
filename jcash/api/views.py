@@ -70,7 +70,7 @@ from jcash.api.serializers import (
     CorporateContactInfoSerializer,
     CorporateDocumentsSerializer,
 )
-from jcash.commonutils import currencyrates
+from jcash.commonutils import currencyrates, math
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
 
 
@@ -322,8 +322,8 @@ class CurrencyView(APIView):
     Response example:
 
     ```
-    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED"},
-    {"base_currency": "jAED","rec_currency": "ETH"}]}
+    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED","round_digits":4},
+    {"base_currency":"jAED","rec_currency":"ETH","round_digits":2}]}
     ```
 
     * Requires token authentication.
@@ -339,10 +339,12 @@ class CurrencyView(APIView):
         for pair in currency_pairs:
             if pair.is_buyable:
                 data["currencies"].append({"base_currency": pair.base_currency.display_name,
-                             "rec_currency": pair.reciprocal_currency.display_name})
+                                           "rec_currency": pair.reciprocal_currency.display_name,
+                                           "round_digits": pair.base_currency.round_digits})
             if pair.is_sellable:
                 data["currencies"].append({"base_currency": pair.reciprocal_currency.display_name,
-                             "rec_currency": pair.base_currency.display_name})
+                                           "rec_currency": pair.base_currency.display_name,
+                                           "round_digits": pair.reciprocal_currency.round_digits})
         return Response(data)
 
 
@@ -371,13 +373,12 @@ class CurrencyRateView(GenericAPIView):
             is_reverse_operation = False
             currency_pair = CurrencyPair.objects.filter(base_currency__display_name__iexact=serializer.validated_data['base_currency'],
                                                          reciprocal_currency__display_name__iexact=serializer.validated_data['rec_currency']) \
-                .first()
+                                                .first()
 
             if not currency_pair:
                 currency_pair = CurrencyPair.objects.filter(
                     base_currency__display_name__iexact=serializer.validated_data['rec_currency'],
-                    reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']
-                ).first()
+                    reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']).first()
                 is_reverse_operation = True
 
             if not currency_pair:
@@ -388,20 +389,35 @@ class CurrencyRateView(GenericAPIView):
             if not currency_pair_rate:
                 return Response({'success': False, 'error': "Currency price does not exists."}, status=400)
 
-            currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else currency_pair_rate.buy_price
+            currency_pair_rate_price = currencyrates.get_currency_pair_rate(currency_pair_rate,
+                                                                            is_reverse_operation)
             if is_reverse_operation:
-                currency_pair_rate_price = 1.0 / currency_pair_rate_price
+                currency_pair_rate_price = math.calc_reverse_rate(currency_pair_rate_price)
 
             base_amount = 0.0
             rec_amount = 0.0
 
             if serializer.validated_data.get('base_amount'):
-                base_amount = serializer.validated_data['base_amount']
-                rec_amount = base_amount * currency_pair_rate_price
+                base_amount = math.round_amount(serializer.validated_data['base_amount'],
+                                                currency_pair,
+                                                is_reverse_operation,
+                                                True)
+
+                rec_amount = math.round_amount(math.calc_reciprocal_amount(base_amount, currency_pair_rate_price),
+                                               currency_pair,
+                                               is_reverse_operation,
+                                               False)
 
             if serializer.validated_data.get('rec_amount'):
-                rec_amount = serializer.validated_data['rec_amount']
-                base_amount = rec_amount / currency_pair_rate_price
+                rec_amount = math.round_amount(serializer.validated_data['rec_amount'],
+                                               currency_pair,
+                                               is_reverse_operation,
+                                               False)
+
+                base_amount = math.round_amount(math.calc_base_amount(rec_amount, currency_pair_rate_price),
+                                                currency_pair,
+                                                is_reverse_operation,
+                                                True)
 
             data = {"success": True,
                     "uuid": currency_pair_rate.id,

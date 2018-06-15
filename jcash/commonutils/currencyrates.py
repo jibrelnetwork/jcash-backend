@@ -9,7 +9,18 @@ from .alphavantage import Alphavantage
 from jcash.api.models import Currency, CurrencyPair, CurrencyPairRate
 
 
-def feth_currency_price():
+def get_currency_pair_rate(currency_pair_rate: CurrencyPairRate, is_reverse_operation: bool):
+    """
+    Get currency
+    :param currency_pair_rate:
+    :param is_reverse_operation: sign if it's reverse exchange operation
+    :return: sell_price or buy_price
+    """
+    return currency_pair_rate.sell_price if is_reverse_operation else \
+        currency_pair_rate.buy_price
+
+
+def fetch_currency_price():
     """
     Fetch currency prices
     """

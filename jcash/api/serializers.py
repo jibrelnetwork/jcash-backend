@@ -28,9 +28,9 @@ from jcash.api.models import (
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
     IncomingTransaction, Exchange, Refund, AccountStatus
 )
-from jcash.commonutils import eth_sign, eth_address
+from jcash.commonutils import eth_sign, eth_address, math
 from jcash.commonutils.notify import send_email_reset_password
-from jcash.settings import LOGIC__EXPIRATION_LIMIT_SEC
+from jcash.settings import LOGIC__EXPIRATION_LIMIT_SEC, LOGIC__OUT_OF_DATE_PRICE_SEC, LOGIC__ADDRESS_VERIFY_TEXT
 
 
 logger = logging.getLogger(__name__)
@@ -617,14 +617,14 @@ class ApplicationsSerializer(serializers.ModelSerializer):
 
     def get_base_amount(self, obj):
         base_amount = obj.base_amount
-        if obj.incoming_txs.count() > 0 and obj.status != str(ApplicationStatus.confirming):
+        if obj.incoming_txs.count() > 0:
             base_amount = obj.incoming_txs.first().value
         return base_amount
 
     def get_reciprocal_amount(self, obj):
         reciprocal_amount = obj.reciprocal_amount
-        if obj.incoming_txs.count() > 0 and obj.status != str(ApplicationStatus.confirming):
-            reciprocal_amount = obj.incoming_txs.first().value * obj.rate
+        if obj.incoming_txs.count() > 0:
+            reciprocal_amount = math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate)
         return reciprocal_amount
 
     def get_app_uuid(self, obj):
@@ -636,7 +636,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     def get_incoming_tx(self, obj):
         try:
             txs = IncomingTransaction.objects.filter(application=obj)
-            return txs[0] if len(txs)>0 else None
+            return txs[0] if len(txs) > 0 else None
         except:
             return None
 
@@ -786,9 +786,10 @@ class AddressSerializer(serializers.Serializer):
         fields = ('address', 'type', 'message', 'uuid')
 
     def generate_message(self, address):
-        return "I, {} {}, hereby confirm that I and only I own and have access to the private key of the address {}. Date: {} UTC" \
-            .format(address.user.account.first_name, address.user.account.last_name,
-                    address.address, timezone.now().strftime('%Y %B %d %I:%M %p'))
+        return LOGIC__ADDRESS_VERIFY_TEXT.format(address.user.account.first_name,
+                                                 address.user.account.last_name,
+                                                 address.address,
+                                                 timezone.now().strftime('%Y %B %d %I:%M %p'))
 
     def save(self, user):
         address = None
@@ -905,16 +906,26 @@ class ApplicationSerializer(serializers.Serializer):
         if currency_pair_rate.currency_pair.pk != currency_pair.pk:
             raise serializers.ValidationError(_('Wrong currency price.'))
 
-        if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > 10*60:
+        if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > LOGIC__OUT_OF_DATE_PRICE_SEC:
             raise serializers.ValidationError(_('Сurrency price is out of date.'))
 
-        currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else currency_pair_rate.buy_price
+        currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else \
+            currency_pair_rate.buy_price
+
         if is_reverse_operation:
-            currency_pair_rate_price = 1.0 / currency_pair_rate_price
+            currency_pair_rate_price = math.calc_reverse_rate(currency_pair_rate_price)
 
         attrs['currency_pair_rate_id'] = currency_pair_rate.pk
         attrs['rate'] = currency_pair_rate_price
-        attrs['reciprocal_amount'] = base_amount_attr * currency_pair_rate_price
+        attrs['base_amount'] = math.round_amount(base_amount_attr,
+                                                 currency_pair,
+                                                 is_reverse_operation,
+                                                 True)
+        attrs['reciprocal_amount'] = math.round_amount(math.calc_reciprocal_amount(attrs['base_amount'],
+                                                                                   currency_pair_rate_price),
+                                                       currency_pair,
+                                                       is_reverse_operation,
+                                                       False)
         attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs
