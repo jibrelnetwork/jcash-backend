@@ -291,7 +291,10 @@ def process_applications():
                                     incoming_transaction_id=in_tx.pk,
                                     to_address=application.address.address,
                                     created_at=datetime.now(tzlocal()),
-                                    value=in_tx.value * application.rate,
+                                    value=math.round_amount(math.calc_reciprocal_amount(in_tx.value, application.rate),
+                                                            application.currency_pair,
+                                                            application.is_reverse,
+                                                            False),
                                     status=TransactionStatus.confirmed)
                         exchange.save()
         except:
