@@ -618,7 +618,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     def get_base_amount(self, obj):
         base_amount = obj.base_amount
         if obj.incoming_txs.count() > 0 and obj.status != str(ApplicationStatus.confirming):
-            base_amount = obj.incoming_txs.first().valu
+            base_amount = obj.incoming_txs.first().value
         return base_amount
 
     def get_reciprocal_amount(self, obj):
