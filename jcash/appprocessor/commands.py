@@ -280,7 +280,7 @@ def process_applications():
                                                        incoming_transaction_id=in_tx.pk,
                                                        to_address=application.address.address,
                                                        created_at=datetime.now(tzlocal()),
-                                                       value=application.incomingtransaction_set.first().value - get_borrow_fee(refund_value),
+                                                       value=refund_value,
                                                        status=TransactionStatus.confirmed)
                         refund.save()
                 elif application.status == str(ApplicationStatus.converting):
@@ -291,9 +291,7 @@ def process_applications():
                                     incoming_transaction_id=in_tx.pk,
                                     to_address=application.address.address,
                                     created_at=datetime.now(tzlocal()),
-                                    value=in_tx.value / application.rate \
-                                            if application.is_reverse else \
-                                        in_tx.value * application.rate,
+                                    value=in_tx.value * application.rate,
                                     status=TransactionStatus.confirmed)
                         exchange.save()
         except:
