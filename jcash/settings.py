@@ -53,7 +53,7 @@ except raven.exceptions.InvalidGitRepository:
 APP_DIR = os.getenv('APP_DIR', here(''))
 
 RAVEN_CONFIG = {
-    #!! 'dsn': os.environ.get('RAVEN_DSN'),
+    'dsn': os.environ.get('RAVEN_DSN'),
     # If you are using git, you can also automatically configure the
     # release based on the git info.
     'release': CODE_VERSION,
@@ -405,7 +405,7 @@ CHECK_MAIL_DELIVERY__DAYS_DEPTH = 4
 
 appLogLevel = logging.DEBUG if DEBUG else logging.INFO
 sqlAlchemyLogLevel = logging.WARNING if DEBUG else logging.ERROR
-appHandlers = ['handler_console'] #, 'sentry']
+appHandlers = ['handler_console', 'sentry']
 
 mailFormat = '''
 Message type:\t\t%(levelname)s
@@ -437,11 +437,11 @@ LOGGING = {
                 'class': 'logging.StreamHandler',
                 'stream': sys.stdout,
             },
-            #'sentry': {
-            #    'level': logging.ERROR,
-            #    'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
-            #    'tags': {'custom-tag': 'x'},
-            #},
+            'sentry': {
+                'level': logging.ERROR,
+                'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+                'tags': {'custom-tag': 'x'},
+            },
         },
         'loggers': {
             '': {'handlers': appHandlers, 'level': appLogLevel, 'propagate': False},
