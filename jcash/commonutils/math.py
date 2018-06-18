@@ -58,3 +58,35 @@ def calc_absolute_difference(value1, value2) -> float:
     :return: difference in percent
     """
     return abs(value1 - value2) / value2 * 100
+
+
+def check_amount_limit(value: float, currency_pair, is_reverse_operation, is_base = True) -> bool:
+    """
+    Check that amount value is greater or equal currency limits
+    :param value:
+    :param currency_pair: CurrencyPair of exchange operation
+    :param is_reverse_operation: sign if it's reverse operation
+    :param is_base: sign if it's base amount
+    :return: bool
+    """
+    result = False
+    if is_base:
+        if is_reverse_operation:
+            if value >= currency_pair.reciprocal_currency.min_limit and \
+                value <= currency_pair.reciprocal_currency.max_limit:
+                result = True
+        else:
+            if value >= currency_pair.base_currency.min_limit and \
+                value <= currency_pair.base_currency.max_limit:
+                result = True
+    else:
+        if is_reverse_operation:
+            if value >= currency_pair.base_currency.min_limit and \
+                value <= currency_pair.base_currency.max_limit:
+                result = True
+        else:
+            if value >= currency_pair.reciprocal_currency.min_limit and \
+                value <= currency_pair.reciprocal_currency.max_limit:
+                result = True
+
+    return result

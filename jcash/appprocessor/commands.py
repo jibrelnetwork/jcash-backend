@@ -172,15 +172,26 @@ def process_linked_unconfirmed_events():
             with transaction.atomic():
                 if tx_info[0] is not None and tx_info[1] >= in_tx.block_height + ETH_TX__BLOCKS_CONFIRM_NUM:
                     in_tx.status = TransactionStatus.confirmed
+                    # check that absolute difference of incoming tx value and application value is not greater then
+                    # backend setting (LOGIC__MAX_DIFF_PERCENT)
                     if math.calc_absolute_difference(in_tx.value,
                                                      in_tx.application.base_amount) > LOGIC__MAX_DIFF_PERCENT:
                         in_tx.application.status = str(ApplicationStatus.confirming)
+                    # check that incoming tx value is not greater then currency balance (reversed exchange operation)
                     elif in_tx.application.is_reverse and \
                             in_tx.application.currency_pair.base_currency.balance < in_tx.value:
                         in_tx.application.status = str(ApplicationStatus.refunding)
                         in_tx.status = TransactionStatus.rejected
+                    #check that incoming tx value is not greater then currency balance (nonreversed exchange operation)
                     elif not in_tx.application.is_reverse and \
                             in_tx.application.currency_pair.reciprocal_currency.balance < in_tx.value:
+                        in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.status = TransactionStatus.rejected
+                    #check that incoming tx value is not over-limit
+                    elif not math.check_amount_limit(in_tx.value,
+                                                     in_tx.application.currency_pair,
+                                                     in_tx.application.is_reverse,
+                                                     True):
                         in_tx.application.status = str(ApplicationStatus.refunding)
                         in_tx.status = TransactionStatus.rejected
                     else:

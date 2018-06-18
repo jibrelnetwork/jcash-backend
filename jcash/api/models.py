@@ -290,6 +290,8 @@ class Currency(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     abi = JSONField(default=dict)
     round_digits = models.IntegerField(null=False, default=8)
+    min_limit = models.FloatField(null=False, default=0.0)
+    max_limit = models.FloatField(null=False, default=999999999.0)
 
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
