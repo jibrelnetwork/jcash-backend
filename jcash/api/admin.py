@@ -105,22 +105,42 @@ class AccountAdmin(admin.ModelAdmin):
     list_display = ['id', 'username', 'first_name', 'last_name',
                     'is_identity_verified', 'is_identity_declined',
                     'is_blocked', 'comment']
+    list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
+    search_fields = ['user__username']
+    ordering = ('-id',)
 
-    def username(self, obj):
+    @staticmethod
+    def username(obj):
         return obj.user.username
 
 
 @admin.register(Address)
 class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
-    list_display = ['created_at', 'address', 'type', 'is_verified', 'is_rejected']
+    list_display = ['id', 'created_at', 'username', 'address', 'type',
+                    'is_verified', 'is_allowed', 'is_removed', 'is_rejected']
+    list_filter = ['is_verified', 'is_allowed', 'is_removed', 'is_rejected']
     search_fields = ['user__username', 'address']
-    list_select_related = ('user__account',)
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        return obj.user.username
 
 
 @admin.register(AddressVerify)
 class AddressVerifyAdmin(ReadonlyMixin, admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'message', 'sig', 'is_verified']
-    search_fields = ['id']
+    list_display = ['id', 'created_at', 'username', 'address', 'is_verified', 'message',]
+    list_filter = ['is_verified']
+    search_fields = ['id', 'address__user__username', 'address__address']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        return obj.address.user.username
+
+    @staticmethod
+    def address(obj):
+        return obj.address.address
 
 
 @admin.register(Document)
@@ -131,44 +151,97 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(Currency)
 class CurrencyAdmin(admin.ModelAdmin):
-    list_display = ['created_at', 'display_name', 'symbol', 'exchanger_address', 'view_address',
-                    'controller_address','is_erc20_token','balance','abi']
+    list_display = ['id', 'created_at', 'display_name', 'symbol', 'exchanger_address',
+                    'view_address', 'controller_address', 'is_erc20_token', 'round_digits',
+                    'min_limit', 'max_limit', 'balance', 'abi']
+    search_fields = ['id', 'display_name', 'symbol', 'exchanger_address',
+                     'view_address', 'controller_address']
+    ordering = ('-created_at',)
 
 
 @admin.register(CurrencyPair)
 class CurrencyPairAdmin(admin.ModelAdmin):
-    list_display = ['created_at', 'display_name', 'symbol', 'base_currency','reciprocal_currency',
+    list_display = ['id', 'created_at', 'display_name', 'symbol', 'base_cur','rec_cur',
                     'is_exchangeable', 'is_buyable', 'is_sellable']
+    search_fields = ['id', 'display_name', 'symbol']
+    raw_id_fields = ('base_currency', 'reciprocal_currency')
+    ordering = ('-id',)
+
+    @staticmethod
+    def base_cur(obj):
+        return obj.base_currency.symbol
+
+    @staticmethod
+    def rec_cur(obj):
+        return obj.reciprocal_currency.symbol
 
 
 @admin.register(CurrencyPairRate)
 class CurrencyPairRateAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'currency_pair', 'buy_price', 'sell_price']
+    list_display = ['id', 'created_at', 'currency_name', 'buy_price', 'sell_price']
+    search_fields = ['id', 'currency_pair__symbol', 'currency_pair__display_name']
+    raw_id_fields = ('currency_pair',)
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def currency_name(obj):
+        return obj.currency_pair.display_name
 
 
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
-    list_display = ['id','address','currency_pair','currency_pair_rate',
-                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount',
-                    'reciprocal_amount', 'created_at', 'status']
+    list_display = ['id', 'created_at', 'username', 'address', 'currency_name', 'currency_rate',
+                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount', 'reciprocal_amount', 'status']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        return obj.address.user.username
+
+    @staticmethod
+    def currency_name(obj):
+        return obj.currency_pair.display_name
+
+    @staticmethod
+    def currency_rate(obj):
+        return obj.currency_pair_rate.pk
 
 
 @admin.register(IncomingTransaction)
 class IncomingTransactionAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'application', 'to_address', 'mined_at',
-                    'block_height', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'from_address',
+                    'to_address', 'mined_at', 'block_height', 'status']
+    ordering = ('-mined_at',)
+
+    @staticmethod
+    def username(obj):
+        if obj.application is not None:
+            return obj.application.user.username
+        return '-'
 
 
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'application', 'to_address', 'mined_at',
-                    'block_height', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'status']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        if obj.application is not None:
+            return obj.application.user.username
+        return '-'
 
 
 @admin.register(Refund)
 class RefundAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'application', 'to_address', 'mined_at',
-                    'block_height', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'status']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        if obj.application is not None:
+            return obj.application.user.username
+        return '-'
 
 
 @admin.register(Notification)

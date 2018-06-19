@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'jcash.api',
  
     # contrib
+    'admin_view_permission',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
