@@ -870,16 +870,20 @@ class ApplicationSerializer(serializers.Serializer):
         rate_uuid = attrs.get('uuid')
 
         user_addresses = Address.objects.filter(user=user, is_verified=True)
-        if not address_attr and len(user_addresses) > 1:
+        if user_addresses.count() == 0:
+            raise serializers.ValidationError(_('have no any addresses.'))
+
+        if address_attr is None and user_addresses.count() > 1:
             raise serializers.ValidationError(_('"address" not specified.'))
-        if address_attr and not user_addresses.filter(address=address_attr).first():
-            raise serializers.ValidationError(_('wrong "address".'))
-        address = user_addresses[0] if len(user_addresses)==1 else user_addresses.filter(address=address_attr)
 
-        if not address:
-            raise serializers.ValidationError(_('specified "address" not found.'))
+        if address_attr is not None:
+            app_address = user_addresses.filter(address=address_attr).first()
+            if app_address is None:
+                raise serializers.ValidationError(_('specified "address" does not exist.'))
 
-        attrs['address_id'] = address.pk
+        cur_address = user_addresses[0] if user_addresses.count() == 1 else app_address
+
+        attrs['address_id'] = cur_address.pk
 
         is_reverse_operation = False
         currency_pair = CurrencyPair.objects.filter(base_currency__display_name=base_currency_attr,
