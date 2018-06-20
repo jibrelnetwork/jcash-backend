@@ -295,6 +295,7 @@ class Currency(models.Model):
 
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
+    rel_currencies = 'incoming_transactions'
 
     class Meta:
         db_table = 'currency'
@@ -407,7 +408,10 @@ class TransactionStatus:
 # IncomingTransaction
 class IncomingTransaction(models.Model):
     transaction_id = models.CharField(max_length=120, null=False, blank=False, unique=True)
-    application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_incoming_txs, null=True)
+    application = models.ForeignKey(Application, models.DO_NOTHING,
+                                    related_name=Application.rel_incoming_txs, null=True)
+    currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING,
+                                 related_name=Currency.rel_currencies, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)

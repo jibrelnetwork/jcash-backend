@@ -241,6 +241,7 @@ def fetch_eth_events():
                         application_id = None
 
                     in_tx = IncomingTransaction.objects.create(transaction_id=evnt[0],
+                                                               currency_id=currency.pk,
                                                                application_id=application_id,
                                                                is_linked=True if application_id else False,
                                                                block_height=evnt[1],
