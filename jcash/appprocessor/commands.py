@@ -196,15 +196,15 @@ def process_linked_unconfirmed_events():
                             in_tx.application.currency_pair.reciprocal_currency.balance < in_tx.value:
                         in_tx.application.status = str(ApplicationStatus.refunding)
                         in_tx.status = TransactionStatus.rejected
-                    #check that incoming tx value is not over-limit
-                    elif not math.check_amount_limit(in_tx.value,
-                                                     in_tx.application.currency_pair,
-                                                     in_tx.application.is_reverse,
-                                                     True):
-                        in_tx.application.status = str(ApplicationStatus.refunding)
-                        in_tx.status = TransactionStatus.rejected
                     else:
                         in_tx.application.status = str(ApplicationStatus.converting)
+                    #check that incoming tx value is not over-limit
+                    if not math.check_amount_limit(in_tx.value,
+                                                   in_tx.application.currency_pair,
+                                                   in_tx.application.is_reverse,
+                                                   True):
+                        in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.status = TransactionStatus.rejected
                 elif tx_info[0] is None:
                     in_tx.application_id = None
                     in_tx.status = TransactionStatus.rejected
