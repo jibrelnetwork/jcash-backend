@@ -210,7 +210,9 @@ class ApplicationAdmin(admin.ModelAdmin):
 @admin.register(IncomingTransaction)
 class IncomingTransactionAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'from_address',
-                    'to_address', 'mined_at', 'block_height', 'status']
+                    'to_address', 'value', 'mined_at', 'block_height', 'status']
+    search_fields = ['id', 'application__user__username', 'to_address', 'from_address', 'transaction_id',
+                     'block_height', 'value', 'status']
     ordering = ('-mined_at',)
 
     @staticmethod
@@ -222,7 +224,8 @@ class IncomingTransactionAdmin(admin.ModelAdmin):
 
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'value', 'status']
+    search_fields = ['id', 'application__user__username', 'to_address', 'value', 'transaction_id', 'status']
     ordering = ('-created_at',)
 
     @staticmethod
@@ -234,7 +237,8 @@ class ExchangeAdmin(admin.ModelAdmin):
 
 @admin.register(Refund)
 class RefundAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'value', 'status']
+    search_fields = ['id', 'application__user__username', 'to_address', 'value', 'transaction_id', 'status']
     ordering = ('-created_at',)
 
     @staticmethod
