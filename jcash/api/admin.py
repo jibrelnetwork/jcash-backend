@@ -210,9 +210,9 @@ class ApplicationAdmin(admin.ModelAdmin):
 @admin.register(IncomingTransaction)
 class IncomingTransactionAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'from_address',
-                    'to_address', 'value', 'mined_at', 'block_height', 'status']
+                    'to_address', 'symbol', 'value', 'mined_at', 'block_height', 'status']
     search_fields = ['id', 'application__user__username', 'to_address', 'from_address', 'transaction_id',
-                     'block_height', 'value', 'status']
+                     'block_height', 'value', 'currency__display_name', 'status']
     ordering = ('-mined_at',)
 
     @staticmethod
@@ -221,11 +221,19 @@ class IncomingTransactionAdmin(admin.ModelAdmin):
             return obj.application.user.username
         return '-'
 
+    @staticmethod
+    def symbol(obj):
+        if obj.currency is not None:
+            return obj.currency.display_name
+        return '-'
+
 
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'value', 'status']
-    search_fields = ['id', 'application__user__username', 'to_address', 'value', 'transaction_id', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'symbol',
+                    'value', 'status']
+    search_fields = ['id', 'application__user__username', 'to_address', 'value', 'transaction_id',
+                     'currency__display_name', 'status']
     ordering = ('-created_at',)
 
     @staticmethod
@@ -234,17 +242,31 @@ class ExchangeAdmin(admin.ModelAdmin):
             return obj.application.user.username
         return '-'
 
+    @staticmethod
+    def symbol(obj):
+        if obj.currency is not None:
+            return obj.currency.display_name
+        return '-'
+
 
 @admin.register(Refund)
 class RefundAdmin(admin.ModelAdmin):
-    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'value', 'status']
-    search_fields = ['id', 'application__user__username', 'to_address', 'value', 'transaction_id', 'status']
+    list_display = ['id', 'created_at', 'transaction_id', 'username', 'application', 'to_address', 'symbol',
+                    'value', 'status']
+    search_fields = ['id', 'application__user__username', 'to_address', 'value', 'transaction_id',
+                     'currency__display_name', 'status']
     ordering = ('-created_at',)
 
     @staticmethod
     def username(obj):
         if obj.application is not None:
             return obj.application.user.username
+        return '-'
+
+    @staticmethod
+    def symbol(obj):
+        if obj.currency is not None:
+            return obj.currency.display_name
         return '-'
 
 

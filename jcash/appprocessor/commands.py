@@ -23,7 +23,15 @@ from jcash.api.models import (
     Refund,
     Exchange
 )
-from jcash.commonutils import notify, person_verify, eth_events, eth_contracts, eth_utils, math
+from jcash.commonutils import (
+    notify,
+    person_verify,
+    eth_events,
+    eth_contracts,
+    eth_utils,
+    math,
+    exchange_utils as utils
+)
 from jcash.api.tasks import celery_refund, celery_transfer
 from jcash.settings import (
     LOGIC__MAX_VERIFICATION_ATTEMPTS,
@@ -145,6 +153,7 @@ def process_unlinked_unconfirmed_events():
                         logger.error('outgoing tx value < 0')
                     refund = Refund.objects.create(created_at=datetime.now(tzlocal()),
                                                    incoming_transaction_id=in_tx.pk,
+                                                   currency_id=in_tx.currency.pk,
                                                    to_address=in_tx.from_address,
                                                    value=refund_value,
                                                    status=TransactionStatus.confirmed)
@@ -290,6 +299,7 @@ def process_applications():
                     if in_tx is not None:
                         refund = Refund.objects.create(application_id=application.pk,
                                                        incoming_transaction_id=in_tx.pk,
+                                                       currency_id=utils.get_refund_currency_by_application(application),
                                                        to_address=application.address.address,
                                                        created_at=datetime.now(tzlocal()),
                                                        value=refund_value,
@@ -301,6 +311,7 @@ def process_applications():
                         exchange = Exchange.objects \
                             .create(application_id=application.pk,
                                     incoming_transaction_id=in_tx.pk,
+                                    currency_id=utils.get_exchange_currency_by_application(application),
                                     to_address=application.address.address,
                                     created_at=datetime.now(tzlocal()),
                                     value=math.round_amount(math.calc_reciprocal_amount(in_tx.value, application.rate),

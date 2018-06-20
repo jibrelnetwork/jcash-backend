@@ -296,6 +296,8 @@ class Currency(models.Model):
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
     rel_currencies = 'incoming_transactions'
+    rel_exchanges = 'exchanges'
+    rel_refunds = 'refunds'
 
     class Meta:
         db_table = 'currency'
@@ -435,6 +437,8 @@ class Exchange(models.Model):
     application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_exchanges)
     incoming_transaction = models.ForeignKey(IncomingTransaction, models.DO_NOTHING,
                                              related_name=IncomingTransaction.rel_refundes, null=True)
+    currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING,
+                                 related_name=Currency.rel_exchanges, null=True)
     to_address = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
@@ -453,6 +457,8 @@ class Refund(models.Model):
     application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_refundes, null=True)
     incoming_transaction = models.ForeignKey(IncomingTransaction, models.DO_NOTHING,
                                              related_name=IncomingTransaction.rel_exchanges, null=True)
+    currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING,
+                                 related_name=Currency.rel_refunds, null=True)
     to_address = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField()
     mined_at = models.DateTimeField(null=True, blank=True)
