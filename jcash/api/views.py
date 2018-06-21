@@ -322,8 +322,10 @@ class CurrencyView(APIView):
     Response example:
 
     ```
-    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED","round_digits":4},
-    {"base_currency":"jAED","rec_currency":"ETH","round_digits":2}]}
+    {"success":true,"currencies":[
+    {"base_currency":"ETH","rec_currency":"jAED","round_digits":4,"min_limit":1.0,"max_limit":999.0},
+    {"base_currency":"jAED","rec_currency":"ETH","round_digits":2,"min_limit":1000.0,"max_limit":999999.0}
+    ]}
     ```
 
     * Requires token authentication.
@@ -340,11 +342,15 @@ class CurrencyView(APIView):
             if pair.is_buyable:
                 data["currencies"].append({"base_currency": pair.base_currency.display_name,
                                            "rec_currency": pair.reciprocal_currency.display_name,
-                                           "round_digits": pair.base_currency.round_digits})
+                                           "round_digits": pair.base_currency.round_digits,
+                                           "min_limit": pair.base_currency.min_limit,
+                                           "max_limit": pair.base_currency.max_limit})
             if pair.is_sellable:
                 data["currencies"].append({"base_currency": pair.reciprocal_currency.display_name,
                                            "rec_currency": pair.base_currency.display_name,
-                                           "round_digits": pair.reciprocal_currency.round_digits})
+                                           "round_digits": pair.reciprocal_currency.round_digits,
+                                           "min_limit": pair.reciprocal_currency.min_limit,
+                                           "max_limit": pair.reciprocal_currency.max_limit})
         return Response(data)
 
 
