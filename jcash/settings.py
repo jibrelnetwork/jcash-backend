@@ -308,10 +308,6 @@ ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')
 LOGGING__ROOT_DIR = ""
 LOGGING__SQLALCHEMY_ECHO = False
 
-# recaptcha settings
-RECAPTCHA__VERIFY__ENABLED = False
-RECAPTCHA__SECRET__KEY = os.getenv('RECAPTCHA_SECRET_KEY', '')
-
 LOGIN_REDIRECT_URL = '/'
 
 # Bitfinex config

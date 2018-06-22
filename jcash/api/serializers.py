@@ -35,7 +35,7 @@ from jcash.settings import LOGIC__EXPIRATION_LIMIT_SEC, LOGIC__OUT_OF_DATE_PRICE
 
 logger = logging.getLogger(__name__)
 
-RECAPTCA_API_URL = 'https://www.google.com/recaptcha/api/siteverify'
+RECAPTCHA_API_URL = 'https://www.google.com/recaptcha/api/siteverify'
 
 class CaptchaHelper():
     @classmethod
@@ -44,7 +44,7 @@ class CaptchaHelper():
             return True
         try:
             r = requests.post(
-                RECAPTCA_API_URL,
+                RECAPTCHA_API_URL,
                 {
                     'secret': settings.RECAPTCHA_PRIVATE_KEY,
                     'response': captcha_token
@@ -66,7 +66,7 @@ class CaptchaHelper():
                 if 'missing-input-secret' in json_response['error-codes'] or \
                         'invalid-input-secret' in json_response['error-codes']:
 
-                    logger.error('Invalid reCaptcha secret key detected')
+                    logger.error('Invalid reCaptcha secret key detected {}'.format(settings.RECAPTCHA_PRIVATE_KEY))
                     raise serializers.ValidationError(
                         _('Connection to reCaptcha server failed')
                     )
