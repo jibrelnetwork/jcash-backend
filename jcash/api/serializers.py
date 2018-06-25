@@ -624,7 +624,10 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     def get_reciprocal_amount(self, obj):
         reciprocal_amount = obj.reciprocal_amount
         if obj.incoming_txs.count() > 0:
-            reciprocal_amount = math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate)
+            reciprocal_amount = math.round_amount(math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate),
+                                                  obj.currency_pair,
+                                                  obj.is_reverse,
+                                                  False)
         return reciprocal_amount
 
     def get_app_uuid(self, obj):
