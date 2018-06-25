@@ -1028,7 +1028,8 @@ class ApplicationFinishSerializer(serializers.Serializer):
 
         if not self.application.is_active or \
                 not (self.application.status == str(ApplicationStatus.refunded) or \
-                     self.application.status == str(ApplicationStatus.converted)):
+                     self.application.status == str(ApplicationStatus.converted) or \
+                     self.application.status == str(ApplicationStatus.cancelled)):
             raise serializers.ValidationError(_('This operation is not possible now.'))
 
         return data
