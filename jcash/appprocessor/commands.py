@@ -324,7 +324,7 @@ def process_applications():
                         exchange.save()
                         logger.info('create exchange tx for app {}'.format(application.pk))
                 elif application.status == str(ApplicationStatus.created) and \
-                        application.expired_at > datetime.now(tzlocal()) and \
+                        application.expired_at < datetime.now(tzlocal()) and \
                         application.is_active:
                     application.status = str(ApplicationStatus.cancelled)
                     application.save()
