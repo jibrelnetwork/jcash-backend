@@ -240,7 +240,7 @@ def fetch_eth_events():
                     try:
                         event_application = Application.objects.annotate(in_tx_cnt=Count('incoming_txs'))\
                             .filter(Q(is_active=True) &
-                                    Q(address__address=evnt[4]) &
+                                    Q(address__address__iexact=evnt[4]) &
                                     Q(in_tx_cnt=0) &
                                     Q(created_at__lt=evnt[2]) &
                                     Q(expired_at__gte=evnt[2])) \
