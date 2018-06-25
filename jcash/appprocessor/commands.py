@@ -274,7 +274,8 @@ def fetch_eth_events():
 def process_applications():
     logger.info('Run process applications')
 
-    applications = Application.objects.filter( Q(status=str(ApplicationStatus.refunding)) |
+    applications = Application.objects.filter( Q(status=str(ApplicationStatus.created)) |
+                                               Q(status=str(ApplicationStatus.refunding)) |
                                                Q(status=str(ApplicationStatus.converting)) |
                                               (Q(status=str(ApplicationStatus.confirming)) &
                                                Q(expired_at__lt=datetime.now(tzlocal()))))
@@ -305,6 +306,7 @@ def process_applications():
                                                        value=refund_value,
                                                        status=TransactionStatus.confirmed)
                         refund.save()
+                        logger.info('create refund tx for app {}'.format(application.pk))
                 elif application.status == str(ApplicationStatus.converting):
                     in_tx = application.incoming_txs.first()
                     if in_tx is not None:
@@ -320,6 +322,14 @@ def process_applications():
                                                             False),
                                     status=TransactionStatus.confirmed)
                         exchange.save()
+                        logger.info('create exchange tx for app {}'.format(application.pk))
+                elif application.status == str(ApplicationStatus.created) and \
+                        application.expired_at > datetime.now(tzlocal()) and \
+                        application.is_active:
+                    application.status = str(ApplicationStatus.cancelled)
+                    application.save()
+                    logger.info('cancel application {}'.format(application.pk))
+
         except:
             exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
             logging.getLogger(__name__).error("Failed to process application \"{}\" due to error:\n{}"
