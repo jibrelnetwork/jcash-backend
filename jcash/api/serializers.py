@@ -28,7 +28,7 @@ from jcash.api.models import (
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
     IncomingTransaction, Exchange, Refund, AccountStatus
 )
-from jcash.commonutils import eth_sign, eth_address, math
+from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
 from jcash.settings import LOGIC__EXPIRATION_LIMIT_SEC, LOGIC__OUT_OF_DATE_PRICE_SEC, LOGIC__ADDRESS_VERIFY_TEXT
 
@@ -925,8 +925,7 @@ class ApplicationSerializer(serializers.Serializer):
         if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > LOGIC__OUT_OF_DATE_PRICE_SEC:
             raise serializers.ValidationError(_('Сurrency price is out of date.'))
 
-        currency_pair_rate_price = currency_pair_rate.sell_price if is_reverse_operation else \
-            currency_pair_rate.buy_price
+        currency_pair_rate_price = currencyrates.get_currency_pair_rate(currency_pair_rate, is_reverse_operation)
 
         if is_reverse_operation:
             currency_pair_rate_price = math.calc_reverse_rate(currency_pair_rate_price)
