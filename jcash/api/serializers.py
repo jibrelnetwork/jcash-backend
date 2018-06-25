@@ -607,13 +607,20 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     source_address = serializers.SerializerMethodField()
     base_amount = serializers.SerializerMethodField()
     reciprocal_amount = serializers.SerializerMethodField()
+    rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency',
-                  'reciprocal_amount', 'rate', 'is_active', 'status')
+                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse')
+
+    def get_rate(self, obj):
+        rate = obj.rate
+        if obj.is_reverse:
+            rate = math.calc_reverse_rate(obj.rate)
+        return rate
 
     def get_base_amount(self, obj):
         base_amount = obj.base_amount
