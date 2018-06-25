@@ -623,7 +623,11 @@ class ApplicationsSerializer(serializers.ModelSerializer):
 
     def get_reciprocal_amount(self, obj):
         reciprocal_amount = obj.reciprocal_amount
-        if obj.incoming_txs.count() > 0:
+
+        if obj.incoming_txs.count() > 0 and \
+                obj.status != str(ApplicationStatus.created) and \
+                obj.status != str(ApplicationStatus.waiting) and \
+                obj.status != str(ApplicationStatus.confirming):
             reciprocal_amount = math.round_amount(math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate),
                                                   obj.currency_pair,
                                                   obj.is_reverse,
