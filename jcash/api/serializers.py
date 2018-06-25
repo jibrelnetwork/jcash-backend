@@ -662,15 +662,13 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         return 0
 
     def get_outgoing_tx(self, obj):
-        if obj.status == str(ApplicationStatus.converting) or \
-                obj.status == str(ApplicationStatus.converted):
+        if obj.status == str(ApplicationStatus.converted):
             try:
                 txs = Exchange.objects.filter(application=obj)
                 return txs[0] if len(txs) > 0 else None
             except:
                 return None
-        elif obj.status == str(ApplicationStatus.refunding) or \
-                obj.status == str(ApplicationStatus.refunded):
+        elif obj.status == str(ApplicationStatus.refunded):
             try:
                 txs = Refund.objects.filter(application=obj)
                 return txs[0] if len(txs) > 0 else None
