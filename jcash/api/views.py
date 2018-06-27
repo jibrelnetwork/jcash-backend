@@ -1266,6 +1266,12 @@ class ResidentialCountriesView(GenericAPIView):
     get:
     Get residential countries list.
 
+    Response example:
+
+    ```
+    {"success": true,"countries": ["Germany","Switzerland","United Kingdom"]}
+    ```
+
     * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
@@ -1283,6 +1289,12 @@ class CitizenshipCountriesView(GenericAPIView):
     """
     get:
     Get citizenship countries list.
+
+    Response example:
+
+    ```
+    {"success": true, "countries": ["Sudan","Italy", "Ethiopia"]}
+    ```
 
     * Requires token authentication.
     """
