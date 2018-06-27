@@ -42,6 +42,7 @@ class AccountStatus:
 class AccountType:
     personal = 'personal'
     corporate = 'corporate'
+    beneficiary = 'beneficiary'
 
 
 # Account model
@@ -164,6 +165,7 @@ class PersonalFieldLength:
 
 
 class Personal(models.Model):
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Contact information
     fullname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
     nationality = models.CharField(max_length=PersonalFieldLength.nationality, null=False, blank=True)
@@ -215,6 +217,7 @@ class CorporateFieldLength:
 
 
 class Corporate(models.Model):
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Company information
     name = models.CharField(max_length=CorporateFieldLength.name,
                             null=False, blank=True)
@@ -316,8 +319,8 @@ class Document(models.Model):
 
     personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
                                  related_name=Personal.rel_documents, null=True)
-    #corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING, # todo:
-    #                              related_name=Corporate.rel_documents, null=True)
+    corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING, # todo:
+                                  related_name=Corporate.rel_documents, null=True)
 
     class Meta:
         db_table = 'document'

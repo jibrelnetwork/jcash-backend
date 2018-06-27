@@ -43,6 +43,8 @@ from jcash.api.models import (
     ObjStatus,
     Country,
     CountryType,
+    Personal,
+    Corporate,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -160,7 +162,8 @@ class AccountUpdateView(GenericAPIView):
     def get_serializer_class(self):
         return AccountUpdateSerializer
 
-    def ensure_account(self, request):
+    @classmethod
+    def ensure_account(cls, request):
         try:
             account = request.user.account
         except ObjectDoesNotExist:
@@ -1047,13 +1050,14 @@ class CustomLoginView(LoginView):
 
 class PersonalContactInfoView(GenericAPIView):
     """
-    get:
-    Get personal contact information.
-
-    * Requires token authentication.
-
     post:
     Updates personal contact information.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1062,22 +1066,33 @@ class PersonalContactInfoView(GenericAPIView):
     serializer_class = PersonalContactInfoSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
+    @classmethod
+    def ensure_personal(cls, account):
+        try:
+            personal = account.personal
+        except ObjectDoesNotExist:
+            personal = Personal.objects.create(account=account)
+        return personal
 
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        personal = self.ensure_personal(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(personal)
         return Response({'success': True})
 
 
 class PersonalAddressView(GenericAPIView):
     """
-    get:
-    Get personal residential / address.
-
-    * Requires token authentication.
-
     post:
     Updates personal residential / address.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1086,22 +1101,25 @@ class PersonalAddressView(GenericAPIView):
     serializer_class = PersonalAddressSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        personal = PersonalContactInfoView.ensure_personal(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(personal)
         return Response({'success': True})
 
 
 class PersonalIncomeInfoView(GenericAPIView):
     """
-    get:
-    Get personal income information.
-
-    * Requires token authentication.
-
     post:
     Updates personal income information.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1110,22 +1128,25 @@ class PersonalIncomeInfoView(GenericAPIView):
     serializer_class = PersonalIncomeInfoSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        personal = PersonalContactInfoView.ensure_personal(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(personal)
         return Response({'success': True})
 
 
 class PersonalDocumentsView(GenericAPIView):
     """
-    get:
-    Get personal documents.
-
-    * Requires token authentication.
-
     post:
     Uploads personal documents.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1134,22 +1155,25 @@ class PersonalDocumentsView(GenericAPIView):
     serializer_class = PersonalDocumentsSerializer
     parser_classes = (MultiPartParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        personal = PersonalContactInfoView.ensure_personal(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(personal)
         return Response({'success': True})
 
 
 class CorporateCompanyInfoView(GenericAPIView):
     """
-    get:
-    Get company information.
-
-    * Requires token authentication.
-
     post:
     Updates company information.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1158,22 +1182,33 @@ class CorporateCompanyInfoView(GenericAPIView):
     serializer_class = CorporateCompanyInfoSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
+    @classmethod
+    def ensure_corporate(cls, account):
+        try:
+            corporate = account.corporate
+        except ObjectDoesNotExist:
+            corporate = Corporate.objects.create(account=account)
+        return corporate
 
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        corporate = self.ensure_corporate(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(corporate)
         return Response({'success': True})
 
 
 class CorporateAddressView(GenericAPIView):
     """
-    get:
-    Get business address.
-
-    * Requires token authentication.
-
     post:
     Updates business address.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1182,22 +1217,25 @@ class CorporateAddressView(GenericAPIView):
     serializer_class = CorporateAddressSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(corporate)
         return Response({'success': True})
 
 
 class CorporateIncomeInfoView(GenericAPIView):
     """
-    get:
-    Get company income information.
-
-    * Requires token authentication.
-
     post:
     Updates company income information.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1206,22 +1244,25 @@ class CorporateIncomeInfoView(GenericAPIView):
     serializer_class = CorporateIncomeInfoSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(corporate)
         return Response({'success': True})
 
 
 class CorporateContactInfoView(GenericAPIView):
     """
-    get:
-    Get company's primary contact information.
-
-    * Requires token authentication.
-
     post:
     Updates company's primary contact information.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1230,22 +1271,25 @@ class CorporateContactInfoView(GenericAPIView):
     serializer_class = CorporateContactInfoSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(corporate)
         return Response({'success': True})
 
 
 class CorporateDocumentsView(GenericAPIView):
     """
-    get:
-    Get company documents.
-
-    * Requires token authentication.
-
     post:
     Uploads company documents.
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
 
     * Requires token authentication.
     """
@@ -1254,10 +1298,12 @@ class CorporateDocumentsView(GenericAPIView):
     serializer_class = CorporateDocumentsSerializer
     parser_classes = (MultiPartParser,)
 
-    def get(self, request):
-        return Response({'success': True})
-
     def post(self, request):
+        account = AccountUpdateView.ensure_account(request)
+        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(corporate)
         return Response({'success': True})
 
 

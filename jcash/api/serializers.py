@@ -26,7 +26,9 @@ import requests
 from jcash.api.models import (
     Address, Account, Document,
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
-    IncomingTransaction, Exchange, Refund, AccountStatus, Country
+    IncomingTransaction, Exchange, Refund, AccountStatus, Country,
+    Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
+    CorporateFieldLength, Corporate
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
@@ -1067,32 +1069,138 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     """
     Serializer for update personal contact information.
     """
-    fullname = serializers.CharField(required=False)
-    nationality = serializers.CharField(required=False)
-    birthday = serializers.DateField(required=False)
-    phone = serializers.DateField(required=False)
-    email = serializers.EmailField(required=False)
+    fullname = serializers.CharField(required=True, max_length=PersonalFieldLength.fullname,
+                                     min_length=1)
+    nationality = serializers.CharField(required=True, max_length=PersonalFieldLength.nationality,
+                                        min_length=1)
+    birthday = serializers.DateField(required=True)
+    phone = serializers.CharField(required=True, max_length=PersonalFieldLength.phone,
+                                  min_length=1)
+    email = serializers.EmailField(required=True, max_length=PersonalFieldLength.email,
+                                   min_length=1)
+
+    class Meta:
+        model = Personal
+        fields = ('fullname', 'nationality', 'birthday', 'phone', 'email')
+
+    def save(self, personal):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
+                is_updated = True
+                personal.fullname = self.validated_data['fullname']
+            if serializer_fields.get('nationality') and self.validated_data.get('nationality'):
+                is_updated = True
+                personal.nationality = self.validated_data['nationality']
+            if serializer_fields.get('birthday') and self.validated_data.get('birthday'):
+                is_updated = True
+                personal.birthday = self.validated_data['birthday']
+            if serializer_fields.get('phone') and self.validated_data.get('phone'):
+                is_updated = True
+                personal.phone = self.validated_data['phone']
+            if serializer_fields.get('email') and self.validated_data.get('email'):
+                is_updated = True
+                personal.email = self.validated_data['email']
+            if is_updated:
+                personal.last_updated_at = timezone.now()
+                if personal.account is not None:
+                    personal.account.last_updated_at = timezone.now()
+                    personal.account.type = AccountType.personal
+                    personal.account.save()
+                personal.save()
 
 
 class PersonalAddressSerializer(serializers.Serializer):
     """
     Serializer for update residential / address.
     """
-    country = serializers.CharField(required=False)
-    street = serializers.CharField(required=False)
-    apartment = serializers.CharField(required=False)
-    city = serializers.CharField(required=False)
-    postcode = serializers.CharField(required=False)
+    country = serializers.CharField(required=True, max_length=PersonalFieldLength.country,
+                                    min_length=1)
+    street = serializers.CharField(required=True, max_length=PersonalFieldLength.street,
+                                   min_length=1)
+    apartment = serializers.CharField(required=True, max_length=PersonalFieldLength.apartment,
+                                      min_length=1)
+    city = serializers.CharField(required=True, max_length=PersonalFieldLength.city,
+                                 min_length=1)
+    postcode = serializers.CharField(required=True, max_length=PersonalFieldLength.postcode,
+                                     min_length=1)
+
+    class Meta:
+        model = Personal
+        fields = ('country', 'street', 'apartment', 'city', 'postcode')
+
+    def save(self, personal):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('country') and self.validated_data.get('country'):
+                is_updated = True
+                personal.country = self.validated_data['country']
+            if serializer_fields.get('street') and self.validated_data.get('street'):
+                is_updated = True
+                personal.street = self.validated_data['street']
+            if serializer_fields.get('apartment') and self.validated_data.get('apartment'):
+                is_updated = True
+                personal.apartment = self.validated_data['apartment']
+            if serializer_fields.get('city') and self.validated_data.get('city'):
+                is_updated = True
+                personal.city = self.validated_data['city']
+            if serializer_fields.get('postcode') and self.validated_data.get('postcode'):
+                is_updated = True
+                personal.postcode = self.validated_data['postcode']
+            if is_updated:
+                personal.last_updated_at = timezone.now()
+                if personal.account is not None:
+                    personal.account.last_updated_at = timezone.now()
+                    personal.account.type = AccountType.personal
+                    personal.account.save()
+                personal.save()
 
 
 class PersonalIncomeInfoSerializer(serializers.Serializer):
     """
     Serializer for update income information.
     """
-    profession = serializers.CharField(required=False)
-    income_source = serializers.CharField(required=False)
-    asstets_origin = serializers.CharField(required=False)
-    jcash_use = serializers.CharField(required=False)
+    profession = serializers.CharField(required=True, max_length=PersonalFieldLength.profession,
+                                       min_length=1)
+    income_source = serializers.CharField(required=True, max_length=PersonalFieldLength.income_source,
+                                          min_length=1)
+    asstets_origin = serializers.CharField(required=True, max_length=PersonalFieldLength.asstets_origin,
+                                           min_length=1)
+    jcash_use = serializers.CharField(required=True, max_length=PersonalFieldLength.jcash_use,
+                                      min_length=1)
+
+    class Meta:
+        model = Personal
+        fields = ('profession', 'income_source', 'asstets_origin', 'jcash_use')
+
+    def save(self, personal):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('profession') and self.validated_data.get('profession'):
+                is_updated = True
+                personal.profession = self.validated_data['profession']
+            if serializer_fields.get('income_source') and self.validated_data.get('income_source'):
+                is_updated = True
+                personal.income_source = self.validated_data['income_source']
+            if serializer_fields.get('asstets_origin') and self.validated_data.get('asstets_origin'):
+                is_updated = True
+                personal.asstets_origin = self.validated_data['asstets_origin']
+            if serializer_fields.get('jcash_use') and self.validated_data.get('jcash_use'):
+                is_updated = True
+                personal.jcash_use = self.validated_data['jcash_use']
+            if is_updated:
+                personal.last_updated_at = timezone.now()
+                if personal.account is not None:
+                    personal.account.last_updated_at = timezone.now()
+                    personal.account.type = AccountType.personal
+                    personal.account.save()
+                personal.save()
 
 
 class PersonalDocumentsSerializer(serializers.Serializer):
@@ -1103,60 +1211,284 @@ class PersonalDocumentsSerializer(serializers.Serializer):
     utilitybills = serializers.FileField(required=True)
     selfie = serializers.FileField(required=True)
 
+    class Meta:
+        model = Personal
+        fields = ('passport', 'utilitybills', 'selfie')
+
+    def save(self, personal):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            if serializer_fields.get('passport') and self.validated_data.get('passport'):
+                passport_document = Document.objects.create(user=personal.account.user, personal=personal)
+                passport_document.image = self.validated_data['passport']
+                passport_document.group = DocumentGroup.personal
+                passport_document.type = DocumentType.passport
+                passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
+                passport_document.save()
+            if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
+                utilitybills_document = Document.objects.create(user=personal.account.user, personal=personal)
+                utilitybills_document.image = self.validated_data['utilitybills']
+                utilitybills_document.group = DocumentGroup.personal
+                utilitybills_document.type = DocumentType.utilitybills
+                utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
+                utilitybills_document.save()
+            if serializer_fields.get('selfie') and self.validated_data.get('selfie'):
+                selfie_document = Document.objects.create(user=personal.account.user, personal=personal)
+                selfie_document.image = self.validated_data['selfie']
+                selfie_document.group = DocumentGroup.personal
+                selfie_document.type = DocumentType.selfie
+                selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
+                selfie_document.save()
+
 
 class CorporateCompanyInfoSerializer(serializers.Serializer):
     """
     Serializer for update company info.
     """
-    name = serializers.CharField(required=False)
-    country = serializers.CharField(required=False)
-    phone = serializers.DateField(required=False)
-    email = serializers.EmailField(required=False)
+    name = serializers.CharField(required=True, max_length=CorporateFieldLength.name,
+                                 min_length=1)
+    country = serializers.CharField(required=True, max_length=CorporateFieldLength.country,
+                                    min_length=1)
+    phone = serializers.CharField(required=True, max_length=CorporateFieldLength.phone,
+                                  min_length=1)
+    email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
+                                   min_length=1)
+
+    class Meta:
+        model = Corporate
+        fields = ('name', 'country', 'phone', 'email')
+
+    def save(self, corporate):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('name') and self.validated_data.get('name'):
+                is_updated = True
+                corporate.name = self.validated_data['name']
+            if serializer_fields.get('country') and self.validated_data.get('country'):
+                is_updated = True
+                corporate.domicile_country = self.validated_data['country']
+            if serializer_fields.get('phone') and self.validated_data.get('phone'):
+                is_updated = True
+                corporate.phone = self.validated_data['phone']
+            if serializer_fields.get('email') and self.validated_data.get('email'):
+                is_updated = True
+                corporate.email = self.validated_data['email']
+            if is_updated:
+                corporate.last_updated_at = timezone.now()
+                if corporate.account is not None:
+                    corporate.account.last_updated_at = timezone.now()
+                    corporate.account.type = AccountType.personal
+                    corporate.account.save()
+                corporate.save()
 
 
 class CorporateAddressSerializer(serializers.Serializer):
     """
     Serializer for update business address.
     """
-    country = serializers.CharField(required=False)
-    street = serializers.CharField(required=False)
-    apartment = serializers.CharField(required=False)
-    city = serializers.CharField(required=False)
-    postcode = serializers.CharField(required=False)
+    country = serializers.CharField(required=True, max_length=CorporateFieldLength.country,
+                                    min_length=1)
+    street = serializers.CharField(required=True, max_length=CorporateFieldLength.street,
+                                   min_length=1)
+    apartment = serializers.CharField(required=True, max_length=CorporateFieldLength.apartment,
+                                      min_length=1)
+    city = serializers.CharField(required=True, max_length=CorporateFieldLength.city,
+                                 min_length=1)
+    postcode = serializers.CharField(required=True, max_length=CorporateFieldLength.postcode,
+                                     min_length=1)
+
+    class Meta:
+        model = Corporate
+        fields = ('country', 'street', 'apartment', 'city', 'postcode')
+
+    def save(self, corporate):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('country') and self.validated_data.get('country'):
+                is_updated = True
+                corporate.country = self.validated_data['country']
+            if serializer_fields.get('street') and self.validated_data.get('street'):
+                is_updated = True
+                corporate.street = self.validated_data['street']
+            if serializer_fields.get('apartment') and self.validated_data.get('apartment'):
+                is_updated = True
+                corporate.apartment = self.validated_data['apartment']
+            if serializer_fields.get('city') and self.validated_data.get('city'):
+                is_updated = True
+                corporate.city = self.validated_data['city']
+            if serializer_fields.get('postcode') and self.validated_data.get('postcode'):
+                is_updated = True
+                corporate.postcode = self.validated_data['postcode']
+            if is_updated:
+                corporate.last_updated_at = timezone.now()
+                if corporate.account is not None:
+                    corporate.account.last_updated_at = timezone.now()
+                    corporate.account.type = AccountType.personal
+                    corporate.account.save()
+                corporate.save()
 
 
 class CorporateIncomeInfoSerializer(serializers.Serializer):
     """
     Serializer for update income information.
     """
-    industry = serializers.CharField(required=False)
-    currency_amount = serializers.CharField(required=False)
-    asstets_origin = serializers.CharField(required=False)
-    asstets_origin_description = serializers.CharField(required=False)
-    jcash_use = serializers.CharField(required=False)
+    industry = serializers.CharField(required=True, max_length=CorporateFieldLength.industry,
+                                     min_length=1)
+    currency_amount = serializers.CharField(required=True, max_length=CorporateFieldLength.currency_nature,
+                                            min_length=1)
+    asstets_origin = serializers.CharField(required=True, max_length=CorporateFieldLength.asstets_origin,
+                                           min_length=1)
+    asstets_origin_description = serializers.CharField(required=True,
+                                                       max_length=CorporateFieldLength.asstets_origin_description,
+                                                       min_length=1)
+    jcash_use = serializers.CharField(required=True, max_length=CorporateFieldLength.jcash_use,
+                                      min_length=1)
+
+    class Meta:
+        model = Corporate
+        fields = ('industry', 'currency_amount', 'asstets_origin', 'asstets_origin_description', 'jcash_use')
+
+    def save(self, corporate):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('industry') and self.validated_data.get('industry'):
+                is_updated = True
+                corporate.industry = self.validated_data['industry']
+            if serializer_fields.get('currency_amount') and self.validated_data.get('currency_amount'):
+                is_updated = True
+                corporate.currency_nature = self.validated_data['currency_amount']
+            if serializer_fields.get('asstets_origin') and self.validated_data.get('asstets_origin'):
+                is_updated = True
+                corporate.asstets_origin = self.validated_data['asstets_origin']
+            if serializer_fields.get('asstets_origin_description') and self.validated_data.get('asstets_origin_description'):
+                is_updated = True
+                corporate.asstets_origin_description = self.validated_data['asstets_origin_description']
+            if serializer_fields.get('jcash_use') and self.validated_data.get('jcash_use'):
+                is_updated = True
+                corporate.jcash_use = self.validated_data['jcash_use']
+            if is_updated:
+                corporate.last_updated_at = timezone.now()
+                if corporate.account is not None:
+                    corporate.account.last_updated_at = timezone.now()
+                    corporate.account.type = AccountType.personal
+                    corporate.account.save()
+                corporate.save()
 
 
 class CorporateContactInfoSerializer(serializers.Serializer):
     """
     Serializer for update primary contact info.
     """
-    fullname = serializers.CharField(required=False)
-    birthday = serializers.DateField(required=False)
-    email = serializers.EmailField(required=False)
-    phone = serializers.DateField(required=False)
-    nationality = serializers.CharField(required=False)
-    country = serializers.CharField(required=False)
-    street = serializers.CharField(required=False)
-    apartment = serializers.CharField(required=False)
-    city = serializers.CharField(required=False)
-    postcode = serializers.CharField(required=False)
+    fullname = serializers.CharField(required=True,max_length=CorporateFieldLength.fullname,
+                                     min_length=1)
+    birthday = serializers.DateField(required=True)
+    email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
+                                   min_length=1)
+    phone = serializers.CharField(required=True, max_length=CorporateFieldLength.phone,
+                                  min_length=1)
+    nationality = serializers.CharField(required=True, max_length=CorporateFieldLength.country,
+                                        min_length=1)
+    residency = serializers.CharField(required=True, max_length=CorporateFieldLength.country,
+                                      min_length=1)
+    street = serializers.CharField(required=True, max_length=CorporateFieldLength.street,
+                                   min_length=1)
+    apartment = serializers.CharField(required=True, max_length=CorporateFieldLength.apartment,
+                                      min_length=1)
+    city = serializers.CharField(required=True, max_length=CorporateFieldLength.city,
+                                 min_length=1)
+    postcode = serializers.CharField(required=True, max_length=CorporateFieldLength.postcode,
+                                     min_length=1)
+
+    class Meta:
+        model = Corporate
+        fields = ('fullname', 'birthday', 'email', 'nationality', 'residency',
+                  'street', 'apartment', 'city', 'postcode')
+
+    def save(self, corporate):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            is_updated = False
+            if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
+                is_updated = True
+                corporate.contact_fullname = self.validated_data['fullname']
+            if serializer_fields.get('birthday') and self.validated_data.get('birthday'):
+                is_updated = True
+                corporate.contact_birthday = self.validated_data['birthday']
+            if serializer_fields.get('email') and self.validated_data.get('email'):
+                is_updated = True
+                corporate.contact_email = self.validated_data['email']
+            if serializer_fields.get('nationality') and self.validated_data.get('nationality'):
+                is_updated = True
+                corporate.contact_nationality = self.validated_data['nationality']
+            if serializer_fields.get('residency') and self.validated_data.get('residency'):
+                is_updated = True
+                corporate.contact_residency = self.validated_data['residency']
+            if serializer_fields.get('street') and self.validated_data.get('street'):
+                is_updated = True
+                corporate.contact_street = self.validated_data['street']
+            if serializer_fields.get('apartment') and self.validated_data.get('apartment'):
+                is_updated = True
+                corporate.contact_apartment = self.validated_data['apartment']
+            if serializer_fields.get('city') and self.validated_data.get('city'):
+                is_updated = True
+                corporate.contact_city = self.validated_data['city']
+            if serializer_fields.get('postcode') and self.validated_data.get('postcode'):
+                is_updated = True
+                corporate.contact_postcode = self.validated_data['postcode']
+            if is_updated:
+                corporate.last_updated_at = timezone.now()
+                if corporate.account is not None:
+                    corporate.account.last_updated_at = timezone.now()
+                    corporate.account.type = AccountType.personal
+                    corporate.account.save()
+                corporate.save()
 
 
 class CorporateDocumentsSerializer(serializers.Serializer):
     """
     Serializer for upload documents.
     """
-    license = serializers.FileField(required=True)
+    passport = serializers.FileField(required=True)
+    utilitybills = serializers.FileField(required=True)
+    selfie = serializers.FileField(required=True)
+
+    class Meta:
+        model = Corporate
+        fields = ('passport', 'utilitybills', 'selfie')
+
+    def save(self, corporate):
+        serializer_fields = self.get_fields()
+
+        with transaction.atomic():
+            if serializer_fields.get('passport') and self.validated_data.get('passport'):
+                passport_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
+                passport_document.image = self.validated_data['passport']
+                passport_document.group = DocumentGroup.personal
+                passport_document.type = DocumentType.passport
+                passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
+                passport_document.save()
+            if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
+                utilitybills_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
+                utilitybills_document.image = self.validated_data['utilitybills']
+                utilitybills_document.group = DocumentGroup.personal
+                utilitybills_document.type = DocumentType.utilitybills
+                utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
+                utilitybills_document.save()
+            if serializer_fields.get('selfie') and self.validated_data.get('selfie'):
+                selfie_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
+                selfie_document.image = self.validated_data['selfie']
+                selfie_document.group = DocumentGroup.personal
+                selfie_document.type = DocumentType.selfie
+                selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
+                selfie_document.save()
 
 
 class CountriesListSerializer(serializers.ListSerializer):
