@@ -1159,10 +1159,18 @@ class CorporateDocumentsSerializer(serializers.Serializer):
     license = serializers.FileField(required=True)
 
 
+class CountriesListSerializer(serializers.ListSerializer):
+    def to_representation(self, data):
+        r = super().to_representation(data)
+
+        return { item['name'] for item in r }
+
+
 class CountriesSerializer(serializers.ModelSerializer):
     """
     Serializer for get a list of countries
     """
     class Meta:
         model = Country
-        fields = ('name')
+        fields = ('name',)
+        list_serializer_class = CountriesListSerializer
