@@ -29,6 +29,7 @@ from jcash.api.models import (
     Exchange,
     Refund,
     Notification,
+    Country,
 )
 
 from jcash.api import serializers
@@ -268,6 +269,13 @@ class RefundAdmin(admin.ModelAdmin):
         if obj.currency is not None:
             return obj.currency.display_name
         return '-'
+
+
+@admin.register(Country)
+class CountryAdmin(admin.ModelAdmin):
+    list_display = ['id', 'type', 'name', 'is_removed']
+    search_fields = ['id', 'type', 'name']
+    list_filter = ['is_removed']
 
 
 @admin.register(Notification)
