@@ -38,8 +38,16 @@ class AccountStatus:
     created = ObjStatus('created', 'new account')
 
 
+# Account types
+class AccountType:
+    personal = 'personal'
+    corporate = 'corporate'
+
+
 # Account model
 class Account(models.Model):
+    # Account type
+    type = models.CharField(max_length=20, null=False, blank=True, default='')
     # Personal data
     first_name = models.CharField(max_length=120, null=False, blank=True)
     last_name = models.CharField(max_length=120, null=False, blank=True)
@@ -72,6 +80,8 @@ class Account(models.Model):
     rel_applications = 'applications'
     rel_documents = 'documents'
     rel_addresses = 'addresses'
+    rel_personal = 'personal'
+    rel_corporate = 'corporate'
 
     # Relationships
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -123,6 +133,142 @@ class Account(models.Model):
         return '{} {}'.format(self.first_name, self.last_name)
 
 
+# Country types
+class CountryType:
+    residential = 'residential'
+    citizenship = 'citizenship'
+
+
+# Country
+class Country(models.Model):
+    type = models.CharField(max_length=20, null=False, blank=False, verbose_name='Type')
+    name = models.CharField(max_length=120, null=False, blank=False, verbose_name='Country name')
+    is_removed = models.BooleanField(default=False, verbose_name='Removed')
+
+
+# Personal fields length
+class PersonalFieldLength:
+    fullname = 255
+    nationality = 120
+    phone = 120
+    email = 120
+    country = 120
+    street = 120
+    apartment = 120
+    city = 120
+    postcode = 120
+    profession = 120
+    income_source = 255
+    asstets_origin = 255
+    jcash_use = 255
+
+
+class Personal(models.Model):
+    # Contact information
+    fullname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    nationality = models.CharField(max_length=PersonalFieldLength.nationality, null=False, blank=True)
+    birthday = models.DateField(null=True, blank=True)
+    phone = models.CharField(max_length=PersonalFieldLength.phone, null=False, blank=True)
+    email = models.CharField(max_length=PersonalFieldLength.email, null=False, blank=True)
+
+    # Residential / address
+    country = models.CharField(max_length=PersonalFieldLength.country, null=False, blank=True)
+    street = models.CharField(max_length=PersonalFieldLength.street, null=False, blank=True)
+    apartment = models.CharField(max_length=PersonalFieldLength.apartment, null=False, blank=True)
+    city = models.CharField(max_length=PersonalFieldLength.city, null=False, blank=True)
+    postcode = models.CharField(max_length=PersonalFieldLength.postcode, null=False, blank=True)
+
+    # Income information
+    profession = models.CharField(max_length=PersonalFieldLength.profession, null=False, blank=True)
+    income_source = models.CharField(max_length=PersonalFieldLength.income_source, null=False, blank=True)
+    asstets_origin = models.CharField(max_length=PersonalFieldLength.asstets_origin, null=False, blank=True)
+    jcash_use = models.CharField(max_length=PersonalFieldLength.jcash_use, null=False, blank=True)
+
+    # Modifications time
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated_at = models.DateTimeField(auto_now_add=True)
+
+    # Relationships
+    account = models.OneToOneField(Account, on_delete=models.DO_NOTHING,
+                                   null=True, related_name=Account.rel_personal)
+
+    rel_documents = 'documents'
+
+
+# Personal fields length
+class CorporateFieldLength:
+    name = 255
+    phone = 120
+    email = 120
+    country = 120
+    fullname = 255
+    street = 120
+    apartment = 120
+    city = 120
+    postcode = 120
+    profession = 120
+    asstets_origin = 255
+    asstets_origin_description = 255
+    jcash_use = 255
+    industry = 255
+    currency_nature = 255
+
+
+class Corporate(models.Model):
+    # Company information
+    name = models.CharField(max_length=CorporateFieldLength.name,
+                            null=False, blank=True)
+    domicile_country = models.CharField(max_length=CorporateFieldLength.country,
+                                        null=False, blank=True)
+    business_phone = models.CharField(max_length=CorporateFieldLength.phone,
+                                      null=False, blank=True)
+    business_email = models.EmailField(max_length=CorporateFieldLength.email,
+                                       null=False, blank=True)
+
+    # Business address.
+    country = models.CharField(max_length=CorporateFieldLength.country,
+                               null=False, blank=True)
+    street = models.CharField(max_length=CorporateFieldLength.street,
+                              null=False, blank=True)
+    apartment = models.CharField(max_length=CorporateFieldLength.apartment,
+                                 null=False, blank=True)
+    city = models.CharField(max_length=CorporateFieldLength.city,
+                            null=False, blank=True)
+    postcode = models.CharField(max_length=CorporateFieldLength.postcode,
+                                null=False, blank=True)
+
+    # Income information
+    industry = models.CharField(max_length=CorporateFieldLength.industry, null=False, blank=True)
+    asstets_origin = models.CharField(max_length=CorporateFieldLength.asstets_origin, null=False, blank=True)
+    currency_nature = models.CharField(max_length=CorporateFieldLength.currency_nature, null=False, blank=True)
+
+    asstets_origin_description = models.CharField(max_length=CorporateFieldLength.asstets_origin_description,
+                                                  null=False, blank=True)
+    jcash_use = models.CharField(max_length=CorporateFieldLength.jcash_use, null=False, blank=True)
+
+    # Primary contact
+    contact_fullname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_birthday = models.DateField(null=True, blank=True)
+    contact_nationality = models.CharField(max_length=CorporateFieldLength.country, null=False, blank=True)
+    contact_residency = models.CharField(max_length=CorporateFieldLength.country, null=False, blank=True)
+    contact_phone = models.CharField(max_length=CorporateFieldLength.phone, null=False, blank=True)
+    contact_email = models.CharField(max_length=CorporateFieldLength.email, null=False, blank=True)
+    contact_street = models.CharField(max_length=CorporateFieldLength.street, null=False, blank=True)
+    contact_apartment = models.CharField(max_length=CorporateFieldLength.apartment, null=False, blank=True)
+    contact_city = models.CharField(max_length=CorporateFieldLength.city, null=False, blank=True)
+    contact_postcode = models.CharField(max_length=CorporateFieldLength.postcode, null=False, blank=True)
+
+    # Modifications time
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated_at = models.DateTimeField(auto_now_add=True)
+
+    # Relationships
+    account = models.OneToOneField(Account, on_delete=models.DO_NOTHING,
+                                   null=True, related_name=Account.rel_corporate)
+
+    rel_documents = 'documents'
+
+
 class DocumentHelper:
     @classmethod
     def get_document_filename_extension(cls, filename):
@@ -137,11 +283,23 @@ class DocumentHelper:
         return "{}.{}".format(uuid.uuid4(), extension)
 
 
+class DocumentGroup:
+    personal = 'personal'
+    corporate = 'corporate'
+
+
+class DocumentType:
+    passport = 'passport'
+    utilitybills = 'utilitybills'
+    selfie = 'selfie'
+
+
 # Document model
 class Document(models.Model):
     image = models.FileField('uploaded document', upload_to=DocumentHelper.unique_document_filename)  # stores the uploaded documents
     ext = models.CharField(max_length=20, null=False, blank=True)
     type = models.CharField(max_length=20, null=False, blank=True)
+    group = models.CharField(max_length=20, null=False, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
@@ -155,6 +313,11 @@ class Document(models.Model):
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_documents)
+
+    personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
+                                 related_name=Personal.rel_documents, null=True)
+    #corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING, # todo:
+    #                              related_name=Corporate.rel_documents, null=True)
 
     class Meta:
         db_table = 'document'

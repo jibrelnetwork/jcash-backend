@@ -26,7 +26,7 @@ import requests
 from jcash.api.models import (
     Address, Account, Document,
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
-    IncomingTransaction, Exchange, Refund, AccountStatus
+    IncomingTransaction, Exchange, Refund, AccountStatus, Country
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
@@ -1157,3 +1157,12 @@ class CorporateDocumentsSerializer(serializers.Serializer):
     Serializer for upload documents.
     """
     license = serializers.FileField(required=True)
+
+
+class CountriesSerializer(serializers.ModelSerializer):
+    """
+    Serializer for get a list of countries
+    """
+    class Meta:
+        model = Country
+        fields = ('name')

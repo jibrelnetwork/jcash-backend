@@ -41,6 +41,8 @@ from jcash.api.models import (
     Application,
     ApplicationStatus,
     ObjStatus,
+    Country,
+    CountryType,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -69,6 +71,7 @@ from jcash.api.serializers import (
     CorporateIncomeInfoSerializer,
     CorporateContactInfoSerializer,
     CorporateDocumentsSerializer,
+    CountriesSerializer,
 )
 from jcash.commonutils import currencyrates, math
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
@@ -672,6 +675,7 @@ class ApplicationView(GenericAPIView):
     "reciprocal_amount": 1799,
     "rate": 1799,
     "is_active": true,
+    "is_reverse": false,
     "status": "converting"
     }}]}}
     ```
@@ -732,6 +736,7 @@ class ApplicationDetailView(GenericAPIView):
     "reciprocal_amount": 1799,
     "rate": 1799,
     "is_active": true,
+    "is_reverse": false,
     "status": "converting"
     }}}}
     ```
@@ -1254,3 +1259,39 @@ class CorporateDocumentsView(GenericAPIView):
 
     def post(self, request):
         return Response({'success': True})
+
+
+class ResidentialCountriesView(GenericAPIView):
+    """
+    get:
+    Get residential countries list.
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CountriesSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        countries_qs = Country.objects.filter(type=CountryType.residential, is_removed=False)
+        countries = CountriesSerializer(countries_qs, many=True).data
+        response_data = {'success': True, 'countries': countries}
+        return Response(response_data)
+
+
+class CitizenshipCountriesView(GenericAPIView):
+    """
+    get:
+    Get citizenship countries list.
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CountriesSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        countries_qs = Country.objects.filter(type=CountryType.citizenship, is_removed=False)
+        countries = CountriesSerializer(countries_qs, many=True).data
+        response_data = {'success': True, 'countries': countries}
+        return Response(response_data)

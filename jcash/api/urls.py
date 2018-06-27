@@ -29,4 +29,6 @@ urlpatterns = [
     url(r'^customer/corporate/income-info/', views.CorporateIncomeInfoView.as_view()),
     url(r'^customer/corporate/contact-info/', views.CorporateContactInfoView.as_view()),
     url(r'^customer/corporate/documents/', views.CorporateDocumentsView.as_view()),
+    url(r'^residential-countries/', views.ResidentialCountriesView.as_view()),
+    url(r'^citizenship-countries/', views.CitizenshipCountriesView.as_view()),
 ]
