@@ -45,6 +45,8 @@ from jcash.api.models import (
     CountryType,
     Personal,
     Corporate,
+    PersonalStatus,
+    CorporateStatus,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -74,6 +76,8 @@ from jcash.api.serializers import (
     CorporateContactInfoSerializer,
     CorporateDocumentsSerializer,
     CountriesSerializer,
+    CorporateSerializer,
+    PersonalSerializer,
 )
 from jcash.commonutils import currencyrates, math
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
@@ -1050,6 +1054,18 @@ class CustomLoginView(LoginView):
 
 class PersonalContactInfoView(GenericAPIView):
     """
+    get:
+    Get contact information.
+
+    Response example:
+
+    ```
+    {"success": true, "fullname": "", "nationality": "", "birthday": "", "phone": "", "email": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates personal contact information.
 
@@ -1074,6 +1090,14 @@ class PersonalContactInfoView(GenericAPIView):
             personal = Personal.objects.create(account=account)
         return personal
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_personal):
+            serializer = PersonalSerializer(account.personal, context={'status': ''})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         personal = self.ensure_personal(account)
@@ -1085,6 +1109,18 @@ class PersonalContactInfoView(GenericAPIView):
 
 class PersonalAddressView(GenericAPIView):
     """
+    get:
+    Get address information.
+
+    Response example:
+
+    ```
+    {"success": true, "country": "", "street": "", "apartment": "", "city": "", "postcode": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates personal residential / address.
 
@@ -1101,6 +1137,14 @@ class PersonalAddressView(GenericAPIView):
     serializer_class = PersonalAddressSerializer
     parser_classes = (JSONParser,)
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_personal):
+            serializer = PersonalSerializer(account.personal, context={'status': str(PersonalStatus.address)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         personal = PersonalContactInfoView.ensure_personal(account)
@@ -1112,6 +1156,18 @@ class PersonalAddressView(GenericAPIView):
 
 class PersonalIncomeInfoView(GenericAPIView):
     """
+    get:
+    Get income information.
+
+    Response example:
+
+    ```
+    {"success": true, "profession": "", "income_source": "", "asstets_origin": "", "jcash_use": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates personal income information.
 
@@ -1128,6 +1184,14 @@ class PersonalIncomeInfoView(GenericAPIView):
     serializer_class = PersonalIncomeInfoSerializer
     parser_classes = (JSONParser,)
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_personal):
+            serializer = PersonalSerializer(account.personal, context={'status': str(PersonalStatus.income_info)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         personal = PersonalContactInfoView.ensure_personal(account)
@@ -1139,6 +1203,18 @@ class PersonalIncomeInfoView(GenericAPIView):
 
 class PersonalDocumentsView(GenericAPIView):
     """
+    get:
+    Get documents information.
+
+    Response example:
+
+    ```
+    {"success": true, "passport": "", "utilitybills": "", "selfie": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Uploads personal documents.
 
@@ -1155,6 +1231,14 @@ class PersonalDocumentsView(GenericAPIView):
     serializer_class = PersonalDocumentsSerializer
     parser_classes = (MultiPartParser,)
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_personal):
+            serializer = PersonalSerializer(account.personal, context={'status': str(PersonalStatus.documents)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         personal = PersonalContactInfoView.ensure_personal(account)
@@ -1166,6 +1250,18 @@ class PersonalDocumentsView(GenericAPIView):
 
 class CorporateCompanyInfoView(GenericAPIView):
     """
+    get:
+    Get company information.
+
+    Response example:
+
+    ```
+    {"success": true, "name": "", "domicile_country": "", "business_phone": "", "business_email": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates company information.
 
@@ -1190,6 +1286,14 @@ class CorporateCompanyInfoView(GenericAPIView):
             corporate = Corporate.objects.create(account=account)
         return corporate
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_corporate):
+            serializer = CorporateSerializer(account.corporate, context={'status': ''})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         corporate = self.ensure_corporate(account)
@@ -1201,6 +1305,18 @@ class CorporateCompanyInfoView(GenericAPIView):
 
 class CorporateAddressView(GenericAPIView):
     """
+    get:
+    Get business information.
+
+    Response example:
+
+    ```
+    {"success": true, "country": "", "street": "", "apartment": "", "city": "", "postcode": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates business address.
 
@@ -1217,6 +1333,14 @@ class CorporateAddressView(GenericAPIView):
     serializer_class = CorporateAddressSerializer
     parser_classes = (JSONParser,)
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_corporate):
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.business_address)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
@@ -1228,6 +1352,19 @@ class CorporateAddressView(GenericAPIView):
 
 class CorporateIncomeInfoView(GenericAPIView):
     """
+    get:
+    Get income information.
+
+    Response example:
+
+    ```
+    {"success": true, "industry": "", "asstets_origin": "", "currency_nature": "",
+    "asstets_origin_description": "", "jcash_use": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates company income information.
 
@@ -1244,6 +1381,14 @@ class CorporateIncomeInfoView(GenericAPIView):
     serializer_class = CorporateIncomeInfoSerializer
     parser_classes = (JSONParser,)
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_corporate):
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.income_info)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
@@ -1255,6 +1400,20 @@ class CorporateIncomeInfoView(GenericAPIView):
 
 class CorporateContactInfoView(GenericAPIView):
     """
+    get:
+    Get primary contact information.
+
+    Response example:
+
+    ```
+    {"success": true, "contact_fullname": "", "contact_birthday": "", "contact_nationality": "",
+    "contact_residency": "", "contact_phon": "", "contact_email": "", "contact_street": "",
+    "contact_apartment": "", "contact_city": "", "contact_postcode": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Updates company's primary contact information.
 
@@ -1271,6 +1430,14 @@ class CorporateContactInfoView(GenericAPIView):
     serializer_class = CorporateContactInfoSerializer
     parser_classes = (JSONParser,)
 
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_corporate):
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.primary_contact)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
+
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
@@ -1282,6 +1449,18 @@ class CorporateContactInfoView(GenericAPIView):
 
 class CorporateDocumentsView(GenericAPIView):
     """
+    get:
+    Get documents info.
+
+    Response example:
+
+    ```
+    {"success": true, "passport": "", "utilitybills": "", "selfie": ""} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
     post:
     Uploads company documents.
 
@@ -1297,6 +1476,14 @@ class CorporateDocumentsView(GenericAPIView):
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = CorporateDocumentsSerializer
     parser_classes = (MultiPartParser,)
+
+    def get(self, request):
+        account = AccountUpdateView.ensure_account(request)
+
+        if hasattr(account, Account.rel_corporate):
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.documents)})
+            return Response(serializer.data)
+        return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
         account = AccountUpdateView.ensure_account(request)

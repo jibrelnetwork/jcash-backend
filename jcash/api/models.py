@@ -164,6 +164,14 @@ class PersonalFieldLength:
     jcash_use = 255
 
 
+# Personal statuses
+class PersonalStatus:
+    address = ObjStatus('address', 'address info required')
+    income_info = ObjStatus('income_info', 'income info required')
+    documents= ObjStatus('documents', 'documents required')
+    submitted = ObjStatus('submitted', 'all fields submitted')
+
+
 class Personal(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Contact information
@@ -197,7 +205,7 @@ class Personal(models.Model):
     rel_documents = 'documents'
 
 
-# Personal fields length
+# Corporate fields length
 class CorporateFieldLength:
     name = 255
     phone = 120
@@ -214,6 +222,15 @@ class CorporateFieldLength:
     jcash_use = 255
     industry = 255
     currency_nature = 255
+
+
+# Corporate statuses
+class CorporateStatus:
+    business_address = ObjStatus('business_address', 'business address info required')
+    income_info = ObjStatus('income_info', 'income info required')
+    primary_contact = ObjStatus('primary_contact', 'primary contact info required')
+    documents = ObjStatus('documents', 'documents required')
+    submitted = ObjStatus('submitted', 'all fields submitted')
 
 
 class Corporate(models.Model):
@@ -319,7 +336,7 @@ class Document(models.Model):
 
     personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
                                  related_name=Personal.rel_documents, null=True)
-    corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING, # todo:
+    corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
                                   related_name=Corporate.rel_documents, null=True)
 
     class Meta:

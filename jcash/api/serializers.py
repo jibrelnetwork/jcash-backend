@@ -28,7 +28,7 @@ from jcash.api.models import (
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
-    CorporateFieldLength, Corporate
+    CorporateFieldLength, Corporate, CorporateStatus, PersonalStatus
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
@@ -1242,14 +1242,67 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 selfie_document.save()
 
 
+class PersonalSerializer(serializers.ModelSerializer):
+    """
+    Serializer that takes an additional `status` argument that
+    controls which fields of Personal should be displayed.
+    """
+
+    passport = serializers.SerializerMethodField()
+    utilitybills = serializers.SerializerMethodField()
+    selfie = serializers.SerializerMethodField()
+    success = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        # Instantiate the superclass normally
+        super(PersonalSerializer, self).__init__(*args, **kwargs)
+
+        status = self.context.get('status', '')
+        if status == '':
+            fields = ('success', 'fullname', 'nationality', 'birthday', 'phone', 'email')
+        elif status == str(PersonalStatus.address):
+            fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
+        elif status == str(PersonalStatus.income_info):
+            fields = ('success', 'profession', 'income_source', 'asstets_origin', 'jcash_use')
+        elif status == str(CorporateStatus.documents):
+            fields = ('success', 'passport', 'utilitybills', 'selfie')
+        else:
+            fields = ('success',)
+
+        included = set(fields)
+        existing = set(self.fields.keys())
+
+        for other in existing - included:
+            self.fields.pop(other)
+
+    class Meta:
+        model = Personal
+        fields = ('success', 'fullname', 'nationality', 'birthday', 'phone', 'email',
+                  'country', 'street', 'apartment', 'city', 'postcode', 'profession',
+                  'income_source', 'asstets_origin', 'jcash_use', 'passport', 'utilitybills',
+                  'selfie')
+
+    def get_passport(self, obj):
+        return ''
+
+    def get_utilitybills(self, obj):
+        return ''
+
+    def get_selfie(self, obj):
+        return ''
+
+    def get_success(self, obj):
+        return True if obj else False
+
+
 class CorporateCompanyInfoSerializer(serializers.Serializer):
     """
     Serializer for update company info.
     """
     name = serializers.CharField(required=True, max_length=CorporateFieldLength.name,
                                  min_length=1)
-    country = serializers.CharField(required=True, max_length=CorporateFieldLength.country,
-                                    min_length=1)
+    domicile_country = serializers.CharField(required=True, max_length=CorporateFieldLength.country,
+                                             min_length=1)
     phone = serializers.CharField(required=True, max_length=CorporateFieldLength.phone,
                                   min_length=1)
     email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
@@ -1267,9 +1320,9 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
             if serializer_fields.get('name') and self.validated_data.get('name'):
                 is_updated = True
                 corporate.name = self.validated_data['name']
-            if serializer_fields.get('country') and self.validated_data.get('country'):
+            if serializer_fields.get('domicile_country') and self.validated_data.get('domicile_country'):
                 is_updated = True
-                corporate.domicile_country = self.validated_data['country']
+                corporate.domicile_country = self.validated_data['domicile_country']
             if serializer_fields.get('phone') and self.validated_data.get('phone'):
                 is_updated = True
                 corporate.phone = self.validated_data['phone']
@@ -1339,7 +1392,7 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
     """
     industry = serializers.CharField(required=True, max_length=CorporateFieldLength.industry,
                                      min_length=1)
-    currency_amount = serializers.CharField(required=True, max_length=CorporateFieldLength.currency_nature,
+    currency_nature = serializers.CharField(required=True, max_length=CorporateFieldLength.currency_nature,
                                             min_length=1)
     asstets_origin = serializers.CharField(required=True, max_length=CorporateFieldLength.asstets_origin,
                                            min_length=1)
@@ -1361,9 +1414,9 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
             if serializer_fields.get('industry') and self.validated_data.get('industry'):
                 is_updated = True
                 corporate.industry = self.validated_data['industry']
-            if serializer_fields.get('currency_amount') and self.validated_data.get('currency_amount'):
+            if serializer_fields.get('currency_nature') and self.validated_data.get('currency_nature'):
                 is_updated = True
-                corporate.currency_nature = self.validated_data['currency_amount']
+                corporate.currency_nature = self.validated_data['currency_nature']
             if serializer_fields.get('asstets_origin') and self.validated_data.get('asstets_origin'):
                 is_updated = True
                 corporate.asstets_origin = self.validated_data['asstets_origin']
@@ -1489,6 +1542,67 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
+
+
+class CorporateSerializer(serializers.ModelSerializer):
+    """
+    Serializer that takes an additional `status` argument that
+    controls which fields of Corporate should be displayed.
+    """
+
+    passport = serializers.SerializerMethodField()
+    utilitybills = serializers.SerializerMethodField()
+    selfie = serializers.SerializerMethodField()
+    success = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        # Instantiate the superclass normally
+        super(CorporateSerializer, self).__init__(*args, **kwargs)
+
+        status = self.context.get('status', '')
+        if status == '':
+            fields = ('success', 'name', 'domicile_country', 'business_phone', 'business_email')
+        elif status == str(CorporateStatus.business_address):
+            fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
+        elif status == str(CorporateStatus.income_info):
+            fields = ('success', 'industry', 'asstets_origin', 'currency_nature',
+                      'asstets_origin_description', 'jcash_use')
+        elif status == str(CorporateStatus.primary_contact):
+            fields = ('success', 'contact_fullname', 'contact_birthday', 'contact_nationality',
+                      'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
+                      'contact_apartment', 'contact_city', 'contact_postcode')
+        elif status == str(CorporateStatus.documents):
+            fields = ('passport', 'utilitybills', 'selfie')
+        else:
+            fields = ('success',)
+
+        included = set(fields)
+        existing = set(self.fields.keys())
+
+        for other in existing - included:
+            self.fields.pop(other)
+
+    class Meta:
+        model = Corporate
+        fields = ('success', 'name', 'domicile_country', 'business_phone', 'business_email',
+                  'country', 'street', 'apartment', 'city', 'postcode',  'industry',
+                  'asstets_origin', 'currency_nature', 'asstets_origin_description',
+                  'jcash_use', 'contact_fullname', 'contact_birthday', 'contact_nationality',
+                  'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
+                  'contact_apartment', 'contact_city', 'contact_postcode', 'passport',
+                  'utilitybills', 'selfie')
+
+    def get_passport(self, obj):
+        return ''
+
+    def get_utilitybills(self, obj):
+        return ''
+
+    def get_selfie(self, obj):
+        return ''
+
+    def get_success(self, obj):
+        return True if obj else False
 
 
 class CountriesListSerializer(serializers.ListSerializer):
