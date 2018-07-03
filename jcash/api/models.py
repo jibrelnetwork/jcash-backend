@@ -170,6 +170,7 @@ class PersonalStatus:
     income_info = ObjStatus('income_info', 'income info required')
     documents= ObjStatus('documents', 'documents required')
     submitted = ObjStatus('submitted', 'all fields submitted')
+    declined = ObjStatus('declined', 'customer declined')
 
 
 class Personal(models.Model):
@@ -197,6 +198,8 @@ class Personal(models.Model):
     # Modifications time
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated_at = models.DateTimeField(auto_now_add=True)
+
+    status = models.CharField(max_length=20, default='')
 
     # Relationships
     account = models.OneToOneField(Account, on_delete=models.DO_NOTHING,
@@ -231,6 +234,7 @@ class CorporateStatus:
     primary_contact = ObjStatus('primary_contact', 'primary contact info required')
     documents = ObjStatus('documents', 'documents required')
     submitted = ObjStatus('submitted', 'all fields submitted')
+    declined = ObjStatus('declined', 'customer declined')
 
 
 class Corporate(models.Model):
@@ -281,6 +285,8 @@ class Corporate(models.Model):
     # Modifications time
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated_at = models.DateTimeField(auto_now_add=True)
+
+    status = models.CharField(max_length=20, default='')
 
     # Relationships
     account = models.OneToOneField(Account, on_delete=models.DO_NOTHING,
