@@ -83,18 +83,51 @@ class CaptchaHelper():
                 )
 
 
-class AccountSerializer(serializers.ModelSerializer):
+class AccountSerializer(serializers.Serializer):
     username = serializers.SerializerMethodField()
+    fullname = serializers.SerializerMethodField()
+    birthday = serializers.SerializerMethodField()
+    nationality = serializers.SerializerMethodField()
+    residency = serializers.SerializerMethodField()
     is_email_confirmed = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     success = serializers.SerializerMethodField()
 
     class Meta:
-        model = Account
-        fields = ('success', 'username', 'first_name', 'last_name', 'birthday',
-                  'citizenship', 'residency', 'is_identity_verified',
-                  'is_identity_declined', 'is_email_confirmed', 'status')
-        read_only_fields = ('is_identity_verified', 'is_identity_declined', 'is_email_confirmed')
+        fields = ('success', 'username', 'fullname', 'birthday', 'nationality', 'residency',
+                  'is_email_confirmed', 'status')
+
+    def get_fullname(self, obj):
+        if hasattr(obj, 'personal'):
+            return obj.personal.fullname
+        elif hasattr(obj, 'corporate'):
+            return obj.corporate.contact_fullname
+        else:
+            return ''
+
+    def get_birthday(self, obj):
+        if hasattr(obj, 'personal'):
+            return obj.personal.birthday
+        elif hasattr(obj, 'corporate'):
+            return obj.corporate.contact_birthday
+        else:
+            return ''
+
+    def get_nationality(self, obj):
+        if hasattr(obj, 'personal'):
+            return obj.personal.nationality
+        elif hasattr(obj, 'corporate'):
+            return obj.corporate.contact_nationality
+        else:
+            return ''
+
+    def get_residency(self, obj):
+        if hasattr(obj, 'personal'):
+            return obj.personal.country
+        elif hasattr(obj, 'corporate'):
+            return obj.corporate.contact_residency
+        else:
+            return ''
 
     def get_success(self, obj):
         return True if obj else False
@@ -1109,6 +1142,7 @@ class PersonalContactInfoSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
+                personal.status = str(PersonalStatus.address)
                 personal.save()
 
 
@@ -1157,6 +1191,7 @@ class PersonalAddressSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
+                    personal.status = str(PersonalStatus.income_info)
                 personal.save()
 
 
@@ -1200,6 +1235,7 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
+                personal.status = str(PersonalStatus.documents)
                 personal.save()
 
 
@@ -1240,6 +1276,7 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
+            personal.status = str(PersonalStatus.submitted)
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1325,16 +1362,17 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
                 corporate.domicile_country = self.validated_data['domicile_country']
             if serializer_fields.get('phone') and self.validated_data.get('phone'):
                 is_updated = True
-                corporate.phone = self.validated_data['phone']
+                corporate.business_phone = self.validated_data['phone']
             if serializer_fields.get('email') and self.validated_data.get('email'):
                 is_updated = True
-                corporate.email = self.validated_data['email']
+                corporate.business_email = self.validated_data['email']
             if is_updated:
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
+                corporate.status = str(CorporateStatus.business_address)
                 corporate.save()
 
 
@@ -1383,7 +1421,9 @@ class CorporateAddressSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
+                corporate.status = str(CorporateStatus.income_info)
                 corporate.save()
+
 
 
 class CorporateIncomeInfoSerializer(serializers.Serializer):
@@ -1432,6 +1472,7 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
+                corporate.status = str(CorporateStatus.primary_contact)
                 corporate.save()
 
 
@@ -1478,6 +1519,9 @@ class CorporateContactInfoSerializer(serializers.Serializer):
             if serializer_fields.get('email') and self.validated_data.get('email'):
                 is_updated = True
                 corporate.contact_email = self.validated_data['email']
+            if serializer_fields.get('phone') and self.validated_data.get('phone'):
+                is_updated = True
+                corporate.contact_phone = self.validated_data['phone']
             if serializer_fields.get('nationality') and self.validated_data.get('nationality'):
                 is_updated = True
                 corporate.contact_nationality = self.validated_data['nationality']
@@ -1502,6 +1546,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
+                corporate.status = str(CorporateStatus.documents)
                 corporate.save()
 
 
@@ -1542,6 +1587,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
+            corporate.status = str(CorporateStatus.submitted)
 
 
 class CorporateSerializer(serializers.ModelSerializer):
@@ -1620,3 +1666,30 @@ class CountriesSerializer(serializers.ModelSerializer):
         model = Country
         fields = ('name',)
         list_serializer_class = CountriesListSerializer
+
+
+class CustomersSerializer(serializers.Serializer):
+    """
+    Serializer for get list of account customers
+    """
+
+    type = serializers.SerializerMethodField()
+    uuid = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        fields = ('type', 'uuid', 'status')
+
+    def get_type(self, obj):
+        if isinstance(obj, Personal):
+            return 'personal'
+        elif isinstance(obj, Corporate):
+            return 'corporate'
+        else:
+            return ''
+
+    def get_uuid(self, obj):
+        return obj.uuid
+
+    def get_status(self, obj):
+        return obj.status
