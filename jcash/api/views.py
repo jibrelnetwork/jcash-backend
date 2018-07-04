@@ -45,8 +45,7 @@ from jcash.api.models import (
     CountryType,
     Personal,
     Corporate,
-    PersonalStatus,
-    CorporateStatus,
+    CustomerStatus,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -120,10 +119,8 @@ class AccountUpdateView(GenericAPIView):
      "birthday":"1971-01-01",
      "citizenship":"Russia",
      "residency":"Russia",
-     "is_identity_verified":true,
-     "is_identity_declined":false,
      "is_email_confirmed":true,
-     "status":"verified"}}
+     "status":"verified",}}
     ```
 
     or
@@ -131,25 +128,6 @@ class AccountUpdateView(GenericAPIView):
     ```{{"success": false, "error": "error description"}}```
 
     ```{{"success": false, "errors": {{"field_name":"error_description"}}}}```
-
-    post:
-    Set account info for current user.
-
-    Response example:
-
-    ```
-    {{"success":true,
-     "username":"ivan.ivanov@example.com",
-     "first_name":"Ivan",
-     "last_name":"Ivanov",
-     "birthday":"1971-01-01",
-     "citizenship":"Russia",
-     "residency":"Russia",
-     "is_identity_verified":true,
-     "is_identity_declined":false,
-     "is_email_confirmed":true,
-     "status":"verified"}}
-     ```
 
     **Statuses**
 
@@ -199,8 +177,7 @@ class AccountUpdateView(GenericAPIView):
 
 
 @docstring_parameter(get_status_class_members(AccountStatus),
-                     get_status_class_members(PersonalStatus),
-                     get_status_class_members(CorporateStatus))
+                     get_status_class_members(CustomerStatus))
 class AccountView(AccountUpdateView):
     """
     get:
@@ -215,7 +192,7 @@ class AccountView(AccountUpdateView):
      "birthday": "2017-01-01",
      "nationality": "Zambia",
      "residency": "Zambia",
-     "is_email_confirmed": true,
+     "is_email_confirmed":true,
      "status": "verified",
      "customers": [{{ "type": "personal",
                      "uuid": "f9229b1b-f859-4cc9-b8ef-501238ca721b",
@@ -229,40 +206,9 @@ class AccountView(AccountUpdateView):
 
     **Customers Statuses**
 
-    **Personal**
-
     {1}
 
-    **Corporate**
-
-    {2}
-
     * Requires token authentication.
-
-    put:
-    Updates account info for current user.
-
-    Response example:
-
-    ```
-    {{"success":true,
-     "username":"ivan.ivanov@example.com",
-     "first_name":"Ivan",
-     "last_name":"Ivanov",
-     "birthday":"1971-01-01",
-     "citizenship":"Russia",
-     "residency":"Russia",
-     "is_identity_verified":true,
-     "is_identity_declined":false,
-     "is_email_confirmed":true,
-     "status":"verified"}}
-    ```
-
-    or
-
-    ```{{"success": false, "error": "error description"}}```
-
-    ```{{"success": false, "errors": {{"field_name":"error_description"}}}}```
 
     post:
     Set account info for current user.
@@ -277,8 +223,6 @@ class AccountView(AccountUpdateView):
      "birthday":"1971-01-01",
      "citizenship":"Russia",
      "residency":"Russia",
-     "is_identity_verified":true,
-     "is_identity_declined":false,
      "is_email_confirmed":true,
      "status":"verified"}}
     ```
@@ -312,11 +256,29 @@ class AccountView(AccountUpdateView):
         account = self.ensure_account(request)
         self.action = request.method.lower()
         account_serializer = AccountSerializer(account)
+
         customers = []
+        personal = None
+        corporate = None
+
         if hasattr(account, account.rel_personal):
-            customers.append(account.personal)
+            personal = account.personal
+
         if hasattr(account, account.rel_corporate):
-            customers.append(account.corporate)
+            corporate = account.corporate
+
+        if personal is not None and personal.status == str(CustomerStatus.submitted):
+            customers.append(personal)
+        elif corporate is not None and corporate.status == str(CustomerStatus.submitted):
+            customers.append(corporate)
+        elif corporate is not None and personal is not None:
+            customers.append(personal)
+            customers.append(corporate)
+        elif corporate is not None and personal is None:
+            customers.append(corporate)
+        elif personal is not None and corporate is None:
+            customers.append(personal)
+
         customer_serializer = CustomersSerializer(customers, many=True)
         response_data = account_serializer.data
         response_data.update({"customers": customer_serializer.data})
@@ -1124,8 +1086,6 @@ class PersonalContactInfoView(GenericAPIView):
         with transaction.atomic():
             account = AccountUpdateView.ensure_account(request)
             personal = self.ensure_personal(account)
-            if hasattr(account, account.rel_corporate):
-                account.corporate.delete()
             serializer = self.serializer_class(data=request.data)
             serializer.is_valid(raise_exception=True)
             serializer.save(personal)
@@ -1166,7 +1126,7 @@ class PersonalAddressView(GenericAPIView):
         account = AccountUpdateView.ensure_account(request)
 
         if hasattr(account, Account.rel_personal):
-            serializer = PersonalSerializer(account.personal, context={'status': str(PersonalStatus.address)})
+            serializer = PersonalSerializer(account.personal, context={'status': str(CustomerStatus.address)})
             return Response(serializer.data)
         return Response({'success': False, 'error': 'customer does not exist'})
 
@@ -1213,7 +1173,7 @@ class PersonalIncomeInfoView(GenericAPIView):
         account = AccountUpdateView.ensure_account(request)
 
         if hasattr(account, Account.rel_personal):
-            serializer = PersonalSerializer(account.personal, context={'status': str(PersonalStatus.income_info)})
+            serializer = PersonalSerializer(account.personal, context={'status': str(CustomerStatus.income_info)})
             return Response(serializer.data)
         return Response({'success': False, 'error': 'customer does not exist'})
 
@@ -1302,8 +1262,6 @@ class CorporateCompanyInfoView(GenericAPIView):
         with transaction.atomic():
             account = AccountUpdateView.ensure_account(request)
             corporate = self.ensure_corporate(account)
-            if hasattr(account, Account.rel_personal):
-                account.personal.delete()
             serializer = self.serializer_class(data=request.data)
             serializer.is_valid(raise_exception=True)
             serializer.save(corporate)
@@ -1344,7 +1302,7 @@ class CorporateAddressView(GenericAPIView):
         account = AccountUpdateView.ensure_account(request)
 
         if hasattr(account, Account.rel_corporate):
-            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.business_address)})
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CustomerStatus.business_address)})
             return Response(serializer.data)
         return Response({'success': False, 'error': 'customer does not exist'})
 
@@ -1392,7 +1350,7 @@ class CorporateIncomeInfoView(GenericAPIView):
         account = AccountUpdateView.ensure_account(request)
 
         if hasattr(account, Account.rel_corporate):
-            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.income_info)})
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CustomerStatus.income_info)})
             return Response(serializer.data)
         return Response({'success': False, 'error': 'customer does not exist'})
 
@@ -1441,7 +1399,7 @@ class CorporateContactInfoView(GenericAPIView):
         account = AccountUpdateView.ensure_account(request)
 
         if hasattr(account, Account.rel_corporate):
-            serializer = CorporateSerializer(account.corporate, context={'status': str(CorporateStatus.primary_contact)})
+            serializer = CorporateSerializer(account.corporate, context={'status': str(CustomerStatus.primary_contact)})
             return Response(serializer.data)
         return Response({'success': False, 'error': 'customer does not exist'})
 
