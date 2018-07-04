@@ -101,7 +101,8 @@ class AccountSerializer(serializers.Serializer):
         fields = ('success', 'username', 'fullname', 'birthday', 'nationality', 'residency',
                   'is_email_confirmed', 'status')
 
-    def get_customer(self, obj):
+    @classmethod
+    def get_customer(cls, obj):
         personal = None
         corporate = None
         if hasattr(obj, 'personal'):
@@ -866,8 +867,14 @@ class AddressSerializer(serializers.Serializer):
         fields = ('address', 'type', 'message', 'uuid')
 
     def generate_message(self, address):
-        return LOGIC__ADDRESS_VERIFY_TEXT.format(address.user.account.first_name,
-                                                 address.user.account.last_name,
+        customer = AccountSerializer.get_customer(address.user.account)
+        fullname = ''
+        if isinstance(customer, Personal):
+            fullname = customer.fullname
+        elif isinstance(customer, Corporate):
+            fullname = customer.contact_fullname
+
+        return LOGIC__ADDRESS_VERIFY_TEXT.format(fullname,
                                                  address.address,
                                                  timezone.now().strftime('%Y %B %d %I:%M %p'))
 
