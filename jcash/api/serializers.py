@@ -22,17 +22,21 @@ from rest_framework import serializers, exceptions
 from rest_framework.fields import CurrentUserDefault
 import requests
 
-
 from jcash.api.models import (
     Address, Account, Document,
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
-    CorporateFieldLength, Corporate, CorporateStatus, PersonalStatus
+    CorporateFieldLength, Corporate, CustomerStatus
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
-from jcash.settings import LOGIC__EXPIRATION_LIMIT_SEC, LOGIC__OUT_OF_DATE_PRICE_SEC, LOGIC__ADDRESS_VERIFY_TEXT
+from jcash.settings import (
+    LOGIC__EXPIRATION_LIMIT_SEC,
+    LOGIC__OUT_OF_DATE_PRICE_SEC,
+    LOGIC__ADDRESS_VERIFY_TEXT,
+    LOGIC__CUSTOMER_DOCUMENTS_NUM,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -97,34 +101,62 @@ class AccountSerializer(serializers.Serializer):
         fields = ('success', 'username', 'fullname', 'birthday', 'nationality', 'residency',
                   'is_email_confirmed', 'status')
 
-    def get_fullname(self, obj):
+    def get_customer(self, obj):
+        personal = None
+        corporate = None
         if hasattr(obj, 'personal'):
+            personal = obj.personal
+        if hasattr(obj, 'corporate'):
+            corporate = obj.corporate
+
+        if personal and personal.status == str(CustomerStatus.submitted):
+            return personal
+        elif corporate and corporate.status == str(CustomerStatus.submitted):
+            return corporate
+        elif corporate and personal:
+            if personal.last_updated_at >= corporate.last_updated_at:
+                return personal
+            else:
+                return corporate
+        elif corporate:
+            return corporate
+        elif personal:
+            return personal
+        else:
+            return None
+
+    def get_fullname(self, obj):
+        customer = self.get_customer(obj)
+        if isinstance(customer, Personal):
             return obj.personal.fullname
-        elif hasattr(obj, 'corporate'):
+        elif isinstance(customer, Corporate):
             return obj.corporate.contact_fullname
         else:
             return ''
 
     def get_birthday(self, obj):
-        if hasattr(obj, 'personal'):
+        customer = self.get_customer(obj)
+        if isinstance(customer, Personal):
             return obj.personal.birthday
-        elif hasattr(obj, 'corporate'):
+        elif isinstance(customer, Corporate):
             return obj.corporate.contact_birthday
         else:
             return ''
 
     def get_nationality(self, obj):
-        if hasattr(obj, 'personal'):
+        customer = self.get_customer(obj)
+        if isinstance(customer, Personal):
             return obj.personal.nationality
-        elif hasattr(obj, 'corporate'):
+        elif isinstance(customer, Corporate):
             return obj.corporate.contact_nationality
         else:
             return ''
 
     def get_residency(self, obj):
-        if hasattr(obj, 'personal'):
+        customer = self.get_customer(obj)
+        if isinstance(customer, Personal):
             return obj.personal.country
-        elif hasattr(obj, 'corporate'):
+        elif isinstance(customer, Corporate):
             return obj.corporate.contact_residency
         else:
             return ''
@@ -140,16 +172,17 @@ class AccountSerializer(serializers.Serializer):
 
     def get_status(self, obj):
         def is_personal_data_filled(obj):
-            fields = [obj.first_name, obj.last_name, obj.birthday,
-                      obj.residency, obj.citizenship]
-            return True if all(fields) else False
+            customer = self.get_customer(obj)
+            return True if customer and customer.status==str(CustomerStatus.submitted) else False
 
         if not obj:
             return ''
         elif obj.is_blocked:
             return str(AccountStatus.blocked)
+        elif not Account.is_user_email_confirmed(obj.user):
+            return str(AccountStatus.email_confirmation)
         elif is_personal_data_filled(obj) and \
-            obj.user.documents.count() >= 2 and \
+            obj.user.documents.count() >= LOGIC__CUSTOMER_DOCUMENTS_NUM and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
             return str(AccountStatus.pending)
@@ -1142,7 +1175,7 @@ class PersonalContactInfoSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
-                personal.status = str(PersonalStatus.address)
+                personal.status = str(CustomerStatus.address)
                 personal.save()
 
 
@@ -1154,7 +1187,7 @@ class PersonalAddressSerializer(serializers.Serializer):
                                     min_length=1)
     street = serializers.CharField(required=True, max_length=PersonalFieldLength.street,
                                    min_length=1)
-    apartment = serializers.CharField(required=True, max_length=PersonalFieldLength.apartment,
+    apartment = serializers.CharField(required=False, max_length=PersonalFieldLength.apartment,
                                       min_length=1)
     city = serializers.CharField(required=True, max_length=PersonalFieldLength.city,
                                  min_length=1)
@@ -1191,7 +1224,7 @@ class PersonalAddressSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
-                    personal.status = str(PersonalStatus.income_info)
+                    personal.status = str(CustomerStatus.income_info)
                 personal.save()
 
 
@@ -1235,7 +1268,7 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
-                personal.status = str(PersonalStatus.documents)
+                personal.status = str(CustomerStatus.documents)
                 personal.save()
 
 
@@ -1276,7 +1309,12 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
-            personal.status = str(PersonalStatus.submitted)
+            personal.last_updated_at = timezone.now()
+            personal.status = str(CustomerStatus.submitted)
+            if personal.account is not None:
+                personal.account.last_updated_at = personal.last_updated_at
+                personal.account.save()
+            personal.save()
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1297,11 +1335,11 @@ class PersonalSerializer(serializers.ModelSerializer):
         status = self.context.get('status', '')
         if status == '':
             fields = ('success', 'fullname', 'nationality', 'birthday', 'phone', 'email')
-        elif status == str(PersonalStatus.address):
+        elif status == str(CustomerStatus.address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
-        elif status == str(PersonalStatus.income_info):
+        elif status == str(CustomerStatus.income_info):
             fields = ('success', 'profession', 'income_source', 'asstets_origin', 'jcash_use')
-        elif status == str(CorporateStatus.documents):
+        elif status == str(CustomerStatus.documents):
             fields = ('success', 'passport', 'utilitybills', 'selfie')
         else:
             fields = ('success',)
@@ -1372,7 +1410,7 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
-                corporate.status = str(CorporateStatus.business_address)
+                corporate.status = str(CustomerStatus.business_address)
                 corporate.save()
 
 
@@ -1384,7 +1422,7 @@ class CorporateAddressSerializer(serializers.Serializer):
                                     min_length=1)
     street = serializers.CharField(required=True, max_length=CorporateFieldLength.street,
                                    min_length=1)
-    apartment = serializers.CharField(required=True, max_length=CorporateFieldLength.apartment,
+    apartment = serializers.CharField(required=False, max_length=CorporateFieldLength.apartment,
                                       min_length=1)
     city = serializers.CharField(required=True, max_length=CorporateFieldLength.city,
                                  min_length=1)
@@ -1421,7 +1459,7 @@ class CorporateAddressSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
-                corporate.status = str(CorporateStatus.income_info)
+                corporate.status = str(CustomerStatus.income_info)
                 corporate.save()
 
 
@@ -1472,7 +1510,7 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
-                corporate.status = str(CorporateStatus.primary_contact)
+                corporate.status = str(CustomerStatus.primary_contact)
                 corporate.save()
 
 
@@ -1493,7 +1531,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                                       min_length=1)
     street = serializers.CharField(required=True, max_length=CorporateFieldLength.street,
                                    min_length=1)
-    apartment = serializers.CharField(required=True, max_length=CorporateFieldLength.apartment,
+    apartment = serializers.CharField(required=False, max_length=CorporateFieldLength.apartment,
                                       min_length=1)
     city = serializers.CharField(required=True, max_length=CorporateFieldLength.city,
                                  min_length=1)
@@ -1546,7 +1584,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                     corporate.account.last_updated_at = timezone.now()
                     corporate.account.type = AccountType.personal
                     corporate.account.save()
-                corporate.status = str(CorporateStatus.documents)
+                corporate.status = str(CustomerStatus.documents)
                 corporate.save()
 
 
@@ -1587,7 +1625,12 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
-            corporate.status = str(CorporateStatus.submitted)
+            corporate.last_updated_at = timezone.now()
+            corporate.status = str(CustomerStatus.submitted)
+            if corporate.account is not None:
+                corporate.account.last_updated_at = corporate.last_updated_at
+                corporate.account.save()
+            corporate.save()
 
 
 class CorporateSerializer(serializers.ModelSerializer):
@@ -1608,16 +1651,16 @@ class CorporateSerializer(serializers.ModelSerializer):
         status = self.context.get('status', '')
         if status == '':
             fields = ('success', 'name', 'domicile_country', 'business_phone', 'business_email')
-        elif status == str(CorporateStatus.business_address):
+        elif status == str(CustomerStatus.business_address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
-        elif status == str(CorporateStatus.income_info):
+        elif status == str(CustomerStatus.income_info):
             fields = ('success', 'industry', 'asstets_origin', 'currency_nature',
                       'asstets_origin_description', 'jcash_use')
-        elif status == str(CorporateStatus.primary_contact):
+        elif status == str(CustomerStatus.primary_contact):
             fields = ('success', 'contact_fullname', 'contact_birthday', 'contact_nationality',
                       'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
                       'contact_apartment', 'contact_city', 'contact_postcode')
-        elif status == str(CorporateStatus.documents):
+        elif status == str(CustomerStatus.documents):
             fields = ('passport', 'utilitybills', 'selfie')
         else:
             fields = ('success',)

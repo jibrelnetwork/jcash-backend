@@ -99,7 +99,6 @@ INSTALLED_APPS = [
     'rest_auth',
     'corsheaders',
     'raven.contrib.django.raven_compat',
-    #'aldjemy',
 ]
 
 MIDDLEWARE = [
@@ -292,6 +291,7 @@ SENDGRID__API_MESSAGES_URL = "https://api.sendgrid.com/api/mail.send.json"
 SENDGRID__API_KEY = ""
 
 # Logics settings
+LOGIC__CUSTOMER_DOCUMENTS_NUM = os.getenv('LOGIC_CUSTOMER_DOCUMENTS_NUM', 3)
 LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)
 LOGIC__MAX_VERIFICATION_ATTEMPTS = os.getenv('LOGIC_MAX_VERIFICATION_ATTEMPTS', 3)
 LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1.0)

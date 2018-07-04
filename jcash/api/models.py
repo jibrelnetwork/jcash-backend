@@ -35,6 +35,7 @@ class AccountStatus:
     pending = ObjStatus('pending', 'user''s documents in pending mode')
     verified = ObjStatus('verified', 'verified account')
     declined = ObjStatus('declined', 'declined account')
+    email_confirmation = ObjStatus('email_confirmation', 'email confirmation required')
     created = ObjStatus('created', 'new account')
 
 
@@ -164,13 +165,15 @@ class PersonalFieldLength:
     jcash_use = 255
 
 
-# Personal statuses
-class PersonalStatus:
-    address = ObjStatus('address', 'address info required')
-    income_info = ObjStatus('income_info', 'income info required')
-    documents= ObjStatus('documents', 'documents required')
-    submitted = ObjStatus('submitted', 'all fields submitted')
-    declined = ObjStatus('declined', 'customer declined')
+# Customer statuses
+class CustomerStatus:
+    address = ObjStatus('address', 'address info required (personal)')
+    business_address = ObjStatus('business_address', 'business address info required (corporate)')
+    income_info = ObjStatus('income_info', 'income info required (personal, corporate)')
+    primary_contact = ObjStatus('primary_contact', 'primary contact info required (corporate)')
+    documents = ObjStatus('documents', 'documents required (personal, corporate)')
+    submitted = ObjStatus('submitted', 'all fields submitted (personal, corporate)')
+    declined = ObjStatus('declined', 'customer declined (personal, corporate)')
 
 
 class Personal(models.Model):
@@ -225,16 +228,6 @@ class CorporateFieldLength:
     jcash_use = 255
     industry = 255
     currency_nature = 255
-
-
-# Corporate statuses
-class CorporateStatus:
-    business_address = ObjStatus('business_address', 'business address info required')
-    income_info = ObjStatus('income_info', 'income info required')
-    primary_contact = ObjStatus('primary_contact', 'primary contact info required')
-    documents = ObjStatus('documents', 'documents required')
-    submitted = ObjStatus('submitted', 'all fields submitted')
-    declined = ObjStatus('declined', 'customer declined')
 
 
 class Corporate(models.Model):
