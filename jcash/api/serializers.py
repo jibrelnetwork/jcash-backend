@@ -32,6 +32,7 @@ from jcash.api.models import (
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
 from jcash.settings import (
+    FRONTEND_URL,
     LOGIC__EXPIRATION_LIMIT_SEC,
     LOGIC__OUT_OF_DATE_PRICE_SEC,
     LOGIC__ADDRESS_VERIFY_TEXT,
@@ -371,7 +372,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         Send a django.core.mail.EmailMultiAlternatives to `to_email`.
         """
-        activate_url = '{protocol}://{domain}/auth/recovery/confirm/{uid}/{token}'.format(**context)
+        activate_url = FRONTEND_URL+'/auth/recovery/confirm/{uid}/{token}'.format(**context)
         logger.info("{} {}".format(to_email, activate_url))
         send_email_reset_password(to_email, activate_url, None)
 

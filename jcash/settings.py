@@ -255,6 +255,9 @@ DATABASE_NAME = 'jcashdb'
 DATABASE_USER = 'jcashuser'
 DATABASE_PASS = 'password'
 
+# Frontend settings
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://localhost')
+
 # Sqlalchemy settings
 SQLALCHEMY_ECHO = True
 

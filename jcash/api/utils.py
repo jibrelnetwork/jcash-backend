@@ -14,6 +14,7 @@ from django.utils.encoding import force_text
 from jcash.api.models import Address, Account
 from jcash.api.views import AccountView
 from jcash.commonutils.notify import send_email_verify_email
+from jcash.settings import FRONTEND_URL
 
 import logging
 
@@ -62,7 +63,7 @@ class AccountAdapter(DefaultAccountAdapter):
         confirmations are sent outside of the request context `request`
         can be `None` here.
         """
-        return build_absolute_uri(None, '/') + 'auth/signup/email-verify/' + emailconfirmation.key
+        return FRONTEND_URL + '/auth/signup/email-verify/' + emailconfirmation.key
 
     def send_confirmation_mail(self, request, emailconfirmation, signup):
         activate_url = self.get_email_confirmation_url(
