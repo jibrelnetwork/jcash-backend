@@ -885,6 +885,7 @@ class AddressSerializer(serializers.Serializer):
                     address.is_removed = False
                     address.is_rejected = False
                     address.is_verified = False
+            address.is_verified = True
             address.save()
             address_verify = AddressVerify.objects.create(address=address,
                                                           message=self.generate_message(address))
