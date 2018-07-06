@@ -110,9 +110,13 @@ class AccountSerializer(serializers.Serializer):
         if hasattr(obj, 'corporate'):
             corporate = obj.corporate
 
-        if personal and personal.status == str(CustomerStatus.submitted):
+        if personal and \
+            (personal.status == str(CustomerStatus.submitted) or \
+             personal.status == str(CustomerStatus.declined)):
             return personal
-        elif corporate and corporate.status == str(CustomerStatus.submitted):
+        elif corporate and \
+            (corporate.status == str(CustomerStatus.submitted) or \
+             corporate.status == str(CustomerStatus.declined)):
             return corporate
         elif corporate and personal:
             if personal.last_updated_at >= corporate.last_updated_at:
@@ -174,7 +178,9 @@ class AccountSerializer(serializers.Serializer):
     def get_status(self, obj):
         def is_personal_data_filled(obj):
             customer = self.get_customer(obj)
-            return True if customer and customer.status==str(CustomerStatus.submitted) else False
+            return True if customer and \
+                           (customer.status == str(CustomerStatus.submitted) or \
+                            customer.status == str(CustomerStatus.declined)) else False
 
         if not obj:
             return ''
@@ -1312,6 +1318,8 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 selfie_document.save()
             personal.last_updated_at = timezone.now()
             personal.status = str(CustomerStatus.submitted)
+            if hasattr(personal.account, Account.rel_corporate):
+                personal.account.corporate.status = str(CustomerStatus.unavailable)
             if personal.account is not None:
                 personal.account.last_updated_at = personal.last_updated_at
                 personal.account.save()
@@ -1626,6 +1634,8 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 selfie_document.save()
             corporate.last_updated_at = timezone.now()
             corporate.status = str(CustomerStatus.submitted)
+            if hasattr(corporate.account, Account.rel_personal):
+                corporate.account.personal.status = str(CustomerStatus.unavailable)
             if corporate.account is not None:
                 corporate.account.last_updated_at = corporate.last_updated_at
                 corporate.account.save()

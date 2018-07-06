@@ -174,6 +174,7 @@ class CustomerStatus:
     documents = ObjStatus('documents', 'documents required (personal, corporate)')
     submitted = ObjStatus('submitted', 'all fields submitted (personal, corporate)')
     declined = ObjStatus('declined', 'customer declined (personal, corporate)')
+    unavailable = ObjStatus('unavailable', 'customer unavailable (personal, corporate)')
 
 
 class Personal(models.Model):

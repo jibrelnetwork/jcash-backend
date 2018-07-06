@@ -258,26 +258,12 @@ class AccountView(AccountUpdateView):
         account_serializer = AccountSerializer(account)
 
         customers = []
-        personal = None
-        corporate = None
 
         if hasattr(account, account.rel_personal):
-            personal = account.personal
+            customers.append(account.personal)
 
         if hasattr(account, account.rel_corporate):
-            corporate = account.corporate
-
-        if personal is not None and personal.status == str(CustomerStatus.submitted):
-            customers.append(personal)
-        elif corporate is not None and corporate.status == str(CustomerStatus.submitted):
-            customers.append(corporate)
-        elif corporate is not None and personal is not None:
-            customers.append(personal)
-            customers.append(corporate)
-        elif corporate is not None and personal is None:
-            customers.append(corporate)
-        elif personal is not None and corporate is None:
-            customers.append(personal)
+            customers.append(account.corporate)
 
         customer_serializer = CustomersSerializer(customers, many=True)
         response_data = account_serializer.data
