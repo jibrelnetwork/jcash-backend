@@ -10,11 +10,13 @@ from jcash.commonutils.eth_contracts import transferEth, transferToken, refundEt
 def celery_transfer_eth(tx_pk: int,
                     contract_abi: str,
                     contract_address: str,
+                    tx_hash: str,
+                    token_address: str,
                     to_address: str,
                     value: float,
                     nonce: int,
                     is_refund=False) -> str:
-    transferEth(tx_pk, contract_abi, contract_address, to_address, value, nonce, is_refund)
+    transferEth(tx_pk, contract_abi, contract_address, tx_hash, token_address, to_address, value, nonce, is_refund)
 
 
 @celery_app.task()
@@ -23,11 +25,13 @@ def celery_transfer_eth(tx_pk: int,
 def celery_transfer_token(tx_pk: int,
                     contract_abi: str,
                     contract_address: str,
+                    tx_hash: str,
+                    token_address: str,
                     to_address: str,
                     value: float,
                     nonce: int,
                     is_refund=False) -> str:
-    transferToken(tx_pk, contract_abi, contract_address, to_address, value, nonce, is_refund)
+    transferToken(tx_pk, contract_abi, contract_address, tx_hash, token_address, to_address, value, nonce, is_refund)
 
 
 @celery_app.task()
@@ -36,11 +40,13 @@ def celery_transfer_token(tx_pk: int,
 def celery_refund_eth(tx_pk: int,
                   contract_abi: str,
                   contract_address: str,
+                  tx_hash: str,
+                  token_address: str,
                   to_address: str,
                   value: float,
                   nonce: int,
                   is_refund=True) -> str:
-    refundEth(tx_pk, contract_abi, contract_address, to_address, value, nonce, is_refund)
+    refundEth(tx_pk, contract_abi, contract_address, tx_hash, token_address, to_address, value, nonce, is_refund)
 
 
 @celery_app.task()
@@ -49,8 +55,10 @@ def celery_refund_eth(tx_pk: int,
 def celery_refund_token(tx_pk: int,
                   contract_abi: str,
                   contract_address: str,
+                  tx_hash: str,
+                  token_address: str,
                   to_address: str,
                   value: float,
                   nonce: int,
                   is_refund=True) -> str:
-    refundToken(tx_pk, contract_abi, contract_address, to_address, value, nonce, is_refund)
+    refundToken(tx_pk, contract_abi, contract_address, tx_hash, token_address, to_address, value, nonce, is_refund)
