@@ -128,7 +128,7 @@ def __transferEth(abi, contract_address, tx_hash, token_address, to_address, val
                          contract_address,
                          ETH_EXCHANGER__ADDRESS,
                          "transferEth",
-                         (w3.toBytes(tx_hash), w3.toChecksumAddress(to_address), _value_wei),
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(to_address), _value_wei),
                          ETH_EXCHANGER__PRIVATE_KEY,
                          nonce)
     return _tx_id
@@ -142,7 +142,8 @@ def __transferToken(abi, contract_address, tx_hash, token_address, to_address, v
                          contract_address,
                          ETH_EXCHANGER__ADDRESS,
                          "transferToken",
-                         (w3.toBytes(tx_hash), w3.toChecksumAddress(token_address), w3.toChecksumAddress(to_address), _value_wei),
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(token_address),
+                          w3.toChecksumAddress(to_address), _value_wei),
                          ETH_EXCHANGER__PRIVATE_KEY,
                          nonce)
     return _tx_id
@@ -156,7 +157,7 @@ def __refundEth(abi, contract_address, tx_hash, token_address, to_address, value
                          contract_address,
                          ETH_EXCHANGER__ADDRESS,
                          "refundEth",
-                         (w3.toBytes(tx_hash), w3.toChecksumAddress(to_address), _value_wei),
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(to_address), _value_wei),
                          ETH_EXCHANGER__PRIVATE_KEY,
                          nonce)
     return _tx_id
@@ -170,7 +171,8 @@ def __refundToken(abi, contract_address, tx_hash, token_address, to_address, val
                          contract_address,
                          ETH_EXCHANGER__ADDRESS,
                          "refundToken",
-                         (w3.toBytes(tx_hash), w3.toChecksumAddress(token_address), w3.toChecksumAddress(to_address), _value_wei),
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(token_address),
+                          w3.toChecksumAddress(to_address), _value_wei),
                          ETH_EXCHANGER__PRIVATE_KEY,
                          nonce)
     return _tx_id
