@@ -32,7 +32,7 @@ from jcash.commonutils import (
     math,
     exchange_utils as utils
 )
-from jcash.api.tasks import celery_refund, celery_transfer
+from jcash.api.tasks import celery_refund_eth, celery_transfer_eth, celery_refund_token, celery_transfer_token
 from jcash.settings import (
     LOGIC__MAX_VERIFICATION_ATTEMPTS,
     ETH_TX__BLOCKS_CONFIRM_NUM,
@@ -372,13 +372,21 @@ def process_license_users_addresses():
 
 
 def get_currency_contract_params(currency, is_refund = False):
-    contract_address = currency.view_address if currency.is_erc20_token \
-               else currency.exchanger_address
-    fn = celery_refund if is_refund and not currency.is_erc20_token \
-        else celery_transfer
+    contract_address = currency.exchanger_address
+    token_address = currency.view_address if currency.is_erc20_token else ''
+    fn = None
+    if is_refund and not currency.is_erc20_token:
+        fn = celery_refund_eth
+    elif is_refund and currency.is_erc20_token:
+        fn = celery_refund_token
+    if not is_refund and not currency.is_erc20_token:
+        fn = celery_transfer_eth
+    if not is_refund and currency.is_erc20_token:
+        fn = celery_transfer_token
+
     abi = currency.abi
 
-    return abi, contract_address, fn
+    return abi, contract_address, token_address, fn
 
 
 def get_currency_contract_params_by_address(contract_address, is_refund = False):
@@ -402,9 +410,10 @@ def process_outgoing_transactions(txs, start_nonce, is_refund = False):
     nonce = start_nonce
     for tx in txs:
         try:
-            abi, contract_address, celery_fn = get_transaction_params(tx, is_refund)
+            abi, contract_address, token_address, celery_fn = get_transaction_params(tx, is_refund)
 
-            celery_fn(tx.pk, abi, contract_address, tx.to_address, tx.value, nonce, is_refund)
+            celery_fn(tx.pk, abi, contract_address, tx.transaction_id,
+                      token_address, tx.to_address, tx.value, nonce, is_refund)
             nonce+=1
         except Exception:
             exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
