@@ -120,29 +120,59 @@ def licenseUser(license_registry_address, user_address, expiration_time):
     logging.getLogger(__name__).info("licensed address {} expiration {}".format(user_address, expiration_time))
 
 
-def __transfer(abi, controller_address, to_address, value: float, nonce: int) -> str:
+def __transferEth(abi, contract_address, tx_hash, token_address, to_address, value: float, nonce: int) -> str:
     from web3.auto import w3
 
     _value_wei = w3.toWei(value, 'ether')
     _tx_id = __sendRawTx(abi,
-                         controller_address,
+                         contract_address,
                          ETH_EXCHANGER__ADDRESS,
-                         "transfer",
-                         ( w3.toChecksumAddress(to_address), _value_wei ),
+                         "transferEth",
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(to_address), _value_wei),
                          ETH_EXCHANGER__PRIVATE_KEY,
                          nonce)
     return _tx_id
 
 
-def __refund(abi, controller_address, to_address, value: float, nonce: int) -> str:
+def __transferToken(abi, contract_address, tx_hash, token_address, to_address, value: float, nonce: int) -> str:
     from web3.auto import w3
 
     _value_wei = w3.toWei(value, 'ether')
     _tx_id = __sendRawTx(abi,
-                         controller_address,
+                         contract_address,
                          ETH_EXCHANGER__ADDRESS,
-                         "refund",
-                         ( w3.toChecksumAddress(to_address), _value_wei),
+                         "transferToken",
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(token_address),
+                          w3.toChecksumAddress(to_address), _value_wei),
+                         ETH_EXCHANGER__PRIVATE_KEY,
+                         nonce)
+    return _tx_id
+
+
+def __refundEth(abi, contract_address, tx_hash, token_address, to_address, value: float, nonce: int) -> str:
+    from web3.auto import w3
+
+    _value_wei = w3.toWei(value, 'ether')
+    _tx_id = __sendRawTx(abi,
+                         contract_address,
+                         ETH_EXCHANGER__ADDRESS,
+                         "refundEth",
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(to_address), _value_wei),
+                         ETH_EXCHANGER__PRIVATE_KEY,
+                         nonce)
+    return _tx_id
+
+
+def __refundToken(abi, contract_address, tx_hash, token_address, to_address, value: float, nonce: int) -> str:
+    from web3.auto import w3
+
+    _value_wei = w3.toWei(value, 'ether')
+    _tx_id = __sendRawTx(abi,
+                         contract_address,
+                         ETH_EXCHANGER__ADDRESS,
+                         "refundToken",
+                         (w3.toBytes(hexstr=tx_hash), w3.toChecksumAddress(token_address),
+                          w3.toChecksumAddress(to_address), _value_wei),
                          ETH_EXCHANGER__PRIVATE_KEY,
                          nonce)
     return _tx_id
@@ -151,6 +181,8 @@ def __refund(abi, controller_address, to_address, value: float, nonce: int) -> s
 def send_outgoing_transaction(tx_pk: int,
                               contract_abi: str,
                               contract_address: str,
+                              tx_hash: str,
+                              token_address: str,
                               to_address: str,
                               value: float,
                               nonce: int,
@@ -166,16 +198,18 @@ def send_outgoing_transaction(tx_pk: int,
         logging.getLogger(__name__).info("outgoing with id {} does not exist".format(tx_pk))
         return
     with transaction.atomic():
-        tx_hash = tx_fn(contract_abi, contract_address, to_address, value, nonce)
+        tx_hash = tx_fn(contract_abi, contract_address, tx_hash, token_address, to_address, value, nonce)
         entry.status = TransactionStatus.pending
         entry.transaction_id = tx_hash
         entry.save()
         logging.getLogger(__name__).info("outgoing tx with id {} successfully processed".format(tx_pk))
 
 
-def transfer(tx_pk: int,
+def transferEth(tx_pk: int,
              contract_abi: str,
              contract_address: str,
+             tx_hash: str,
+             token_address: str,
              to_address: str,
              value: float,
              nonce: int,
@@ -183,25 +217,73 @@ def transfer(tx_pk: int,
     send_outgoing_transaction(tx_pk,
                               contract_abi,
                               contract_address,
+                              tx_hash,
+                              token_address,
                               to_address.lower(),
                               value,
                               nonce,
                               is_refund,
-                              __transfer)
+                              __transferEth)
 
 
-def refund(tx_pk: int,
-           contract_abi: str,
-           contract_address: str,
-           to_address: str,
-           value: float,
-           nonce: int,
-           is_refund=True):
+def transferToken(tx_pk: int,
+                  contract_abi: str,
+                  contract_address: str,
+                  tx_hash: str,
+                  token_address: str,
+                  to_address: str,
+                  value: float,
+                  nonce: int,
+                  is_refund=False):
     send_outgoing_transaction(tx_pk,
                               contract_abi,
                               contract_address,
+                              tx_hash,
+                              token_address,
                               to_address.lower(),
                               value,
                               nonce,
                               is_refund,
-                              __refund)
+                              __transferToken)
+
+
+def refundEth(tx_pk: int,
+              contract_abi: str,
+              contract_address: str,
+              tx_hash: str,
+              token_address: str,
+              to_address: str,
+              value: float,
+              nonce: int,
+              is_refund=True):
+    send_outgoing_transaction(tx_pk,
+                              contract_abi,
+                              contract_address,
+                              tx_hash,
+                              token_address,
+                              to_address.lower(),
+                              value,
+                              nonce,
+                              is_refund,
+                              __refundEth)
+
+
+def refundToken(tx_pk: int,
+                contract_abi: str,
+                contract_address: str,
+                tx_hash: str,
+                token_address: str,
+                to_address: str,
+                value: float,
+                nonce: int,
+                is_refund=True):
+    send_outgoing_transaction(tx_pk,
+                              contract_abi,
+                              contract_address,
+                              tx_hash,
+                              token_address,
+                              to_address.lower(),
+                              value,
+                              nonce,
+                              is_refund,
+                              __refundToken)
