@@ -352,7 +352,7 @@ class LoginSerializer(serializers.Serializer):
 
         # Did we get back an active user?
         if user:
-            if user.account.is_blocked:
+            if hasattr(user, 'account') and user.account.is_blocked:
                 msg = _('Your account is blocked.')
                 raise exceptions.ValidationError(msg)
         else:
