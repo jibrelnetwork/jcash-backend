@@ -21,7 +21,8 @@ from jcash.api.models import (
     Application,
     ApplicationStatus,
     Refund,
-    Exchange
+    Exchange,
+    Replenisher,
 )
 from jcash.commonutils import (
     notify,
@@ -221,19 +222,25 @@ def process_linked_unconfirmed_events():
 def fetch_eth_events():
     logger.info('Run fetch eth events')
 
+    replenisher_entries = Replenisher.objects.filter(is_removed=False)
+    replenishers = [replenisher.address.lower() for replenisher in replenisher_entries]
+
     currencies = Currency.objects.all()
     for currency in currencies:
+        if len(replenishers) == 0:
+            break
+
         try:
             last_event = IncomingTransaction.objects.latest('block_height')
             last_block = last_event.block_height + 1
         except IncomingTransaction.DoesNotExist:
             last_block = 0
 
-        events = eth_events.get_contract_events(currency.view_address if currency.is_erc20_token else currency.exchanger_address,
-                                                currency.exchanger_address,
-                                                currency.abi,
+        events = eth_events.get_incoming_txs(currency.view_address if currency.is_erc20_token else currency.exchanger_address,
+                                             currency.exchanger_address,
+                                             currency.abi,
                                                 'Transfer' if currency.is_erc20_token else 'ReceiveEvent',
-                                                last_block)
+                                             last_block)
         try:
             with transaction.atomic():
                 for evnt in events:
@@ -249,20 +256,21 @@ def fetch_eth_events():
                     except Application.DoesNotExist:
                         application_id = None
 
-                    in_tx = IncomingTransaction.objects.create(transaction_id=evnt[0],
-                                                               currency_id=currency.pk,
-                                                               application_id=application_id,
-                                                               is_linked=True if application_id else False,
-                                                               block_height=evnt[1],
-                                                               mined_at=str(evnt[2]),
-                                                               from_address=evnt[4],
-                                                               to_address=evnt[5],
-                                                               value=evnt[6],
-                                                               status=TransactionStatus.not_confirmed)
-                    in_tx.save()
-                    if application_id:
-                        event_application.status = str(ApplicationStatus.waiting)
-                        event_application.save()
+                    if not evnt[4].lower() in replenishers:
+                        in_tx = IncomingTransaction.objects.create(transaction_id=evnt[0],
+                                                                   currency_id=currency.pk,
+                                                                   application_id=application_id,
+                                                                   is_linked=True if application_id else False,
+                                                                   block_height=evnt[1],
+                                                                   mined_at=str(evnt[2]),
+                                                                   from_address=evnt[4],
+                                                                   to_address=evnt[5],
+                                                                   value=evnt[6],
+                                                                   status=TransactionStatus.not_confirmed)
+                        in_tx.save()
+                        if application_id:
+                            event_application.status = str(ApplicationStatus.waiting)
+                            event_application.save()
         except:
             exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
             logging.getLogger(__name__).error("Failed to fetch eth events \"{}\" due to error:\n{}"
@@ -389,11 +397,6 @@ def get_currency_contract_params(currency, is_refund = False):
     return abi, contract_address, token_address, fn
 
 
-def get_currency_contract_params_by_address(contract_address, is_refund = False):
-    currency = Currency.objects.get(exchanger_address=contract_address)
-    return get_currency_contract_params(currency, is_refund)
-
-
 def get_reciprocal_currency_by_application(application):
     if application.is_reverse:
         return application.currency_pair.base_currency
@@ -402,7 +405,7 @@ def get_reciprocal_currency_by_application(application):
 
 
 def get_transaction_params(tx, is_refund = False):
-    return get_currency_contract_params_by_address(tx.incoming_transaction.to_address, is_refund) if is_refund else \
+    return get_currency_contract_params(tx.currency, is_refund) if is_refund else \
         get_currency_contract_params(get_reciprocal_currency_by_application(tx.application), is_refund)
 
 
@@ -412,7 +415,7 @@ def process_outgoing_transactions(txs, start_nonce, is_refund = False):
         try:
             abi, contract_address, token_address, celery_fn = get_transaction_params(tx, is_refund)
 
-            celery_fn(tx.pk, abi, contract_address, tx.transaction_id,
+            celery_fn(tx.pk, abi, contract_address, tx.incoming_transaction.transaction_id,
                       token_address, tx.to_address, tx.value, nonce, is_refund)
             nonce+=1
         except Exception:
@@ -510,4 +513,44 @@ def check_outgoing_transactions_runner():
     except Exception:
         exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
         logging.getLogger(__name__).error("Failed to check outgoing transactions due to exception:\n{}"
+                                          .format(exception_str))
+
+
+def fetch_replenisher():
+    # noinspection PyBroadException
+    try:
+        logging.getLogger(__name__).info("Start to fetch replenishers")
+
+        eth_currency = Currency.objects.get(symbol__icontains='eth')
+        try:
+            last_event = Replenisher.objects.latest('block_height')
+            last_block = last_event.block_height + 1
+        except Replenisher.DoesNotExist:
+            last_block = 0
+
+        events = eth_events.get_replenishers(eth_currency.exchanger_address, eth_currency.abi, last_block)
+        with transaction.atomic():
+            for evnt in events:
+                tx_hash, block_height, mined_at, evnt_type, evnt_address = evnt
+
+                if evnt_type == "ReplenisherDisabledEvent":
+                    try:
+                        replenisher = Replenisher.objects.filter(address__iexact=evnt_address).latest('block_height')
+                        replenisher.is_removed = True
+                        replenisher.last_updated_at = timezone.now()
+                        replenisher.save()
+                    except Replenisher.DoesNotExist:
+                        pass
+                else:
+                    replenisher = Replenisher.objects.create(transaction_id=tx_hash,
+                                                   block_height=block_height,
+                                                   mined_at=str(mined_at),
+                                                   type=evnt_type,
+                                                   address=evnt_address)
+                    replenisher.save()
+
+        logging.getLogger(__name__).info("Finished fetching replenishers")
+    except Exception:
+        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+        logging.getLogger(__name__).error("Failed to fetch replenishers due to exception:\n{}"
                                           .format(exception_str))
