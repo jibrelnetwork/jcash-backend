@@ -59,7 +59,7 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
     contract_func = getattr(contract.functions, _functionName)
 
     _tx_gas_price = int(web3.eth.gasPrice  * ETH_TX__GAZ_MULTIPLICATOR)
-    _tx_gas_limit = 100000 #contract_func(*_args).estimateGas()
+    _tx_gas_limit = 300000 #contract_func(*_args).estimateGas()
 
     if _nonce is None:
         _nonce = web3.eth.getTransactionCount(_from)

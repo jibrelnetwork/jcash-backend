@@ -41,6 +41,13 @@ def celery_fetch_eth_events():
 @celery_app.task()
 @locked_task()
 @initialize_app
+def celery_fetch_replenisher():
+    return commands.fetch_replenisher()
+
+
+@celery_app.task()
+@locked_task()
+@initialize_app
 def celery_process_linked_unconfirmed_events():
     return commands.process_linked_unconfirmed_events()
 
@@ -122,3 +129,7 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_process_outgoing_transactions,
                              expires=1 * 60,
                              name='process_outgoing_transactions')
+    sender.add_periodic_task(60,
+                             celery_fetch_replenisher,
+                             expires=1 * 60,
+                             name='fetch_replenisher')

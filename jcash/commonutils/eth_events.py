@@ -10,14 +10,14 @@ from web3.contract import ContractEvents
 from .eth_utils import create_web3
 
 
-def get_contract_events(
+def get_incoming_txs(
         contract_address: str,
         exchanger_address: str,
         contract_abi: List,
         event_name: str,
         block_number: int) -> List[Tuple[str,int,datetime,str,str,str,float]]:
     """
-    Get contract events
+    Get incoming transactions
     :param contract_address: address
     :param contract_abi: abi
     :param event_name: event name
@@ -56,6 +56,47 @@ def get_contract_events(
                            evnt_args.args['from'].lower(),
                            evnt_args.args['to'].lower(),
                            web3.fromWei(evnt_args.args.value, 'ether')))
+    return result
+
+
+def get_replenishers(
+        contract_address: str,
+        contract_abi: List,
+        block_number: int) -> List[Tuple[str,int,datetime,str,str,str,float]]:
+    """
+    Get replenishers
+    :param contract_address: address
+    :param contract_abi: abi
+    :param block_number: block number
+    :return: list of tuple (transaction_hash,block_number,mined_at,event_name,replenisher_address)
+    """
+    web3 = create_web3()
+
+    event_names = ['ReplenisherEnabledEvent', 'ReplenisherDisabledEvent']
+    contract_abi_json = contract_abi
+    contract_events = ContractEvents(contract_abi_json, web3, contract_address)
+
+    result = []
+
+    for event_name in event_names:
+        event_abi = contract_events[event_name]._get_event_abi()
+        topic_set = construct_event_topic_set(event_abi)
+
+        filter = web3.eth.filter({'topics': topic_set[0], 'address': contract_address.lower(), 'fromBlock':block_number})
+        logs = web3.eth.getFilterLogs(filter.filter_id)
+
+        for log_entry in logs:
+            block_number = log_entry['blockNumber']
+            block_data = web3.eth.getBlock(block_number)
+            transaction_hash = HexBytes(log_entry['transactionHash']).hex()
+            mined_at = datetime.fromtimestamp(block_data.timestamp, tzlocal())
+            evnt_args = get_event_data(event_abi, log_entry)
+
+            result.append((transaction_hash,
+                           block_number,
+                           mined_at,
+                           event_name,
+                           evnt_args.args['replenisher'].lower()))
     return result
 
 

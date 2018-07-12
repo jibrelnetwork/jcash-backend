@@ -532,6 +532,21 @@ class AccountAddress(models.Model):
         db_table = 'account_address'
 
 
+# Replenisher
+class Replenisher(models.Model):
+    transaction_id = models.CharField(max_length=120, null=False, blank=False, unique=True)
+    type = models.CharField(max_length=40, null=False, blank=True, default='')
+    mined_at = models.DateTimeField(null=True, blank=True)
+    block_height = models.IntegerField(blank=True, null=True, unique=True)
+    address = models.CharField(max_length=120, null=True, blank=True)
+    is_removed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'replenisher'
+
+
 # ApplicationStatus
 class ApplicationStatus:
     created = ObjStatus('created', 'new application')

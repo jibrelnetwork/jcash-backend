@@ -31,7 +31,8 @@ from jcash.api.models import (
     Notification,
     Country,
     Personal,
-    Corporate
+    Corporate,
+    Replenisher,
 )
 
 from jcash.api import serializers
@@ -300,6 +301,14 @@ class CorporateAdmin(admin.ModelAdmin):
                     'contact_fullname', 'contact_birthday', 'contact_nationality', 'contact_residency',
                     'contact_phone', 'contact_email', 'contact_street', 'contact_apartment',
                     'contact_city', 'contact_postcode', 'created_at']
+
+
+@admin.register(Replenisher)
+class ReplenisherAdmin(admin.ModelAdmin):
+    list_display = ['id', 'address', 'is_removed', 'created_at', 'last_updated_at']
+    search_fields = ['address']
+    list_filter = ['is_removed']
+    ordering = ('id',)
 
 
 admin.site.unregister(EmailAddress)
