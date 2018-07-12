@@ -1199,7 +1199,8 @@ class PersonalAddressSerializer(serializers.Serializer):
                                     min_length=1)
     street = serializers.CharField(required=True, max_length=PersonalFieldLength.street,
                                    min_length=1)
-    apartment = serializers.CharField(required=False, max_length=PersonalFieldLength.apartment)
+    apartment = serializers.CharField(required=False, allow_blank=True, max_length=PersonalFieldLength.apartment,
+                                      min_length=1)
     city = serializers.CharField(required=True, max_length=PersonalFieldLength.city,
                                  min_length=1)
     postcode = serializers.CharField(required=True, max_length=PersonalFieldLength.postcode,
@@ -1435,7 +1436,8 @@ class CorporateAddressSerializer(serializers.Serializer):
                                     min_length=1)
     street = serializers.CharField(required=True, max_length=CorporateFieldLength.street,
                                    min_length=1)
-    apartment = serializers.CharField(required=False, max_length=CorporateFieldLength.apartment)
+    apartment = serializers.CharField(required=False, allow_blank=True, max_length=CorporateFieldLength.apartment,
+                                      min_length=1)
     city = serializers.CharField(required=True, max_length=CorporateFieldLength.city,
                                  min_length=1)
     postcode = serializers.CharField(required=True, max_length=CorporateFieldLength.postcode,
@@ -1543,7 +1545,8 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                                       min_length=1)
     street = serializers.CharField(required=True, max_length=CorporateFieldLength.street,
                                    min_length=1)
-    apartment = serializers.CharField(required=False, max_length=CorporateFieldLength.apartment)
+    apartment = serializers.CharField(required=False, allow_blank=True, max_length=CorporateFieldLength.apartment,
+                                      min_length=1)
     city = serializers.CharField(required=True, max_length=CorporateFieldLength.city,
                                  min_length=1)
     postcode = serializers.CharField(required=True, max_length=CorporateFieldLength.postcode,
