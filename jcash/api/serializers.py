@@ -697,9 +697,15 @@ class ApplicationsSerializer(serializers.ModelSerializer):
             rate = math.calc_reverse_rate(obj.rate)
         return rate
 
+    def is_application_confirmed(self, obj):
+        return obj.status != str(ApplicationStatus.created) and \
+               obj.status != str(ApplicationStatus.waiting) and \
+               obj.status != str(ApplicationStatus.confirming)
+
     def get_base_amount(self, obj):
         base_amount = obj.base_amount
-        if obj.incoming_txs.count() > 0:
+        if obj.incoming_txs.count() > 0 and \
+                self.is_application_confirmed(obj):
             base_amount = obj.incoming_txs.first().value
         return base_amount
 
@@ -707,9 +713,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         reciprocal_amount = obj.reciprocal_amount
 
         if obj.incoming_txs.count() > 0 and \
-                obj.status != str(ApplicationStatus.created) and \
-                obj.status != str(ApplicationStatus.waiting) and \
-                obj.status != str(ApplicationStatus.confirming):
+                self.is_application_confirmed(obj):
             reciprocal_amount = math.round_amount(math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate),
                                                   obj.currency_pair,
                                                   obj.is_reverse,
