@@ -669,6 +669,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "reciprocal_currency": "jAED",
         "base_amount": 1.0,
         "reciprocal_amount": 1810.0,
+        "reciprocal_amount_actual": 1810.0,
         "rate": 1810.0,
         "is_active": true
         "status": "created",
@@ -682,13 +683,14 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     source_address = serializers.SerializerMethodField()
     base_amount = serializers.SerializerMethodField()
     reciprocal_amount = serializers.SerializerMethodField()
+    reciprocal_amount_actual = serializers.SerializerMethodField()
     rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
-                  'base_currency', 'base_amount', 'reciprocal_currency',
+                  'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
                   'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse')
 
     def get_rate(self, obj):
@@ -714,6 +716,16 @@ class ApplicationsSerializer(serializers.ModelSerializer):
 
         if obj.incoming_txs.count() > 0 and \
                 self.is_application_confirmed(obj):
+            reciprocal_amount = math.round_amount(math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate),
+                                                  obj.currency_pair,
+                                                  obj.is_reverse,
+                                                  False)
+        return reciprocal_amount
+
+    def get_reciprocal_amount_actual(self, obj):
+        reciprocal_amount = obj.reciprocal_amount
+
+        if obj.incoming_txs.count() > 0:
             reciprocal_amount = math.round_amount(math.calc_reciprocal_amount(obj.incoming_txs.first().value, obj.rate),
                                                   obj.currency_pair,
                                                   obj.is_reverse,
