@@ -1764,3 +1764,26 @@ class CustomersSerializer(serializers.Serializer):
 
     def get_status(self, obj):
         return obj.status
+
+
+class CheckTokenSerializer(serializers.Serializer):
+    """
+    Serializer that check a token.
+    """
+    uid = serializers.CharField()
+    token = serializers.CharField()
+
+    def validate(self, attrs):
+        self._errors = {}
+
+        # Decode the uidb64 to uid to get User object
+        try:
+            uid = force_text(uid_decoder(attrs['uid']))
+            self.user = UserModel._default_manager.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            raise exceptions.ValidationError({'uid': ['Invalid value']})
+
+        if not default_token_generator.check_token(self.user, attrs['token']):
+            raise exceptions.ValidationError({'token': ['Invalid value']})
+
+        return attrs

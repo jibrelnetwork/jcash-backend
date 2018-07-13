@@ -78,6 +78,7 @@ from jcash.api.serializers import (
     CorporateSerializer,
     PersonalSerializer,
     CustomersSerializer,
+    CheckTokenSerializer,
 )
 from jcash.commonutils import currencyrates, math
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
@@ -1473,3 +1474,28 @@ class CitizenshipCountriesView(GenericAPIView):
         countries = CountriesSerializer(countries_qs, many=True).data
         response_data = {'success': True, 'countries': countries}
         return Response(response_data)
+
+
+class CheckTokenView(GenericAPIView):
+    """
+    post:
+    Check token
+
+    Response example:
+
+    ```
+    {"success": true} |
+    {"success": false}
+
+    ```
+    """
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = CheckTokenSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            return Response({'success': True})
+        else:
+            return Response({'success': False})
