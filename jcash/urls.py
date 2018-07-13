@@ -23,7 +23,7 @@ from jcash.api.views import (
     ResendEmailConfirmationView, CustomUserDetailsView,
     RegisterView, CustomPasswordChangeView, CustomPasswordResetView,
     CustomPasswordResetConfirmView, CustomVerifyEmailView,
-    CustomLogoutView, CustomLoginView,
+    CustomLogoutView, CustomLoginView, CheckTokenView,
 )
 from rest_auth.views import (
     LoginView
@@ -48,6 +48,7 @@ urlpatterns = [
     url(r'^auth/registration/verify-email/$', CustomVerifyEmailView.as_view(),
         name='rest_verify_email'),
     url(r'^auth/registration/confirm-email-resend/$', ResendEmailConfirmationView.as_view()),
+    url(r'^auth/isalive/$', CheckTokenView.as_view()),
 
     # API
     url(r'^api/', include('jcash.api.urls')),
