@@ -973,9 +973,9 @@ class ApplicationSerializer(serializers.Serializer):
         base_amount_attr = attrs.get('base_amount')
         rate_uuid = attrs.get('uuid')
 
-        user_addresses = Address.objects.filter(user=user, is_verified=True)
+        user_addresses = Address.objects.filter(user=user, is_verified=True, is_removed=False)
         if user_addresses.count() == 0:
-            raise serializers.ValidationError(_('have no any addresses.'))
+            raise serializers.ValidationError(_('You have no addresses.'))
 
         if address_attr is None and user_addresses.count() > 1:
             raise serializers.ValidationError(_('"address" not specified.'))
