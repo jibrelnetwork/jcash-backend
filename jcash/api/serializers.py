@@ -1787,3 +1787,13 @@ class CheckTokenSerializer(serializers.Serializer):
             raise exceptions.ValidationError({'token': ['Invalid value']})
 
         return attrs
+
+
+class ValidatePasswordSerializer(serializers.Serializer):
+    """
+    Serializer that validate a password.
+    """
+    password = serializers.CharField(required=True)
+
+    def validate_password(self, password):
+        return get_adapter().clean_password(password)

@@ -79,6 +79,7 @@ from jcash.api.serializers import (
     PersonalSerializer,
     CustomersSerializer,
     CheckTokenSerializer,
+    ValidatePasswordSerializer,
 )
 from jcash.commonutils import currencyrates, math
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
@@ -1499,3 +1500,26 @@ class CheckTokenView(GenericAPIView):
             return Response({'success': True})
         else:
             return Response({'success': False})
+
+
+class ValidatePasswordView(GenericAPIView):
+    """
+    post:
+    Validate password
+
+    Response example:
+
+    ```
+    {"success": true} |
+    {"success": false, "error": "error_description"} |
+    {"success": false, "errors": {object}}
+    ```
+    """
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = ValidatePasswordSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            return Response({'success': True})
