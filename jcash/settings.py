@@ -261,6 +261,9 @@ DATABASE_PASS = 'password'
 # Frontend settings
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://localhost')
 
+# Backend url
+BACKEND_URL = os.getenv('BACKEND_URL', 'https://localhost')
+
 # Sqlalchemy settings
 SQLALCHEMY_ECHO = True
 
