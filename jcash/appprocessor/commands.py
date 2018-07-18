@@ -174,7 +174,7 @@ def verify_document(document_id):
             else:
                 logger.info('Document for %s already uploaded: %s', document.user.username, document.onfido_document_id)
 
-            check_id = person_verify.create_check(document.onfido_applicant_id)
+            check_id = person_verify.create_check(doc_verification.onfido_applicant_id)
             document.onfido_check_id = check_id
             document.onfido_check_created = timezone.now()
             document.save()
