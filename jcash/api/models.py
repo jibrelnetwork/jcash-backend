@@ -361,6 +361,7 @@ class DocumentVerificationStatus:
 class DocumentVerification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, null=False, blank=False, default=DocumentVerificationStatus.created)
+    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     # Relationships
     personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
@@ -369,14 +370,14 @@ class DocumentVerification(models.Model):
     corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
                                   blank=True, null=True, related_name=Corporate.rel_document_verifications)
 
-    passport = models.ForeignKey(Document, on_delete=models.DO_NOTHING,
-                                 blank=False, null=False, related_name=Document.rel_passport_verification)
+    passport = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=False, null=False, related_name=Document.rel_passport_verification)
 
-    utilitybills = models.ForeignKey(Document, on_delete=models.DO_NOTHING,
-                                     blank=False, null=False, related_name=Document.rel_utilitybills_verification)
+    utilitybills = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                        blank=False, null=False, related_name=Document.rel_utilitybills_verification)
 
-    selfie = models.ForeignKey(Document, on_delete=models.DO_NOTHING,
-                               blank=False, null=False, related_name=Document.rel_selfie_verification)
+    selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                  blank=False, null=False, related_name=Document.rel_selfie_verification)
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_documentverification)

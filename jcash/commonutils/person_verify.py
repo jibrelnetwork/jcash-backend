@@ -4,10 +4,10 @@ import onfido
 from onfido.rest import ApiException
 from pprint import pprint
 import requests
-import tempfile
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
+
+from jcash.api.models import DocumentVerification
 
 
 STATUS_COMPLETE = 'complete'
@@ -25,14 +25,12 @@ def get_client(api_key=None):
     return api
 
 
-def create_applicant(user_id):
-    user = get_user_model().objects.get(pk=user_id)
-
+def create_applicant(first_name, last_name, email, birthday):
     details = {
-        'first_name': user.account.first_name,
-        'last_name': user.account.last_name,
-        'email': user.email,
-        'dob': user.account.birthday,
+        'first_name': first_name,
+        'last_name': last_name,
+        'email': email,
+        'dob': birthday,
     }
     applicant = onfido.Applicant(**details)
 
@@ -58,24 +56,30 @@ def create_check(applicant_id):
     return resp.id
 
 
-def upload_document(applicant_id, document_url, document_type):
+def upload_document(applicant_id, document_path, document_ext, document_type):
     api = get_client()
-    resp = requests.get(document_url)
-    if not document_type:
-        document_type = resp.headers['X-File-Name'].split('.')[-1]
-    if document_type == 'jpeg':
-        document_type = 'jpg'
 
-    document_type = document_type.lower()
-    if document_type not in ('jpg', 'png', 'pdf'):
+    document_ext = document_ext.lower()
+
+    if document_ext == 'jpeg':
+        document_ext = 'jpg'
+
+    if document_ext not in ('jpg', 'png', 'pdf'):
         raise RuntimeError(
-            'Document type {} is not allowed. Url {}, applicant {}'.format(
-                document_type, document_url, applicant_id))
+            'Document extension {} is not allowed. Path {}, applicant {}, type {}'.format(
+                document_ext, document_path, applicant_id, document_type))
 
-    if resp.status_code != 200:
-        raise RuntimeError("Can't get document file {} for applicant {}".format(
-                           document_url, applicant_id))
-    with tempfile.NamedTemporaryFile(suffix='.' + document_type) as fp:
-        fp.write(resp.content)
-        resp = api.upload_document(applicant_id, file=fp.name, type='passport')
-        return resp.id
+    if document_type not in ('selfie', 'passport', 'utilitybills'):
+        raise RuntimeError(
+            'Document type {} is not allowed. Path {}, applicant {}, type {}'.format(
+                document_ext, document_path, applicant_id, document_type))
+
+    resp = None
+    if document_type == 'selfie':
+        resp = api.upload_live_photo(applicant_id, file=document_path, advanced_validation=True)
+    elif document_type == 'passport':
+        resp = api.upload_document(applicant_id, file=document_path, type='passport')
+    elif document_type == 'utilitybills':
+        resp = api.upload_document(applicant_id, file=document_path, type='bank_statement')
+
+    return resp.id

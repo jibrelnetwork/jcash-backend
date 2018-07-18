@@ -23,6 +23,7 @@ from jcash.api.models import (
     Refund,
     Exchange,
     Replenisher,
+    DocumentVerification,
 )
 from jcash.commonutils import (
     notify,
@@ -61,55 +62,123 @@ def process_all_notifications_runner():
     logger.info('Finished notifications processing')
 
 
+def get_document_verification(document: Document) -> DocumentVerification:
+    """
+    Get latest document verification
+    :param document: Document
+    :return: DocumentVerification
+    """
+    doc_verification = None
+
+    if hasattr(document, Document.rel_selfie_verification):
+        doc_verification = document.selfie_verification
+    elif hasattr(document, Document.rel_utilitybills_verification):
+        doc_verification = document.utilitybills_verification
+    elif hasattr(document, Document.rel_passport_verification):
+        doc_verification = document.passport_verification
+
+    return doc_verification
+
+
+def check_document_verification_status(document_id):
+    """
+    Check and store OnFido check status and result
+    """
+    document = Document.objects.get(pk=document_id)
+    logger.info('Checking verification status for document id=%s', document_id)
+    if document.onfido_check_status == person_verify.STATUS_COMPLETE:
+        logger.warn('Verification completed')
+        return
+    api = person_verify.get_client()
+
+    doc_verification = get_document_verification(document)
+
+    if doc_verification:
+        with transaction.atomic():
+            check = api.find_check(doc_verification.onfido_applicant_id, document.onfido_check_id)
+            logger.info('Verification status is: %s, result: %s', check.status, check.result)
+            document.onfido_check_status = check.status
+            document.onfido_check_result = check.result
+            document.save()
+
+
+def check_document_verification_status_runner():
+    documents_to_check = Document.objects.filter(onfido_check_result=None).exclude(onfido_check_id=None).all()
+    for document in documents_to_check:
+        logger.info('Run check verification status for document id=%s', document.pk)
+        check_document_verification_status(document.pk)
+
+
 def verify_document(document_id):
     """
-    Create OnFido check to verify user document
+    Create OnFido check to verify customer document
     """
     with transaction.atomic():
         now = timezone.now()
         document = Document.objects.select_for_update().get(id=document_id)
 
         if document.onfido_check_status == person_verify.STATUS_COMPLETE:
-            logger.warn('Verification completed for %s, exiting', document.user.username)
+            logger.warn('Verification completed for id %s, exiting', document.pk)
             return
 
         if document.onfido_check_id is not None:
-            logger.warn('Check exists for %s, exiting', document.user.username)
+            logger.warn('Check exists for id %s, exiting', document.pk)
             return
 
         if (document.verification_started_at and
             (now - document.verification_started_at) < timedelta(minutes=5)):
-            logger.info('Verification already started for %s, exiting', document.user.username)
+            logger.info('Verification already started for id %s, exiting', document.pk)
             return
 
-        logger.info('Start verifying process for user %s <%s>', document.user.pk, document.user.username)
+        logger.info('Start verifying process for id %s', document.pk)
         document.verification_started_at = now
         document.verification_attempts += 1
         document.save()
 
-    if not document.user.account.onfido_applicant_id:
-        applicant_id = person_verify.create_applicant(document.user.pk)
-        document.user.account.onfido_applicant_id = applicant_id
-        document.user.account.save()
-        logger.info('Applicant %s created for %s', document.user.account.onfido_applicant_id, document.user.username)
-    else:
-        logger.info('Applicant for %s already exists: %s', document.user.username, document.user.account.onfido_applicant_id)
+    doc_verification = get_document_verification(document)
+    if doc_verification:
+        with transaction.atomic():
+            if not doc_verification.onfido_applicant_id:
+                if doc_verification.personal:
+                    full_name = doc_verification.personal.fullname
+                    first_name = full_name.split(" ")[0]
+                    last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
+                    birtday = doc_verification.personal.birthday
+                elif doc_verification.corporate:
+                    full_name = doc_verification.corporate.contact_fullname
+                    first_name = full_name.split(" ")[0]
+                    last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
+                    birtday = doc_verification.corporate.contact_birthday
+                else:
+                    logger.error('Document verification id=%s has no customer', doc_verification.pk)
+                    return
 
-    if not document.onfido_document_id:
-        document_id = person_verify.upload_document(document.user.account.onfido_applicant_id,
-                                                    document.image.url,
-                                                    document.ext)
-        document.onfido_document_id = document_id
-        document.save()
-        logger.info('Document for %s uploaded: %s', document.user.username, document.onfido_document_id)
-    else:
-        logger.info('Document for %s already uploaded: %s', document.user.username, document.onfido_document_id)
+                email = doc_verification.user.email
+                applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
+                doc_verification.onfido_applicant_id = applicant_id
+                doc_verification.save()
+                logger.info('Applicant %s created for %s', doc_verification.onfido_applicant_id,
+                            doc_verification.user.username)
+            else:
+                logger.info('Applicant for %s already exists: %s', doc_verification.user.username,
+                            doc_verification.onfido_applicant_id)
 
-    check_id = person_verify.create_check(document.onfido_applicant_id)
-    document.onfido_check_id = check_id
-    document.onfido_check_created = timezone.now()
-    document.save()
-    logger.info('Check for %s created: %s', document.user.username, document.onfido_check_id)
+            if not document.onfido_document_id:
+                document_id = person_verify.upload_document(doc_verification.onfido_applicant_id,
+                                                            document.image.path,
+                                                            document.ext,
+                                                            document.type)
+                document.onfido_document_id = document_id
+                document.save()
+                logger.info('Document for %s uploaded: %s', document.user.username, document.onfido_document_id)
+            else:
+                logger.info('Document for %s already uploaded: %s', document.user.username, document.onfido_document_id)
+
+            check_id = person_verify.create_check(document.onfido_applicant_id)
+            document.onfido_check_id = check_id
+            document.onfido_check_created = timezone.now()
+            document.save()
+            logger.info('Check for %s created: %s', document.user.username, document.onfido_check_id)
 
 
 def process_all_uncomplete_verifications():
@@ -125,8 +194,7 @@ def process_all_uncomplete_verifications():
     )
     documents_to_verify = Document.objects.filter(condition).all()
     for document in documents_to_verify:
-        logger.info('Retry uncomplete document verification %s <%s> %s',
-                    document.user.pk, document.user.email, document.type)
+        logger.info('Retry uncomplete document verification %s', document.pk)
         verify_document(document.pk)
 
     logger.info('Finished process uncomplete verifications')
