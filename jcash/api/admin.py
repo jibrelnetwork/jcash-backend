@@ -11,10 +11,9 @@ from django.utils.safestring import mark_safe
 from django.http import HttpResponse
 from django.contrib.admin import SimpleListFilter
 from django.utils import timezone
-
-
 from rest_framework.authtoken.models import Token
 from allauth.account.models import EmailAddress
+from django.urls import reverse
 
 from jcash.api.models import (
     Address,
@@ -33,6 +32,8 @@ from jcash.api.models import (
     Personal,
     Corporate,
     Replenisher,
+    DocumentVerification,
+    AccountType,
 )
 
 from jcash.api import serializers
@@ -105,10 +106,9 @@ class ReadonlyMixin:
 
 
 @admin.register(Account)
-class AccountAdmin(admin.ModelAdmin):
-    list_display = ['id', 'username', 'first_name', 'last_name',
-                    'is_identity_verified', 'is_identity_declined',
-                    'is_blocked', 'comment']
+class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
+    list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
+                    'is_identity_verified', 'is_identity_declined', 'is_blocked', 'comment']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
     search_fields = ['user__username']
     ordering = ('-id',)
@@ -116,6 +116,40 @@ class AccountAdmin(admin.ModelAdmin):
     @staticmethod
     def username(obj):
         return obj.user.username
+
+    def customer_link(self, obj):
+        if hasattr(obj.user, 'account'):
+            if hasattr(obj.user.account, Account.rel_personal):
+                personal = obj.user.account.personal
+                url = reverse('admin:api_personal_change', args=(personal.pk,))
+                return format_html('<a href="{url}">{type}</a>', url=url, type=AccountType.personal)
+            elif hasattr(obj.user.account, Account.rel_corporate):
+                corporate = obj.user.account.corporate
+                url = reverse('admin:api_corporate_change', args=(corporate.pk,))
+                return format_html('<a href="{url}">{type}</a>', url=url, type=AccountType.corporate)
+            else:
+                return ''
+        else:
+            return ''
+        customer_link.allow_tags = True
+
+    def verification_link(self, obj):
+        if hasattr(obj.user, Account.rel_documentverification):
+            doc_verification = obj.user.documentverification.latest('created_at')
+            url = reverse('admin:api_documentverification_change', args=(doc_verification.pk,))
+            return format_html('<a href="{url}">{created_at}</a>',
+                               url=url,
+                               created_at=doc_verification.created_at)
+        else:
+            return ''
+    verification_link.allow_tags = True
+
+    def verification_status(self, obj):
+        if hasattr(obj.user, Account.rel_documentverification):
+            doc_verification = obj.user.documentverification.latest('created_at')
+            return doc_verification.status
+        else:
+            return ''
 
 
 @admin.register(Address)
@@ -309,6 +343,62 @@ class ReplenisherAdmin(admin.ModelAdmin):
     search_fields = ['address']
     list_filter = ['is_removed']
     ordering = ('id',)
+
+
+@admin.register(DocumentVerification)
+class DocumentVerificationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'username', 'created_at', 'status',
+                    'passport_thumb', 'passport_status',
+                    'utilitybills_thumb', 'utilitybills_status',
+                    'selfie_thumb', 'selfie_status']
+    search_fields = ['id']
+    ordering = ('-id',)
+
+    @staticmethod
+    def username(obj):
+        return obj.user.username
+
+    def passport_status(self, obj):
+        if obj.passport:
+            return obj.passport.onfido_check_result
+        else:
+            return None
+
+    def utilitybills_status(self, obj):
+        if obj.utilitybills:
+            return obj.utilitybills.onfido_check_result
+        else:
+            return None
+
+    def selfie_status(self, obj):
+        if obj.selfie:
+            return obj.selfie.onfido_check_result
+        else:
+            return None
+
+    def document_thumb(self, obj):
+        if not obj.image:
+            return ''
+        if obj.ext.lower() in ('jpg', 'jpeg', 'png'):
+            return format_html('<a href="{src}"><img src="{src}" height="30"/></a>', src=obj.image.url)
+        else:
+            return obj.image.url
+
+    def passport_thumb(self, obj):
+        return self.document_thumb(obj.passport)
+
+    def utilitybills_thumb(self, obj):
+        return self.document_thumb(obj.utilitybills)
+
+    def selfie_thumb(self, obj):
+        return self.document_thumb(obj.selfie)
+
+    passport_thumb.short_description = 'Passport'
+    passport_thumb.allow_tags = True
+    utilitybills_thumb.short_description = 'Utilitybills'
+    utilitybills_thumb.allow_tags = True
+    selfie_thumb.short_description = 'Selfie'
+    selfie_thumb.allow_tags = True
 
 
 admin.site.unregister(EmailAddress)

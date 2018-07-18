@@ -27,7 +27,7 @@ from jcash.api.models import (
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
-    CorporateFieldLength, Corporate, CustomerStatus
+    CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates
 from jcash.commonutils.notify import send_email_reset_password
@@ -1341,6 +1341,12 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 personal.account.last_updated_at = personal.last_updated_at
                 personal.account.save()
             personal.save()
+            doc_verification = DocumentVerification.objects.create(user=personal.account.user,
+                                                                   personal=personal,
+                                                                   passport=passport_document,
+                                                                   utilitybills=utilitybills_document,
+                                                                   selfie=selfie_document)
+            doc_verification.save()
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1659,6 +1665,12 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 corporate.account.last_updated_at = corporate.last_updated_at
                 corporate.account.save()
             corporate.save()
+            doc_verification = DocumentVerification.objects.create(user=corporate.account.user,
+                                                                   corporate=corporate,
+                                                                   passport=passport_document,
+                                                                   utilitybills=utilitybills_document,
+                                                                   selfie=selfie_document)
+            doc_verification.save()
 
 
 class CorporateSerializer(serializers.ModelSerializer):

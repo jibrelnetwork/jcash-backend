@@ -84,6 +84,7 @@ class Account(models.Model):
     rel_addresses = 'addresses'
     rel_personal = 'personal'
     rel_corporate = 'corporate'
+    rel_documentverification = 'documentverification'
 
     # Relationships
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -210,6 +211,7 @@ class Personal(models.Model):
                                    null=True, related_name=Account.rel_personal)
 
     rel_documents = 'documents'
+    rel_document_verifications = 'document_verifications'
 
 
 # Corporate fields length
@@ -287,6 +289,7 @@ class Corporate(models.Model):
                                    null=True, related_name=Account.rel_corporate)
 
     rel_documents = 'documents'
+    rel_document_verifications = 'document_verifications'
 
 
 class DocumentHelper:
@@ -339,8 +342,45 @@ class Document(models.Model):
     corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
                                   related_name=Corporate.rel_documents, null=True)
 
+    rel_passport_verification = 'passport_verification'
+    rel_utilitybills_verification = 'utilitybills_verification'
+    rel_selfie_verification = 'selfie_verification'
+
     class Meta:
         db_table = 'document'
+
+
+class DocumentVerificationStatus:
+    created = 'created'
+    pending = 'pending'
+    verified = 'verified'
+    declined = 'declined'
+
+
+# DocumentVerification
+class DocumentVerification(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, null=False, blank=False, default=DocumentVerificationStatus.created)
+    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
+
+    # Relationships
+    personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
+                                 blank=True, null=True, related_name=Personal.rel_document_verifications)
+
+    corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
+                                  blank=True, null=True, related_name=Corporate.rel_document_verifications)
+
+    passport = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=False, null=False, related_name=Document.rel_passport_verification)
+
+    utilitybills = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                        blank=False, null=False, related_name=Document.rel_utilitybills_verification)
+
+    selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                  blank=False, null=False, related_name=Document.rel_selfie_verification)
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
+                             blank=False, null=False, related_name=Account.rel_documentverification)
 
 
 # Address model
