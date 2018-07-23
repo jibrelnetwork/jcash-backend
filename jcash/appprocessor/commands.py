@@ -593,33 +593,37 @@ def fetch_replenisher():
     try:
         logging.getLogger(__name__).info("Start to fetch replenishers")
 
-        eth_currency = Currency.objects.get(symbol__icontains='eth')
         try:
-            last_event = Replenisher.objects.latest('block_height')
-            last_block = last_event.block_height + 1
-        except Replenisher.DoesNotExist:
-            last_block = 0
+            eth_currency = Currency.objects.get(symbol__icontains='eth')
+            try:
+                last_event = Replenisher.objects.latest('block_height')
+                last_block = last_event.block_height + 1
+            except Replenisher.DoesNotExist:
+                last_block = 0
 
-        events = eth_events.get_replenishers(eth_currency.exchanger_address, eth_currency.abi, last_block)
-        with transaction.atomic():
-            for evnt in events:
-                tx_hash, block_height, mined_at, evnt_type, evnt_address = evnt
+            events = eth_events.get_replenishers(eth_currency.exchanger_address, eth_currency.abi, last_block)
+            with transaction.atomic():
+                for evnt in events:
+                    tx_hash, block_height, mined_at, evnt_type, evnt_address = evnt
 
-                if evnt_type == "ReplenisherDisabledEvent":
-                    try:
-                        replenisher = Replenisher.objects.filter(address__iexact=evnt_address).latest('block_height')
-                        replenisher.is_removed = True
-                        replenisher.last_updated_at = timezone.now()
+                    if evnt_type == "ReplenisherDisabledEvent":
+                        try:
+                            replenisher = Replenisher.objects.filter(address__iexact=evnt_address).latest('block_height')
+                            replenisher.is_removed = True
+                            replenisher.last_updated_at = timezone.now()
+                            replenisher.save()
+                        except Replenisher.DoesNotExist:
+                            pass
+                    else:
+                        replenisher = Replenisher.objects.create(transaction_id=tx_hash,
+                                                       block_height=block_height,
+                                                       mined_at=str(mined_at),
+                                                       type=evnt_type,
+                                                       address=evnt_address)
                         replenisher.save()
-                    except Replenisher.DoesNotExist:
-                        pass
-                else:
-                    replenisher = Replenisher.objects.create(transaction_id=tx_hash,
-                                                   block_height=block_height,
-                                                   mined_at=str(mined_at),
-                                                   type=evnt_type,
-                                                   address=evnt_address)
-                    replenisher.save()
+
+        except Currency.DoesNotExist:
+            logging.getLogger(__name__).warn("Currencies not configured")
 
         logging.getLogger(__name__).info("Finished fetching replenishers")
     except Exception:
