@@ -516,14 +516,15 @@ def process_outgoing_transactions_runner():
         refund_limit_count = overall_limit_count - exchange_limit_count
 
         if exchange_limit_count <= 0:
-            logger.info('Finished to process new transfer transactions. Over the limit.')
+            logger.info('Finished to process new exchange transactions. Over the limit.')
             return
 
         exchanges = Exchange.objects.filter(Q(status=TransactionStatus.confirmed) &
                                             (Q(transaction_id="") | Q(transaction_id=None))) \
                                     .order_by('id')[:exchange_limit_count]  # type: List[Exchange]
-        nonce = eth_utils.get_exchanger_nonce()
-        process_outgoing_transactions(exchanges, nonce)
+        if exchanges.count() > 0:
+            nonce = eth_utils.get_exchanger_nonce()
+            process_outgoing_transactions(exchanges, nonce)
 
         if refund_limit_count <= 0:
             logger.info('Finished to process new refund transactions. Over the limit.')
@@ -532,8 +533,9 @@ def process_outgoing_transactions_runner():
         refunds = Refund.objects.filter(Q(status=TransactionStatus.confirmed) &
                                             (Q(transaction_id="") | Q(transaction_id=None))) \
                                     .order_by('id')[:exchange_limit_count]  # type: List[Refund]
-        nonce = eth_utils.get_exchanger_nonce()
-        process_outgoing_transactions(refunds, nonce, True)
+        if refunds.count() > 0:
+            nonce = eth_utils.get_exchanger_nonce()
+            process_outgoing_transactions(refunds, nonce, True)
 
         logger.info('Finished process outgoing transactions')
     except Exception:
