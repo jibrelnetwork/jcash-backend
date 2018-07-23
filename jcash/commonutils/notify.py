@@ -274,5 +274,12 @@ def send_email_reset_password(email, activate_url, user_id=None):
     add_notification(email, user_id=user_id, type=api_models.NotificationType.password_change_request, data=ctx)
 
 
-def send_email_identity_not_verified(email, user_id=None):
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.account_rejected, data={})
+def send_email_kyc_account_rejected(email, reason, user_id=None):
+    ctx = {
+        'reason': reason,
+    }
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.kyc_account_rejected, data=ctx)
+
+
+def send_email_kyc_account_approved(email, user_id=None):
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.kyc_account_approved, data={})

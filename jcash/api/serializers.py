@@ -29,7 +29,7 @@ from jcash.api.models import (
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
 )
-from jcash.commonutils import eth_sign, eth_address, math, currencyrates
+from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration
 from jcash.commonutils.notify import send_email_reset_password
 from jcash.settings import (
     FRONTEND_URL,
@@ -260,7 +260,7 @@ class RegisterSerializer(serializers.Serializer):
         setup_user_email(request, user, [])
         tracking = self.validated_data.get('tracking', {})
         account = Account.objects.create(user=user, tracking=tracking)
-        # ga_integration.on_status_new(account)
+        ga_integration.on_status_new(account)
         return user
 
 
@@ -1347,6 +1347,7 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                                                                    utilitybills=utilitybills_document,
                                                                    selfie=selfie_document)
             doc_verification.save()
+            ga_integration.on_status_registration_complete(personal.account)
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1671,6 +1672,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                                                                    utilitybills=utilitybills_document,
                                                                    selfie=selfie_document)
             doc_verification.save()
+            ga_integration.on_status_registration_complete(corporate.account)
 
 
 class CorporateSerializer(serializers.ModelSerializer):

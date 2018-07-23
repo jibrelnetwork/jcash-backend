@@ -32,7 +32,8 @@ from jcash.commonutils import (
     eth_contracts,
     eth_utils,
     math,
-    exchange_utils as utils
+    exchange_utils as utils,
+    ga_integration,
 )
 from jcash.api.tasks import celery_refund_eth, celery_transfer_eth, celery_refund_token, celery_transfer_token
 from jcash.settings import (
@@ -554,6 +555,7 @@ def check_outgoing_transactions(txs, is_refund = False):
                             tx.application.status = str(ApplicationStatus.refunded)
                         else:
                             tx.application.status = str(ApplicationStatus.converted)
+                            ga_integration.on_exchange_completed(tx.application)
                         tx.application.save()
                 elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail

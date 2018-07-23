@@ -12,6 +12,8 @@ from django.utils.timezone import now
 from django.contrib.auth.tokens import default_token_generator as token_generator
 from django.contrib.sites.shortcuts import get_current_site
 
+from jcash.commonutils import notify
+
 
 logger = logging.getLogger(__name__)
 
@@ -111,17 +113,24 @@ class Account(models.Model):
         self.is_blocked = True
         self.save()
 
+    def unblock_account(self):
+        self.is_blocked = False
+        self.save()
+
     def approve_verification(self):
         self.is_identity_verified = True
         self.is_identity_declined = False
         self.save()
+        notify.send_email_kyc_account_approved(self.user.email if self.user else None,
+                                               self.user.id if self.user else None)
 
-    def decline_verification(self):
+    def decline_verification(self, reason):
         self.is_identity_verified = False
         self.is_identity_declined = True
         self.save()
-        # notify.send_email_kyc_account_rejected(self.user.email if self.user else None,
-        # self.user.id if self.user else None) # Todo:
+        notify.send_email_kyc_account_rejected(self.user.email if self.user else None,
+                                               reason,
+                                               self.user.id if self.user else None)
 
     @classmethod
     def is_user_email_confirmed(cls, user):
@@ -430,6 +439,8 @@ class NotificationType:
     account_email_confirmed = 'account_email_confirmed'
     password_change_request = 'password_change_request'
     password_changed        = 'password_changed'
+    kyc_account_approved    = 'kyc_account_approved'
+    kyc_account_rejected    = 'kyc_account_rejected'
 
 
 class Notification(models.Model):
@@ -453,6 +464,8 @@ class Notification(models.Model):
         NotificationType.account_email_confirmed: 'registration_02',
         NotificationType.password_change_request: 'account_01_01',
         NotificationType.password_changed: 'account_01_02',
+        NotificationType.kyc_account_approved: 'kyc_01',
+        NotificationType.kyc_account_rejected: 'kyc_02',
     }
 
     notification_subjects = {
@@ -460,6 +473,8 @@ class Notification(models.Model):
         'account_01_02': 'Your password was updated',
         'registration_01': 'Verify your email address',
         'registration_02': 'Accessing your jCash',
+        'kyc_01': 'Completing Your KYC',
+        'kyc_02': 'Completing Your KYC',
     }
 
     def __str__(self):

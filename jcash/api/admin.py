@@ -38,7 +38,7 @@ from jcash.api.models import (
 
 from jcash.api import serializers
 from jcash.api import utils
-#from jcash.commonutils import ga_integration
+from jcash.commonutils import ga_integration
 
 
 logger = logging.getLogger(__name__)
@@ -108,10 +108,31 @@ class ReadonlyMixin:
 @admin.register(Account)
 class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
-                    'is_identity_verified', 'is_identity_declined', 'is_blocked', 'comment']
+                    'is_identity_verified', 'is_identity_declined', 'is_blocked', 'account_actions']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
+    exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
+               'country', 'street', 'town', 'postcode', 'terms_confirmed']
     search_fields = ['user__username']
     ordering = ('-id',)
+
+    class Media:
+        js = ['api/account.js',]
+
+    def changelist_view(self, request, extra_context=None):
+        self.request = request
+        return super(AccountAdmin, self).changelist_view(request, extra_context=extra_context)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+
+            url(
+                r'^(?P<account_id>.+)/action/$',
+                self.admin_site.admin_view(self.account_action),
+                name='account-action',
+            ),
+        ]
+        return custom_urls + urls
 
     @staticmethod
     def username(obj):
@@ -150,6 +171,72 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
             return doc_verification.status
         else:
             return ''
+
+    def account_actions(self, obj):
+        return format_html(
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=block" data-action="block">Block</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=unblock" data-action="block">Unblock</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=approve" data-action="approve">Approve</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=decline" data-action="decline">Decline</a>&nbsp;',
+            url = reverse('admin:account-action', args=[obj.pk]))
+
+    account_actions.short_description = 'Account Actions'
+    account_actions.allow_tags = True
+
+    def block_account(self, request, account_id, *args, **kwargs):
+        account = get_object_or_404(Account, pk=account_id)
+        account.block_account()
+        logger.info('Manual block for %s', account.user.username)
+        messages.success(request,
+                         mark_safe('Account <b>Blocked</b> for {}'.format(account.user.username)),
+                         extra_tags='safe')
+        return HttpResponse('OK')
+
+    def unblock_account(self, request, account_id, *args, **kwargs):
+        account = get_object_or_404(Account, pk=account_id)
+        account.unblock_account()
+        logger.info('Manual unblock for %s', account.user.username)
+        messages.success(request,
+                         mark_safe('Account <b>Unblocked</b> for {}'.format(account.user.username)),
+                         extra_tags='safe')
+        return HttpResponse('OK')
+
+    def approve_identity_verification(self, request, account_id, *args, **kwargs):
+        account = get_object_or_404(Account, pk=account_id)
+        account.approve_verification()
+        logger.info('Manual Identity approve for %s', account.user.username)
+        ga_integration.on_status_verified_manual(account)
+        messages.success(request,
+                         mark_safe('Verification Status <b>Approved</b> for {}'.format(account.user.username)),
+                         extra_tags='safe')
+        return HttpResponse('OK')
+
+    def decline_identity_verification(self, request, account_id, *args, **kwargs):
+        reason = request.POST.get('reason')
+        account = get_object_or_404(Account, pk=account_id)
+        logger.info('Manual Identity decline for %s', account.user.username)
+        account.decline_verification(reason)
+        ga_integration.on_status_not_verified_manual(account)
+        messages.success(request,
+                         mark_safe('Verification Status <b>Declined</b> for {}'.format(account.user.username)),
+                         extra_tags='safe')
+        return HttpResponse('OK')
+
+    def account_action(self, request, account_id, *args, **kwargs):
+        if request.method == 'POST' and request.POST.get('confirm'):
+            action = request.POST.get('action')
+            if action == 'block':
+                return self.block_account(request, account_id)
+            elif action == 'unblock':
+                return self.unblock_account(request, account_id)
+            elif action == 'approve':
+                return self.approve_identity_verification(request, account_id)
+            elif action == 'decline':
+                return self.decline_identity_verification(request, account_id)
+        else:
+            account = get_object_or_404(Account, pk=account_id)
+            action = request.GET.get('action')
+            return render(request, 'account_action_confirm.html', {'action': action, 'account': account, 'opts': account._meta})
 
 
 @admin.register(Address)
