@@ -40,7 +40,7 @@ def get_incoming_txs(
         transaction_hash = HexBytes(log_entry['transactionHash']).hex()
         mined_at = datetime.fromtimestamp(block_data.timestamp, tzlocal())
         evnt_args = get_event_data(event_abi, log_entry)
-        if event_name == 'ReceiveEvent':
+        if event_name == 'ReceiveEthEvent':
             result.append((transaction_hash,
                            block_number,
                            mined_at,
