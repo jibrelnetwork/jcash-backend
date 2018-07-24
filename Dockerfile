@@ -7,7 +7,7 @@ COPY requirements*.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt -r requirements.production.txt
 
 COPY . /app
-RUN pip install --editable --no-cache-dir .
+RUN pip install --no-cache-dir --editable .
 
 VOLUME ["/app/uploads"]
 
