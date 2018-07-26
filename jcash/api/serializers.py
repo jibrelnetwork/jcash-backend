@@ -1260,14 +1260,14 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
                                        min_length=1)
     income_source = serializers.CharField(required=True, max_length=PersonalFieldLength.income_source,
                                           min_length=1)
-    asstets_origin = serializers.CharField(required=True, max_length=PersonalFieldLength.asstets_origin,
+    assets_origin = serializers.CharField(required=True, max_length=PersonalFieldLength.assets_origin,
                                            min_length=1)
     jcash_use = serializers.CharField(required=True, max_length=PersonalFieldLength.jcash_use,
                                       min_length=1)
 
     class Meta:
         model = Personal
-        fields = ('profession', 'income_source', 'asstets_origin', 'jcash_use')
+        fields = ('profession', 'income_source', 'assets_origin', 'jcash_use')
 
     def save(self, personal):
         serializer_fields = self.get_fields()
@@ -1280,9 +1280,9 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
             if serializer_fields.get('income_source') and self.validated_data.get('income_source'):
                 is_updated = True
                 personal.income_source = self.validated_data['income_source']
-            if serializer_fields.get('asstets_origin') and self.validated_data.get('asstets_origin'):
+            if serializer_fields.get('assets_origin') and self.validated_data.get('assets_origin'):
                 is_updated = True
-                personal.asstets_origin = self.validated_data['asstets_origin']
+                personal.assets_origin = self.validated_data['assets_origin']
             if serializer_fields.get('jcash_use') and self.validated_data.get('jcash_use'):
                 is_updated = True
                 personal.jcash_use = self.validated_data['jcash_use']
@@ -1371,7 +1371,7 @@ class PersonalSerializer(serializers.ModelSerializer):
         elif status == str(CustomerStatus.address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
         elif status == str(CustomerStatus.income_info):
-            fields = ('success', 'profession', 'income_source', 'asstets_origin', 'jcash_use')
+            fields = ('success', 'profession', 'income_source', 'assets_origin', 'jcash_use')
         elif status == str(CustomerStatus.documents):
             fields = ('success', 'passport', 'utilitybills', 'selfie')
         else:
@@ -1387,7 +1387,7 @@ class PersonalSerializer(serializers.ModelSerializer):
         model = Personal
         fields = ('success', 'fullname', 'nationality', 'birthday', 'phone', 'email',
                   'country', 'street', 'apartment', 'city', 'postcode', 'profession',
-                  'income_source', 'asstets_origin', 'jcash_use', 'passport', 'utilitybills',
+                  'income_source', 'assets_origin', 'jcash_use', 'passport', 'utilitybills',
                   'selfie')
 
     def get_passport(self, obj):
@@ -1505,17 +1505,17 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
                                      min_length=1)
     currency_nature = serializers.CharField(required=True, max_length=CorporateFieldLength.currency_nature,
                                             min_length=1)
-    asstets_origin = serializers.CharField(required=True, max_length=CorporateFieldLength.asstets_origin,
+    assets_origin = serializers.CharField(required=True, max_length=CorporateFieldLength.assets_origin,
                                            min_length=1)
-    asstets_origin_description = serializers.CharField(required=True,
-                                                       max_length=CorporateFieldLength.asstets_origin_description,
+    assets_origin_description = serializers.CharField(required=True,
+                                                       max_length=CorporateFieldLength.assets_origin_description,
                                                        min_length=1)
     jcash_use = serializers.CharField(required=True, max_length=CorporateFieldLength.jcash_use,
                                       min_length=1)
 
     class Meta:
         model = Corporate
-        fields = ('industry', 'currency_amount', 'asstets_origin', 'asstets_origin_description', 'jcash_use')
+        fields = ('industry', 'currency_amount', 'assets_origin', 'assets_origin_description', 'jcash_use')
 
     def save(self, corporate):
         serializer_fields = self.get_fields()
@@ -1528,12 +1528,12 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
             if serializer_fields.get('currency_nature') and self.validated_data.get('currency_nature'):
                 is_updated = True
                 corporate.currency_nature = self.validated_data['currency_nature']
-            if serializer_fields.get('asstets_origin') and self.validated_data.get('asstets_origin'):
+            if serializer_fields.get('assets_origin') and self.validated_data.get('assets_origin'):
                 is_updated = True
-                corporate.asstets_origin = self.validated_data['asstets_origin']
-            if serializer_fields.get('asstets_origin_description') and self.validated_data.get('asstets_origin_description'):
+                corporate.assets_origin = self.validated_data['assets_origin']
+            if serializer_fields.get('assets_origin_description') and self.validated_data.get('assets_origin_description'):
                 is_updated = True
-                corporate.asstets_origin_description = self.validated_data['asstets_origin_description']
+                corporate.assets_origin_description = self.validated_data['assets_origin_description']
             if serializer_fields.get('jcash_use') and self.validated_data.get('jcash_use'):
                 is_updated = True
                 corporate.jcash_use = self.validated_data['jcash_use']
@@ -1696,8 +1696,8 @@ class CorporateSerializer(serializers.ModelSerializer):
         elif status == str(CustomerStatus.business_address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
         elif status == str(CustomerStatus.income_info):
-            fields = ('success', 'industry', 'asstets_origin', 'currency_nature',
-                      'asstets_origin_description', 'jcash_use')
+            fields = ('success', 'industry', 'assets_origin', 'currency_nature',
+                      'assets_origin_description', 'jcash_use')
         elif status == str(CustomerStatus.primary_contact):
             fields = ('success', 'contact_fullname', 'contact_birthday', 'contact_nationality',
                       'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
@@ -1717,7 +1717,7 @@ class CorporateSerializer(serializers.ModelSerializer):
         model = Corporate
         fields = ('success', 'name', 'domicile_country', 'business_phone', 'business_email',
                   'country', 'street', 'apartment', 'city', 'postcode',  'industry',
-                  'asstets_origin', 'currency_nature', 'asstets_origin_description',
+                  'assets_origin', 'currency_nature', 'assets_origin_description',
                   'jcash_use', 'contact_fullname', 'contact_birthday', 'contact_nationality',
                   'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
                   'contact_apartment', 'contact_city', 'contact_postcode', 'passport',
