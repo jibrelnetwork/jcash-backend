@@ -411,14 +411,14 @@ class NotificationAdmin(admin.ModelAdmin):
 class PersonalAdmin(admin.ModelAdmin):
     list_display = ['uuid', 'fullname', 'nationality', 'birthday', 'phone', 'email',
                     'country', 'street', 'apartment', 'city', 'postcode',
-                    'profession', 'income_source', 'asstets_origin', 'jcash_use', 'created_at']
+                    'profession', 'income_source', 'assets_origin', 'jcash_use', 'created_at']
 
 
 @admin.register(Corporate)
 class CorporateAdmin(admin.ModelAdmin):
     list_display = ['uuid', 'name', 'domicile_country', 'business_phone', 'business_email', 'country',
-                    'street', 'apartment', 'city', 'postcode', 'industry', 'asstets_origin',
-                    'currency_nature', 'asstets_origin_description', 'jcash_use',
+                    'street', 'apartment', 'city', 'postcode', 'industry', 'assets_origin',
+                    'currency_nature', 'assets_origin_description', 'jcash_use',
                     'contact_fullname', 'contact_birthday', 'contact_nationality', 'contact_residency',
                     'contact_phone', 'contact_email', 'contact_street', 'contact_apartment',
                     'contact_city', 'contact_postcode', 'created_at']

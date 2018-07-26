@@ -1137,7 +1137,7 @@ class PersonalIncomeInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "profession": "", "income_source": "", "asstets_origin": "", "jcash_use": ""} |
+    {"success": true, "profession": "", "income_source": "", "assets_origin": "", "jcash_use": ""} |
     {"success": false, "error": "error_description"}
     ```
 
@@ -1313,8 +1313,8 @@ class CorporateIncomeInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "industry": "", "asstets_origin": "", "currency_nature": "",
-    "asstets_origin_description": "", "jcash_use": ""} |
+    {"success": true, "industry": "", "assets_origin": "", "currency_nature": "",
+    "assets_origin_description": "", "jcash_use": ""} |
     {"success": false, "error": "error_description"}
     ```
 
@@ -1499,7 +1499,7 @@ class CheckTokenView(GenericAPIView):
         if serializer.is_valid():
             return Response({'success': True})
         else:
-            return Response({'success': False})
+            return Response({'success': False}, status=400)
 
 
 class ValidatePasswordView(GenericAPIView):

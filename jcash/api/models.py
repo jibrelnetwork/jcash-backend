@@ -171,7 +171,7 @@ class PersonalFieldLength:
     postcode = 120
     profession = 120
     income_source = 255
-    asstets_origin = 255
+    assets_origin = 255
     jcash_use = 255
 
 
@@ -206,7 +206,7 @@ class Personal(models.Model):
     # Income information
     profession = models.CharField(max_length=PersonalFieldLength.profession, null=False, blank=True)
     income_source = models.CharField(max_length=PersonalFieldLength.income_source, null=False, blank=True)
-    asstets_origin = models.CharField(max_length=PersonalFieldLength.asstets_origin, null=False, blank=True)
+    assets_origin = models.CharField(max_length=PersonalFieldLength.assets_origin, null=False, blank=True)
     jcash_use = models.CharField(max_length=PersonalFieldLength.jcash_use, null=False, blank=True)
 
     # Modifications time
@@ -235,8 +235,8 @@ class CorporateFieldLength:
     city = 120
     postcode = 120
     profession = 120
-    asstets_origin = 255
-    asstets_origin_description = 255
+    assets_origin = 255
+    assets_origin_description = 255
     jcash_use = 255
     industry = 255
     currency_nature = 255
@@ -268,10 +268,10 @@ class Corporate(models.Model):
 
     # Income information
     industry = models.CharField(max_length=CorporateFieldLength.industry, null=False, blank=True)
-    asstets_origin = models.CharField(max_length=CorporateFieldLength.asstets_origin, null=False, blank=True)
+    assets_origin = models.CharField(max_length=CorporateFieldLength.assets_origin, null=False, blank=True)
     currency_nature = models.CharField(max_length=CorporateFieldLength.currency_nature, null=False, blank=True)
 
-    asstets_origin_description = models.CharField(max_length=CorporateFieldLength.asstets_origin_description,
+    assets_origin_description = models.CharField(max_length=CorporateFieldLength.assets_origin_description,
                                                   null=False, blank=True)
     jcash_use = models.CharField(max_length=CorporateFieldLength.jcash_use, null=False, blank=True)
 
