@@ -7,7 +7,6 @@ from jcash.api import views
 
 urlpatterns = [
     url(r'^account/', views.AccountView.as_view()),
-    url(r'^account-update/', views.AccountUpdateView.as_view()),
     url(r'^address/$', views.AddressView.as_view()),
     url(r'^address-remove/$', views.RemoveAddressView.as_view()),
     url(r'^currency/', views.CurrencyView.as_view()),
