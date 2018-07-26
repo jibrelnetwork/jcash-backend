@@ -103,14 +103,14 @@ You can create dotenv file `./jcash/.env` and put all env vars here
 ## Init database
 
 ```sh
-python jcash/dj-manage.py migrate
+python jcash/manage.py migrate
 ```
 
 
 ## Launching Django server in dev mode
 
 ```sh
-python jcash/dj-manage.py runserver
+python jcash/manage.py runserver
 ```
 
 
@@ -171,4 +171,10 @@ celery -A jcash worker \
     --pidfile="./celery-sys/%n.pid" \
     --logfile="./celery-log/%n-%i.log" \
     --loglevel=INFO
+```
+
+# Collects the static files into STATIC_ROOT.
+
+```sh
+python jcash/manage.py collectstatic
 ```
