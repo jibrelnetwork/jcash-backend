@@ -112,9 +112,9 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_process_unlinked_unconfirmed_events,
                              expires=1 * 60,
                              name='process_unlinked_unconfirmed_events')
-    sender.add_periodic_task(20,
+    sender.add_periodic_task(1,
                              celery_process_all_notifications_runner,
-                             expires=1 * 60,
+                             expires=10,
                              name='process_all_notifications')
     sender.add_periodic_task(120,
                              celery_check_document_verification_status_runner,
