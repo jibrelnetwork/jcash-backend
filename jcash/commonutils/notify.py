@@ -72,21 +72,23 @@ def _send_email(recipient: str,
                 email_subject: str,
                 email_body: str,
                 proposal_id: str,
-                *, files: List = ()) -> Tuple[bool, Optional[str]]:
-
+                *, files: List = ()) -> Tuple[bool, str, Optional[str]]:
     if any(domain in recipient for domain in config.EMAIL_NOTIFICATIONS__SENDGRID_DOMAINS):
-        return _send_email_sendgrid(config.EMAIL_NOTIFICATIONS__SENDGRID_SENDER,
-                                    recipient,
-                                    email_subject,
-                                    email_body,
-                                    proposal_id)
+        success, message_id = _send_email_sendgrid(config.EMAIL_NOTIFICATIONS__SENDGRID_SENDER,
+                                                   recipient,
+                                                   email_subject,
+                                                   email_body,
+                                                   proposal_id)
+        provider = 'sendgrid'
     else:
-        return _send_email_mailgun(config.EMAIL_NOTIFICATIONS__MAILGUN_SENDER,
-                                   recipient,
-                                   email_subject,
-                                   email_body,
-                                   proposal_id,
-                                   files=files)
+        success, message_id = _send_email_mailgun(config.EMAIL_NOTIFICATIONS__MAILGUN_SENDER,
+                                                  recipient,
+                                                  email_subject,
+                                                  email_body,
+                                                  proposal_id,
+                                                  files=files)
+        provider = 'mailgun'
+    return success, provider, message_id
 
 
 def _send_email_mailgun(sender: str,

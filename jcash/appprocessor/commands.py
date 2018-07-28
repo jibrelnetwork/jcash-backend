@@ -52,11 +52,12 @@ logger = logging.getLogger(__name__)
 def process_all_notifications_runner():
     logger.info('Run notifications processing')
 
-    notifications_to_send = Notification.objects.filter(is_sended=False).all()
+    notifications_to_send = Notification.objects.filter(Q(is_sended=False) & ~Q(meta__has_key='message_id')).all()
     for notification in notifications_to_send:
-        success, message_id = notify.send_notification(notification.pk)
+        success, provider, message_id = notify.send_notification(notification.pk)
         notification.is_sended = success
-        notification.meta['mailgun_message_id'] = message_id
+        notification.meta['message_id'] = message_id
+        notification.meta['provider'] = provider
 
         notification.save()
 
