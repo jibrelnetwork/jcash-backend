@@ -81,8 +81,32 @@ def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -
     return _tx_id
 
 
+def isUserAdmitted(abi, contract_address, user_address) -> bool:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.isUserAdmitted(web3.toChecksumAddress(user_address)).call()
+
+    return res
+
+
+def isUserGranted(abi, contract_address, user_address, license_name) -> bool:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.isUserGranted(web3.toChecksumAddress(user_address), license_name).call()
+
+    return res
+
+
 def admitUser(license_registry_address, user_address) -> str:
     from web3.auto import w3
+
+    if isUserAdmitted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                      license_registry_address,
+                      user_address):
+        return ''
+
     _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
@@ -94,6 +118,13 @@ def admitUser(license_registry_address, user_address) -> str:
 
 def grantUserLicense(license_registry_address, user_address, license_name, expiration_time) -> str:
     from web3.auto import w3
+
+    if isUserGranted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                     license_registry_address,
+                     user_address,
+                     license_name):
+        return ''
+
     _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,

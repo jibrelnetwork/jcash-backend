@@ -421,10 +421,10 @@ def process_license_users_addresses():
     # noinspection PyBroadException
     try:
         logger.info('Start to process license users addresses')
-
+        license_limit_count = 3
         license_addresses = LicenseAddress.objects.filter(Q(status=LicenseAddressStatus.created)).order_by(
             'id'
-        )  # type: List[LicenseAddress]
+        )[:license_limit_count]  # type: List[LicenseAddress]
 
         for la in license_addresses:
             # noinspection PyBroadException
@@ -667,7 +667,6 @@ def check_address_licenses():
                 .values('address__address', 'currency__id') \
                 .annotate(max_id=Max('id')) \
                 .filter(is_remove_license=False)
-            license_limit_count = 5
             addresses_add_license = Address.objects.values('pk', 'licenseaddress__currency__id').annotate(
                 last_la_id=Max('licenseaddress__id'),
                 is_removed_lic=F('is_removed')) \
@@ -681,7 +680,7 @@ def check_address_licenses():
                     (Q(last_la_id__in=addresses_with_add_license_qs.values('max_id')) &
                      Q(is_verified=True) &
                      Q(is_removed=True))
-            )[:license_limit_count]
+            )
             for address_entry in addresses_add_license:
                 license_address(address_entry['pk'], currency, address_entry['is_removed_lic'])
 

@@ -329,22 +329,78 @@ ETH_EXCHANGER__ADDRESS = os.getenv('ETH_EXCHANGER_ADDRESS', '')
 ETH_TX__GAZ_MULTIPLICATOR = os.getenv('ETH_TX_GAZ_MULTIPLICATOR', 1.2)
 ETH_TX__BLOCKS_CONFIRM_NUM = os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5)
 ETH_TX__MAX_PENDING_TX_COUNT = os.getenv('ETH_TX_MAX_PENDING_TX_COUNT', 10)
-ETH_LICENSE_REGISTRY_MANAGEMENT__ABI = b'[{"constant": false, ' \
-                                       b'   "inputs": [{"name": "_userAddress","type": "address"},' \
-                                       b'              {"name": "_licenseName","type": "string"},' \
-                                       b'              {"name": "_expirationTimestamp","type": "uint256"}],' \
-                                       b'   "name": "grantUserLicense",' \
-                                       b'   "outputs": [],' \
-                                       b'   "payable": false,' \
-                                       b'    "stateMutability": "nonpayable",' \
-                                       b'   "type": "function"},' \
-                                       b' {"constant": false, ' \
-                                       b'  "inputs": [{"name": "_userAddress","type": "address"}],' \
-                                       b'  "name": "admitUser",' \
-                                       b'  "outputs": [],' \
-                                       b'  "payable": false,' \
-                                       b'  "stateMutability": "nonpayable",' \
-                                       b'  "type": "function"}]'
+ETH_LICENSE_REGISTRY_MANAGEMENT__ABI =  b'[{"constant": true, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}], ' \
+                                        b'      "name": "isUserGranted", ' \
+                                        b'      "outputs": [{"name": "", "type": "bool"}], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "view", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": true, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}], ' \
+                                        b'      "name": "isUserLicenseValid", ' \
+                                        b'      "outputs": [{"name": "", "type": "bool"}], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "view", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": false, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}], ' \
+                                        b'      "name": "denyUser", ' \
+                                        b'      "outputs": [], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "nonpayable", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": false, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}, ' \
+                                        b'                 {"name": "_expirationTimestamp", "type": "uint256"}], ' \
+                                        b'      "name": "renewUserLicense", ' \
+                                        b'      "outputs": [], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "nonpayable", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": true, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}], ' \
+                                        b'      "name": "isUserAdmitted", ' \
+                                        b'      "outputs": [{"name": "", "type": "bool"}], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "view", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": false, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}], ' \
+                                        b'      "name": "revokeUserLicense", ' \
+                                        b'      "outputs": [], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "nonpayable", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": true, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}], ' \
+                                        b'      "name": "isUserAllowed", ' \
+                                        b'      "outputs": [{"name": "", "type": "bool"}], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "view", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": false, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}], ' \
+                                        b'      "name": "admitUser", ' \
+                                        b'      "outputs": [], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "nonpayable", ' \
+                                        b'      "type": "function"}, ' \
+                                        b' {"constant": false, ' \
+                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}, ' \
+                                        b'                 {"name": "_expirationTimestamp", "type": "uint256"}], ' \
+                                        b'      "name": "grantUserLicense", ' \
+                                        b'      "outputs": [], ' \
+                                        b'      "payable": false, ' \
+                                        b'      "stateMutability": "nonpayable", ' \
+                                        b'      "type": "function" ' \
+                                        b'  }]'
 
 # Proxies
 CRAWLER_PROXY__ENABLED = True
