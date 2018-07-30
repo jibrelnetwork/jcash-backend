@@ -289,7 +289,8 @@ class CurrencyAdmin(admin.ModelAdmin):
 @admin.register(CurrencyPair)
 class CurrencyPairAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'display_name', 'symbol', 'base_cur','rec_cur',
-                    'is_exchangeable', 'is_buyable', 'is_sellable']
+                    'is_exchangeable', 'is_buyable', 'is_sellable', 'buy_fee_percent',
+                    'sell_fee_percent']
     search_fields = ['id', 'display_name', 'symbol']
     raw_id_fields = ('base_currency', 'reciprocal_currency')
     ordering = ('-id',)
