@@ -34,6 +34,7 @@ from jcash.api.models import (
     Replenisher,
     DocumentVerification,
     AccountType,
+    LicenseAddress,
 )
 
 from jcash.api import serializers
@@ -390,6 +391,32 @@ class RefundAdmin(admin.ModelAdmin):
 
     @staticmethod
     def symbol(obj):
+        if obj.currency is not None:
+            return obj.currency.display_name
+        return '-'
+
+
+@admin.register(LicenseAddress)
+class LicenseAddressAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user_name', 'address', 'currency_name',
+                    'created_at', 'status', 'is_remove_license']
+    search_fields = ['user__username', 'address__address', 'currency__display_name', 'status']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def user_name(obj):
+        if obj.address is not None and obj.address.user is not None:
+            return obj.address.user.username
+        return '-'
+
+    @staticmethod
+    def address(obj):
+        if obj.address is not None:
+            return obj.address.address
+        return '-'
+
+    @staticmethod
+    def currency_name(obj):
         if obj.currency is not None:
             return obj.currency.display_name
         return '-'

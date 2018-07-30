@@ -62,7 +62,7 @@ def get_incoming_txs(
 def get_replenishers(
         contract_address: str,
         contract_abi: List,
-        block_number: int) -> List[Tuple[str,int,datetime,str,str,str,float]]:
+        block_number: int) -> List[Tuple[str,int,datetime,str,str]]:
     """
     Get replenishers
     :param contract_address: address
