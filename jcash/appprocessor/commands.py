@@ -1,14 +1,12 @@
 import logging
 import sys
-import json
 import traceback
 from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 import time
 
 from django.db import transaction
-from django.db.models import Q, F, Count
-from django.contrib.auth import get_user_model
+from django.db.models import Q, F, Count, Max
 from django.utils import timezone
 
 from jcash.api.models import (
@@ -24,6 +22,8 @@ from jcash.api.models import (
     Exchange,
     Replenisher,
     DocumentVerification,
+    LicenseAddress,
+    LicenseAddressStatus,
 )
 from jcash.commonutils import (
     notify,
@@ -52,11 +52,12 @@ logger = logging.getLogger(__name__)
 def process_all_notifications_runner():
     logger.info('Run notifications processing')
 
-    notifications_to_send = Notification.objects.filter(is_sended=False).all()
+    notifications_to_send = Notification.objects.filter(Q(is_sended=False) & ~Q(meta__has_key='message_id')).all()
     for notification in notifications_to_send:
-        success, message_id = notify.send_notification(notification.pk)
+        success, provider, message_id = notify.send_notification(notification.pk)
         notification.is_sended = success
-        notification.meta['mailgun_message_id'] = message_id
+        notification.meta['message_id'] = message_id
+        notification.meta['provider'] = provider
 
         notification.save()
 
@@ -323,6 +324,7 @@ def fetch_eth_events():
                             .latest('created_at')
                         application_id = event_application.pk
                     except Application.DoesNotExist:
+                        event_application = None
                         application_id = None
 
                     if not evnt[4].lower() in replenishers:
@@ -419,27 +421,36 @@ def process_license_users_addresses():
     # noinspection PyBroadException
     try:
         logger.info('Start to process license users addresses')
+        license_limit_count = 3
+        license_addresses = LicenseAddress.objects.filter(Q(status=LicenseAddressStatus.created)).order_by(
+            'id'
+        )[:license_limit_count]  # type: List[LicenseAddress]
 
-        addresses = Address.objects.filter(Q(is_verified=True) &
-                                           Q(is_allowed=False)) \
-                                   .order_by('id')  # type: List[Address]
-
-        currencies = Currency.objects.filter(is_erc20_token=True)
-
-        for address in addresses:
+        for la in license_addresses:
+            # noinspection PyBroadException
             try:
                 with transaction.atomic():
-                    for currency in currencies:
-                        if currency.license_registry_address is not None:
-                            expiration_time = round(time.time()) + (365 * 24 * 60 * 60)
-                            eth_contracts.licenseUser(currency.license_registry_address, address.address, expiration_time)
-                    address.is_allowed = True
-                    address.save()
-                    logger.info('address {} licensed successfully'.format(address.address))
+                    la.status = LicenseAddressStatus.pending
+                    la.save()
+
+                if not la.is_remove_license:
+                    expiration_time = round(time.time()) + (365 * 24 * 60 * 60)
+                    txs_data = eth_contracts.licenseUser(la.currency.license_registry_address,
+                                                         la.address.address,
+                                                         expiration_time)
+                    with transaction.atomic():
+                        la.status = LicenseAddressStatus.success
+                        for key in txs_data:
+                            la.meta[key] = txs_data[key]
+                        la.save()
+                        logger.info('address: {} currency: {} licensed successfully'.format(la.address.address,
+                                                                                            la.currency.display_name))
             except Exception:
                 exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
                 logging.getLogger(__name__).error(
-                    "Failed license address {} due to exception:\n{}".format(address.address, exception_str))
+                    "Failed license address: {} currency: {} due to exception:\n{}".format(la.address.address,
+                                                                                           la.currency.display_name,
+                                                                                           exception_str))
 
         logger.info('Finished process license users addresses')
     except Exception:
@@ -629,4 +640,52 @@ def fetch_replenisher():
     except Exception:
         exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
         logging.getLogger(__name__).error("Failed to fetch replenishers due to exception:\n{}"
+                                          .format(exception_str))
+
+
+def license_address(address_id: int, currency: Currency, is_removed: bool):
+    logging.getLogger(__name__).info(
+        "Create LicenseAddress entry for address_id: {} currency: {} is_remove_license: {}" \
+            .format(address_id, currency.display_name, is_removed))
+    LicenseAddress.objects.create(address_id=address_id, currency=currency, is_remove_license=is_removed)
+
+
+def check_address_licenses():
+    # noinspection PyBroadException
+    try:
+        logging.getLogger(__name__).info("Start to check users licenses")
+
+        currencies = Currency.objects.filter(~Q(symbol__icontains='eth') &
+                                             Q(reciprocal_currencies__is_exchangeable=True))
+        for currency in currencies:
+
+            addresses_with_rm_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
+                .values('address__address', 'currency__id') \
+                .annotate(max_id=Max('id')) \
+                .filter(is_remove_license=True)
+            addresses_with_add_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
+                .values('address__address', 'currency__id') \
+                .annotate(max_id=Max('id')) \
+                .filter(is_remove_license=False)
+            addresses_add_license = Address.objects.values('pk', 'licenseaddress__currency__id').annotate(
+                last_la_id=Max('licenseaddress__id'),
+                is_removed_lic=F('is_removed')) \
+                .filter(
+                    (~Q(licenseaddress__currency=currency) &
+                     Q(is_verified=True) &
+                     Q(is_removed=False)) |
+                    (Q(last_la_id__in=addresses_with_rm_license_qs.values('max_id')) &
+                     Q(is_verified=True) &
+                     Q(is_removed=False)) |
+                    (Q(last_la_id__in=addresses_with_add_license_qs.values('max_id')) &
+                     Q(is_verified=True) &
+                     Q(is_removed=True))
+            )
+            for address_entry in addresses_add_license:
+                license_address(address_entry['pk'], currency, address_entry['is_removed_lic'])
+
+        logging.getLogger(__name__).info("Finished checking address licenses")
+    except Exception:
+        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+        logging.getLogger(__name__).error("Failed to check address licenses due to exception:\n{}"
                                           .format(exception_str))

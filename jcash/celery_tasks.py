@@ -94,6 +94,13 @@ def celery_process_outgoing_transactions():
     return commands.process_outgoing_transactions_runner()
 
 
+@celery_app.task()
+@locked_task()
+@initialize_app
+def celery_check_address_licenses():
+    return commands.check_address_licenses()
+
+
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(minute='*/1'),
@@ -112,9 +119,9 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_process_unlinked_unconfirmed_events,
                              expires=1 * 60,
                              name='process_unlinked_unconfirmed_events')
-    sender.add_periodic_task(20,
+    sender.add_periodic_task(1,
                              celery_process_all_notifications_runner,
-                             expires=1 * 60,
+                             expires=10,
                              name='process_all_notifications')
     sender.add_periodic_task(120,
                              celery_check_document_verification_status_runner,
@@ -144,3 +151,7 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_fetch_replenisher,
                              expires=1 * 60,
                              name='fetch_replenisher')
+    sender.add_periodic_task(5,
+                             celery_check_address_licenses,
+                             expires=15,
+                             name='check_address_licenses')

@@ -40,7 +40,7 @@ def get_incoming_txs(
         transaction_hash = HexBytes(log_entry['transactionHash']).hex()
         mined_at = datetime.fromtimestamp(block_data.timestamp, tzlocal())
         evnt_args = get_event_data(event_abi, log_entry)
-        if event_name == 'ReceiveEthEvent':
+        if event_name == 'ReceiveEvent':
             result.append((transaction_hash,
                            block_number,
                            mined_at,
@@ -62,7 +62,7 @@ def get_incoming_txs(
 def get_replenishers(
         contract_address: str,
         contract_abi: List,
-        block_number: int) -> List[Tuple[str,int,datetime,str,str,str,float]]:
+        block_number: int) -> List[Tuple[str,int,datetime,str,str]]:
     """
     Get replenishers
     :param contract_address: address

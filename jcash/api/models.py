@@ -87,6 +87,7 @@ class Account(models.Model):
     rel_personal = 'personal'
     rel_corporate = 'corporate'
     rel_documentverification = 'documentverification'
+    rel_licenseaddress = 'licenseaddress'
 
     # Relationships
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -405,6 +406,7 @@ class Address(models.Model):
 
     rel_verifies = 'verifies'
     rel_applications = 'applications'
+    rel_licenseaddress = 'licenseaddress'
 
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
@@ -536,6 +538,7 @@ class Currency(models.Model):
     rel_currencies = 'incoming_transactions'
     rel_exchanges = 'exchanges'
     rel_refunds = 'refunds'
+    rel_licenseusers = 'licenseusers'
 
     class Meta:
         db_table = 'currency'
@@ -649,6 +652,31 @@ class Application(models.Model):
     class Meta:
         db_table = 'application'
 
+
+# LicenseUserStatus
+class LicenseAddressStatus:
+    created = 'created'
+    pending = 'pending'
+    fail = 'fail'
+    success = 'success'
+
+
+# LicenseUser
+class LicenseAddress(models.Model):
+    status = models.CharField(max_length=20, default=LicenseAddressStatus.created)
+    meta = JSONField(default=dict)
+    is_remove_license = models.BooleanField(default=False)
+    created_at = models.DateTimeField(null=True, auto_now_add=True)
+
+    # Relationships
+    address = models.ForeignKey(Address,
+                                on_delete=models.DO_NOTHING,
+                                related_name=Address.rel_licenseaddress)
+    currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING,
+                                 related_name=Currency.rel_licenseusers)
+
+    class Meta:
+        db_table = 'license_address'
 
 # TransactionStatus
 class TransactionStatus:

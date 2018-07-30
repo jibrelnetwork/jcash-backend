@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.http import HttpResponse
 from django.contrib.admin import SimpleListFilter
+from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from allauth.account.models import EmailAddress
@@ -34,6 +35,7 @@ from jcash.api.models import (
     Replenisher,
     DocumentVerification,
     AccountType,
+    LicenseAddress,
 )
 
 from jcash.api import serializers
@@ -242,8 +244,8 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
 @admin.register(Address)
 class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'created_at', 'username', 'address', 'type',
-                    'is_verified', 'is_allowed', 'is_removed', 'is_rejected']
-    list_filter = ['is_verified', 'is_allowed', 'is_removed', 'is_rejected']
+                    'is_verified', 'is_removed', 'is_rejected']
+    list_filter = ['is_verified', 'is_removed', 'is_rejected']
     search_fields = ['user__username', 'address']
     ordering = ('-created_at',)
 
@@ -287,7 +289,8 @@ class CurrencyAdmin(admin.ModelAdmin):
 @admin.register(CurrencyPair)
 class CurrencyPairAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'display_name', 'symbol', 'base_cur','rec_cur',
-                    'is_exchangeable', 'is_buyable', 'is_sellable']
+                    'is_exchangeable', 'is_buyable', 'is_sellable', 'buy_fee_percent',
+                    'sell_fee_percent']
     search_fields = ['id', 'display_name', 'symbol']
     raw_id_fields = ('base_currency', 'reciprocal_currency')
     ordering = ('-id',)
@@ -395,6 +398,32 @@ class RefundAdmin(admin.ModelAdmin):
         return '-'
 
 
+@admin.register(LicenseAddress)
+class LicenseAddressAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user_name', 'address', 'currency_name',
+                    'created_at', 'status', 'is_remove_license']
+    search_fields = ['user__username', 'address__address', 'currency__display_name', 'status']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def user_name(obj):
+        if obj.address is not None and obj.address.user is not None:
+            return obj.address.user.username
+        return '-'
+
+    @staticmethod
+    def address(obj):
+        if obj.address is not None:
+            return obj.address.address
+        return '-'
+
+    @staticmethod
+    def currency_name(obj):
+        if obj.currency is not None:
+            return obj.currency.display_name
+        return '-'
+
+
 @admin.register(Country)
 class CountryAdmin(admin.ModelAdmin):
     list_display = ['id', 'type', 'name', 'is_removed']
@@ -486,6 +515,27 @@ class DocumentVerificationAdmin(admin.ModelAdmin):
     utilitybills_thumb.allow_tags = True
     selfie_thumb.short_description = 'Selfie'
     selfie_thumb.allow_tags = True
+
+
+@admin.register(LogEntry)
+class LogEntryAdmin(admin.ModelAdmin):
+    list_display = ['id', 'action_time', 'username', 'object_id', 'object_repr', 'actionflag', 'change_message']
+    search_fields = ['user__username', 'actionflag', 'object_repr']
+    ordering = ('-action_time','-id')
+
+    @staticmethod
+    def username(obj):
+        return obj.user.username
+
+    def actionflag(self, obj):
+        if obj.action_flag == CHANGE:
+            return 'CHANGE'
+        elif obj.action_flag == ADDITION:
+            return 'ADDITION'
+        elif obj.action_flag == DELETION:
+            return 'DELETION'
+        else:
+            return str(obj.action_flag)
 
 
 admin.site.unregister(EmailAddress)

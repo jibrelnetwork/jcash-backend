@@ -78,29 +78,63 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
 def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -> str:
     _tx_id = __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key)
     __waitTxConfirmation(_tx_id)
+    return _tx_id
 
 
-def admitUser(license_registry_address, user_address):
+def isUserAdmitted(abi, contract_address, user_address) -> bool:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.isUserAdmitted(web3.toChecksumAddress(user_address)).call()
+
+    return res
+
+
+def isUserGranted(abi, contract_address, user_address, license_name) -> bool:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.isUserGranted(web3.toChecksumAddress(user_address), license_name).call()
+
+    return res
+
+
+def admitUser(license_registry_address, user_address) -> str:
     from web3.auto import w3
+
+    if isUserAdmitted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                      license_registry_address,
+                      user_address):
+        return ''
+
     _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
                                 "admitUser",
                                 ( w3.toChecksumAddress(user_address), ),
                                 ETH_MANAGER__PRIVATE_KEY)
+    return _tx_id
 
 
-def grantUserLicense(license_registry_address, user_address, license_name, expiration_time):
+def grantUserLicense(license_registry_address, user_address, license_name, expiration_time) -> str:
     from web3.auto import w3
+
+    if isUserGranted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                     license_registry_address,
+                     user_address,
+                     license_name):
+        return ''
+
     _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
                                 "grantUserLicense",
                                 ( w3.toChecksumAddress(user_address), license_name, expiration_time),
                                 ETH_MANAGER__PRIVATE_KEY)
+    return _tx_id
 
 
-def licenseUser(license_registry_address, user_address, expiration_time):
+def licenseUser(license_registry_address, user_address, expiration_time) -> dict:
     license_names_list = [
         'transfer_funds',
         'receive_funds',
@@ -108,16 +142,20 @@ def licenseUser(license_registry_address, user_address, expiration_time):
         #'get_approval',
         #'spend_funds',
     ]
-
+    res = {}
     for license_name in license_names_list:
-        grantUserLicense(license_registry_address,
-                         user_address,
-                         license_name,
-                         expiration_time)
+        tx_id = grantUserLicense(license_registry_address,
+                                 user_address,
+                                 license_name,
+                                 expiration_time)
+        res[license_name] = tx_id
 
-    admitUser(license_registry_address, user_address)
+    tx_id = admitUser(license_registry_address, user_address)
+    res['admitUser'] = tx_id
 
     logging.getLogger(__name__).info("licensed address {} expiration {}".format(user_address, expiration_time))
+
+    return res
 
 
 def __transferEth(abi, contract_address, tx_hash, token_address, to_address, value: float, nonce: int) -> str:

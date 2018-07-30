@@ -105,82 +105,9 @@ def docstring_parameter(*sub):
     return dec
 
 
-@docstring_parameter(get_status_class_members(AccountStatus))
-class AccountUpdateView(GenericAPIView):
-    """
-    post:
-    Updates account info for current user.
-
-    Response example:
-
-    ```
-    {{"success":true,
-     "username":"ivan.ivanov@example.com",
-     "first_name":"Ivan",
-     "last_name":"Ivanov",
-     "birthday":"1971-01-01",
-     "citizenship":"Russia",
-     "residency":"Russia",
-     "is_email_confirmed":true,
-     "status":"verified",}}
-    ```
-
-    or
-
-    ```{{"success": false, "error": "error description"}}```
-
-    ```{{"success": false, "errors": {{"field_name":"error_description"}}}}```
-
-    **Statuses**
-
-    {0}
-
-    * Requires token authentication.
-    """
-    authentication_classes = (authentication.TokenAuthentication,)
-    serializer_classes = {
-        'get': AccountSerializer,
-        'post': AccountUpdateSerializer
-    }
-    parser_classes = (JSONParser,)
-
-    def get_serializer_class(self):
-        return AccountUpdateSerializer
-
-    @classmethod
-    def ensure_account(cls, request):
-        try:
-            account = request.user.account
-        except ObjectDoesNotExist:
-            account = Account.objects.create(user=request.user)
-        return account
-
-    def update_account_info(self, request):
-        account = self.ensure_account(request)
-        self.action = request.method.lower()
-        serializer_class = self.serializer_classes.get(self.action)
-        serializer = serializer_class(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save(account)
-            self.maybe_start_identity_verification(account)
-            serializer_get = self.serializer_classes.get('get')(account)
-
-            return Response(serializer_get.data, 201)
-
-    def post(self, request):
-        return self.update_account_info(request)
-
-    def maybe_start_identity_verification(self, account):
-        #if account.document_url and not account.onfido_check_id:
-        #    ga_integration.on_status_registration_complete(account)
-        #    tasks.verify_user.delay(account.user.pk)
-        # todo:
-        pass
-
-
 @docstring_parameter(get_status_class_members(AccountStatus),
                      get_status_class_members(CustomerStatus))
-class AccountView(AccountUpdateView):
+class AccountView(GenericAPIView):
     """
     get:
     Returns account info for current user.
@@ -211,25 +138,6 @@ class AccountView(AccountUpdateView):
     {1}
 
     * Requires token authentication.
-
-    post:
-    Set account info for current user.
-
-    Response example:
-
-    ```
-    {{"success":true,
-     "username":"ivan.ivanov@example.com",
-     "first_name":"Ivan",
-     "last_name":"Ivanov",
-     "birthday":"1971-01-01",
-     "citizenship":"Russia",
-     "residency":"Russia",
-     "is_email_confirmed":true,
-     "status":"verified"}}
-    ```
-
-    * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_classes = {
@@ -254,6 +162,14 @@ class AccountView(AccountUpdateView):
 
         return self.serializer_classes.get(action, AccountSerializer)
 
+    @classmethod
+    def ensure_account(cls, request):
+        try:
+            account = request.user.account
+        except ObjectDoesNotExist:
+            account = Account.objects.create(user=request.user)
+        return account
+
     def get(self, request):
         account = self.ensure_account(request)
         self.action = request.method.lower()
@@ -271,9 +187,6 @@ class AccountView(AccountUpdateView):
         response_data = account_serializer.data
         response_data.update({"customers": customer_serializer.data})
         return Response(response_data)
-
-    def post(self, request):
-        return self.update_account_info(request)
 
 
 class ResendEmailConfirmationView(GenericAPIView):
@@ -1065,7 +978,7 @@ class PersonalContactInfoView(GenericAPIView):
         return personal
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
 
         if hasattr(account, Account.rel_personal):
             serializer = PersonalSerializer(account.personal, context={'status': ''})
@@ -1074,7 +987,7 @@ class PersonalContactInfoView(GenericAPIView):
 
     def post(self, request):
         with transaction.atomic():
-            account = AccountUpdateView.ensure_account(request)
+            account = AccountView.ensure_account(request)
             personal = self.ensure_personal(account)
             serializer = self.serializer_class(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -1113,7 +1026,7 @@ class PersonalAddressView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
 
         if hasattr(account, Account.rel_personal):
             serializer = PersonalSerializer(account.personal, context={'status': str(CustomerStatus.address)})
@@ -1121,7 +1034,7 @@ class PersonalAddressView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         personal = PersonalContactInfoView.ensure_personal(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1160,7 +1073,7 @@ class PersonalIncomeInfoView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
 
         if hasattr(account, Account.rel_personal):
             serializer = PersonalSerializer(account.personal, context={'status': str(CustomerStatus.income_info)})
@@ -1168,7 +1081,7 @@ class PersonalIncomeInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         personal = PersonalContactInfoView.ensure_personal(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1195,7 +1108,7 @@ class PersonalDocumentsView(GenericAPIView):
     parser_classes = (MultiPartParser,)
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         personal = PersonalContactInfoView.ensure_personal(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1242,7 +1155,7 @@ class CorporateCompanyInfoView(GenericAPIView):
         return corporate
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         if hasattr(account, Account.rel_corporate):
             serializer = CorporateSerializer(account.corporate, context={'status': ''})
             return Response(serializer.data)
@@ -1250,7 +1163,7 @@ class CorporateCompanyInfoView(GenericAPIView):
 
     def post(self, request):
         with transaction.atomic():
-            account = AccountUpdateView.ensure_account(request)
+            account = AccountView.ensure_account(request)
             corporate = self.ensure_corporate(account)
             serializer = self.serializer_class(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -1289,7 +1202,7 @@ class CorporateAddressView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
 
         if hasattr(account, Account.rel_corporate):
             serializer = CorporateSerializer(account.corporate, context={'status': str(CustomerStatus.business_address)})
@@ -1297,7 +1210,7 @@ class CorporateAddressView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1337,7 +1250,7 @@ class CorporateIncomeInfoView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
 
         if hasattr(account, Account.rel_corporate):
             serializer = CorporateSerializer(account.corporate, context={'status': str(CustomerStatus.income_info)})
@@ -1345,7 +1258,7 @@ class CorporateIncomeInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1386,7 +1299,7 @@ class CorporateContactInfoView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def get(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
 
         if hasattr(account, Account.rel_corporate):
             serializer = CorporateSerializer(account.corporate, context={'status': str(CustomerStatus.primary_contact)})
@@ -1394,7 +1307,7 @@ class CorporateContactInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1421,7 +1334,7 @@ class CorporateDocumentsView(GenericAPIView):
     parser_classes = (MultiPartParser,)
 
     def post(self, request):
-        account = AccountUpdateView.ensure_account(request)
+        account = AccountView.ensure_account(request)
         corporate = CorporateCompanyInfoView.ensure_corporate(account)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
