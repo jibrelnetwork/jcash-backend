@@ -243,8 +243,8 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
 @admin.register(Address)
 class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'created_at', 'username', 'address', 'type',
-                    'is_verified', 'is_allowed', 'is_removed', 'is_rejected']
-    list_filter = ['is_verified', 'is_allowed', 'is_removed', 'is_rejected']
+                    'is_verified', 'is_removed', 'is_rejected']
+    list_filter = ['is_verified', 'is_removed', 'is_rejected']
     search_fields = ['user__username', 'address']
     ordering = ('-created_at',)
 

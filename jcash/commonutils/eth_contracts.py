@@ -78,6 +78,7 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
 def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -> str:
     _tx_id = __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key)
     __waitTxConfirmation(_tx_id)
+    return _tx_id
 
 
 def admitUser(license_registry_address, user_address) -> str:
