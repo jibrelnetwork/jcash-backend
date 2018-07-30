@@ -660,16 +660,17 @@ def check_address_licenses():
         for currency in currencies:
 
             addresses_with_rm_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
-                .values('address__address') \
+                .values('address__address', 'currency__id') \
                 .annotate(max_id=Max('id')) \
                 .filter(is_remove_license=True)
             addresses_with_add_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
-                .values('address__address') \
+                .values('address__address', 'currency__id') \
                 .annotate(max_id=Max('id')) \
                 .filter(is_remove_license=False)
             license_limit_count = 5
-            addresses_add_license = Address.objects.values('pk').annotate(last_la_id=Max('licenseaddress__id'),
-                                                                          is_removed_lic=F('is_removed')) \
+            addresses_add_license = Address.objects.values('pk', 'licenseaddress__currency__id').annotate(
+                last_la_id=Max('licenseaddress__id'),
+                is_removed_lic=F('is_removed')) \
                 .filter(
                     (~Q(licenseaddress__currency=currency) &
                      Q(is_verified=True) &
