@@ -41,10 +41,20 @@ def client(live_server):
     return ApiClient(base_url=live_server.url)
 
 
-def test_success_login(live_server, users):
+def test_success_login_lowercase(live_server, users):
     client = ApiClient(base_url=live_server.url)
     resp = client.post('/auth/login/',
                        {'email': 'user1@mail.local',
+                        'password': 'password1',
+                        'captcha': '123'})
+    assert resp.status_code == 200
+    assert resp.json()['success'] == True
+
+
+def test_success_login_uppercase(live_server, users):
+    client = ApiClient(base_url=live_server)
+    resp = client.post('/auth/login/',
+                       {'email': 'USER1@MAIL.LOCAL',
                         'password': 'password1',
                         'captcha': '123'})
     assert resp.status_code == 200
@@ -119,6 +129,12 @@ def test_success_password_reset_and_confirm_and_isalive(client, users, accounts)
     #check /auth/password/reset/confirm endpoint
     resp = client.post('/auth/password/reset/confirm/',
                        {'new_password': '12Qwerty@', 'uid': uid, 'token': token})
+    assert resp.status_code == 200
+    assert resp.json() == {'success': True}
+
+    #check /auth/passord/reset/ endpoint (uppercase email)
+    resp = client.post('/auth/password/reset/',
+                       {'email': 'USER1@MAIL.LOCAL', 'captcha': '123'})
     assert resp.status_code == 200
     assert resp.json() == {'success': True}
 
@@ -283,3 +299,25 @@ def test_success_registration_emplty_tracking(client, addresses):
     assert resp.status_code == 201
     account = models.Account.objects.get(user__username=user_data['email'])
     assert account.tracking == {}
+
+
+def test_success_registration_email_uppercase(client, addresses):
+    user_data = {
+        'email': 'AAA@AA.AA',
+        'password': '123qwerty#',
+        'captcha': 'zxc',
+    }
+    resp = client.post('/auth/registration/', json=user_data)
+    assert resp.status_code == 201
+    assert resp.json()['success'] == True
+
+
+def test_fail_registration_duplicate_email(client, addresses):
+    user_data = {
+        'email': 'user1@mail.local',
+        'password': '123qwerty#',
+        'captcha': 'zxc',
+    }
+    resp = client.post('/auth/registration/', json=user_data)
+    assert resp.status_code != 200
+    assert resp.json()['success'] == False

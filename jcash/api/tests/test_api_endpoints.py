@@ -494,6 +494,24 @@ def test_fail_customer_personal_address_w_apartment(client, accounts):
     assert 'postcode' in resp.json()['errors']
 
 
+def test_success_get_personal_income_info(client, customers):
+    client.authenticate('user2@mail.local', 'password2')
+    resp = client.get('/api/customer/personal/income-info/')
+    assert resp.status_code == 200
+    assert resp.json()['success'] == True
+    assert 'profession' in resp.json()
+    assert 'income_source' in resp.json()
+    assert 'assets_origin' in resp.json()
+    assert 'jcash_use' in resp.json()
+
+
+def test_fail_get_personal_income_info_wo_authenticate(live_server, accounts):
+    client = ApiClient(base_url=live_server.url)
+    resp = client.get('/api/customer/personal/income-info/')
+    assert resp.status_code != 200
+    assert resp.json()['success'] == False
+
+
 def test_success_personal_income_info(client, accounts):
     client.authenticate('user3@mail.local', 'password3')
     resp = client.post('/api/customer/personal/income-info/',
