@@ -666,7 +666,7 @@ def check_address_licenses():
                 .values('address__address') \
                 .annotate(max_id=Max('id')) \
                 .filter(is_remove_license=False)
-
+            license_limit_count = 5
             addresses_add_license = Address.objects.values('pk').annotate(last_la_id=Max('licenseaddress__id'),
                                                                           is_removed_lic=F('is_removed')) \
                 .filter(
@@ -679,7 +679,7 @@ def check_address_licenses():
                     (Q(last_la_id__in=addresses_with_add_license_qs.values('max_id')) &
                      Q(is_verified=True) &
                      Q(is_removed=True))
-            )
+            )[:license_limit_count]
             for address_entry in addresses_add_license:
                 license_address(address_entry['pk'], currency, address_entry['is_removed_lic'])
 
