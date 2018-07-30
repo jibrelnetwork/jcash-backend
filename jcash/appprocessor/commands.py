@@ -655,7 +655,8 @@ def check_address_licenses():
     try:
         logging.getLogger(__name__).info("Start to check users licenses")
 
-        currencies = Currency.objects.filter(~Q(symbol__icontains='eth'))
+        currencies = Currency.objects.filter(~Q(symbol__icontains='eth') &
+                                             Q(reciprocal_currencies__is_exchangeable=True))
         for currency in currencies:
 
             addresses_with_rm_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
