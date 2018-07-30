@@ -747,6 +747,7 @@ class Refund(models.Model):
     value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
+    is_admin_approved = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'refund'
