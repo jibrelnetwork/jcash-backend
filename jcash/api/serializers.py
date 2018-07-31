@@ -228,6 +228,7 @@ class RegisterSerializer(serializers.Serializer):
 
         if allauth_settings.UNIQUE_EMAIL:
             if email and email_address_exists(email):
+                logger.info('A user is already registered with this email address {}'.format(email))
                 raise serializers.ValidationError(
                     _("A user is already registered with this e-mail address."))
         return email
@@ -261,6 +262,9 @@ class RegisterSerializer(serializers.Serializer):
         tracking = self.validated_data.get('tracking', {})
         account = Account.objects.create(user=user, tracking=tracking)
         ga_integration.on_status_new(account)
+
+        logger.info('User {} successfully registered'.format(self.cleaned_data['email']))
+
         return user
 
 
@@ -404,6 +408,7 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         try:
             user = UserModel._default_manager.get(email=email)
         except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            logger.info('PasswordReset: Invalid email {}'.format(email))
             raise exceptions.ValidationError(_('Invalid email.'))
 
         # Create PasswordResetForm with the serializer
@@ -417,6 +422,7 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         CaptchaHelper.validate_captcha(captcha_token)
 
     def save(self):
+        logger.info('PasswordReset: email sent successfully {}'.format(self.validated_data['email']))
         request = self.context.get('request')
         # Set some values to trigger the send_email method.
         opts = {
@@ -490,6 +496,7 @@ class CustomPasswordChangeSerializer(serializers.Serializer):
         )
 
         if all(invalid_password_conditions):
+            logger.info('PasswordChange: invalid old_password user:{}'.format(self.user.username if self.user else '-'))
             raise serializers.ValidationError('Invalid password')
         return value
 
@@ -503,6 +510,7 @@ class CustomPasswordChangeSerializer(serializers.Serializer):
         return attrs
 
     def save(self):
+        logger.info('PasswordChange: password changed user: {}'.format(self.user.username if self.user else '-'))
         self.set_password_form.save()
         if not self.logout_on_password_change:
             from django.contrib.auth import update_session_auth_hash
@@ -530,6 +538,7 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
             uid = force_text(uid_decoder(attrs['uid']))
             self.user = UserModel._default_manager.get(pk=uid)
         except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            logger.info('PasswordResetConfirm: invalid uid ({})'.format(attrs['uid']))
             raise exceptions.ValidationError({'uid': ['Invalid value']})
 
         self.custom_validation(attrs)
@@ -540,11 +549,13 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
         if not self.set_password_form.is_valid():
             raise serializers.ValidationError(self.set_password_form.errors)
         if not default_token_generator.check_token(self.user, attrs['token']):
+            logger.info('PasswordResetConfirm: invalid token ({}) user: {}'.format(attrs['token'], self.user.username))
             raise exceptions.ValidationError({'token': ['Invalid value']})
 
         return attrs
 
     def save(self):
+        logger.info('PasswordResetConfirm: successfully confirmed user: {}'.format(self.user.username))
         return self.set_password_form.save()
 
 
@@ -1188,6 +1199,8 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     def save(self, personal):
         serializer_fields = self.get_fields()
 
+        logger.info('PersonalContractInfo: succeeded {}'.format(personal.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
@@ -1237,6 +1250,8 @@ class PersonalAddressSerializer(serializers.Serializer):
     def save(self, personal):
         serializer_fields = self.get_fields()
 
+        logger.info('PersonalAddress: succeeded {}'.format(personal.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('country') and self.validated_data.get('country'):
@@ -1284,6 +1299,8 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
     def save(self, personal):
         serializer_fields = self.get_fields()
 
+        logger.info('PersonalIncomeInfo: succeeded {}'.format(personal.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('profession') and self.validated_data.get('profession'):
@@ -1322,6 +1339,8 @@ class PersonalDocumentsSerializer(serializers.Serializer):
 
     def save(self, personal):
         serializer_fields = self.get_fields()
+
+        logger.info('PersonalDocuments: succeeded {}'.format(personal.account.user.username))
 
         with transaction.atomic():
             if serializer_fields.get('passport') and self.validated_data.get('passport'):
@@ -1435,6 +1454,8 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateCompanyInfo: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('name') and self.validated_data.get('name'):
@@ -1480,6 +1501,8 @@ class CorporateAddressSerializer(serializers.Serializer):
 
     def save(self, corporate):
         serializer_fields = self.get_fields()
+
+        logger.info('CorporateAddress: succeeded {}'.format(corporate.account.user.username))
 
         with transaction.atomic():
             is_updated = False
@@ -1531,6 +1554,8 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
 
     def save(self, corporate):
         serializer_fields = self.get_fields()
+
+        logger.info('CorporateIncomeInfo: succeeded {}'.format(corporate.account.user.username))
 
         with transaction.atomic():
             is_updated = False
@@ -1591,6 +1616,8 @@ class CorporateContactInfoSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateContactInfo: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
@@ -1647,6 +1674,8 @@ class CorporateDocumentsSerializer(serializers.Serializer):
 
     def save(self, corporate):
         serializer_fields = self.get_fields()
+
+        logger.info('CorporateDocuments: succeeded {}'.format(corporate.account.user.username))
 
         with transaction.atomic():
             if serializer_fields.get('passport') and self.validated_data.get('passport'):

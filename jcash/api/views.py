@@ -206,7 +206,9 @@ class ResendEmailConfirmationView(GenericAPIView):
         try:
             send_email_confirmation(request, request.user)
         except:
+            logger.info('Resend email confirmation failed {}'.format(request.user.username))
             return Response({'success': False, 'error': [_('Resend email confirmation failed')]}, status=400)
+        logger.info('Resend email confirmation succeeded {}'.format(request.user.username))
         return Response({'success': True})
 
 
