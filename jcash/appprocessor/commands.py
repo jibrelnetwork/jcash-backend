@@ -344,7 +344,7 @@ def fetch_eth_events():
                         if application_id:
                             event_application.base_amount_actual = evnt[6]
                             event_application.reciprocal_amount_actual = math.round_amount(
-                                math.calc_reciprocal_amount(evnt[6], event_application.rate),
+                                math.calc_reciprocal_amount(float(evnt[6]), event_application.rate),
                                 event_application.currency_pair,
                                 event_application.is_reverse,
                                 False)
