@@ -279,7 +279,7 @@ class DocumentAdmin(admin.ModelAdmin):
 class CurrencyAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'display_name', 'symbol', 'exchanger_address',
                     'view_address', 'controller_address', 'is_erc20_token', 'round_digits',
-                    'min_limit', 'max_limit', 'balance', 'abi']
+                    'min_limit', 'max_limit', 'balance']
     search_fields = ['id', 'display_name', 'symbol', 'exchanger_address',
                      'view_address', 'controller_address']
     ordering = ('-created_at',)
