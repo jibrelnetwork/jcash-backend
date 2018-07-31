@@ -575,12 +575,14 @@ def process_outgoing_transactions_runner():
             logger.info('Finished to process new refund transactions. Over the limit.')
             return
 
-        refunds = Refund.objects.filter(Q(status=TransactionStatus.confirmed) &
-                                            (Q(transaction_id="") | Q(transaction_id=None))) \
-                                    .order_by('id')[:exchange_limit_count]  # type: List[Refund]
-        if refunds.count() > 0:
-            nonce = eth_utils.get_exchanger_nonce()
-            process_outgoing_transactions(refunds, nonce, True)
+        # JCASH-100 Disable automatic refunds
+        # refunds = Refund.objects.filter(Q(status=TransactionStatus.confirmed) &
+        #                                 Q(is_admin_approved=True) &
+        #                                     (Q(transaction_id="") | Q(transaction_id=None))) \
+        #                             .order_by('id')[:exchange_limit_count]  # type: List[Refund]
+        # if refunds.count() > 0:
+        #     nonce = eth_utils.get_exchanger_nonce()
+        #     process_outgoing_transactions(refunds, nonce, True)
 
         logger.info('Finished process outgoing transactions')
     except Exception:

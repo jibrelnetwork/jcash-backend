@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.http import HttpResponse
 from django.contrib.admin import SimpleListFilter
+from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from allauth.account.models import EmailAddress
@@ -288,7 +289,8 @@ class CurrencyAdmin(admin.ModelAdmin):
 @admin.register(CurrencyPair)
 class CurrencyPairAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'display_name', 'symbol', 'base_cur','rec_cur',
-                    'is_exchangeable', 'is_buyable', 'is_sellable']
+                    'is_exchangeable', 'is_buyable', 'is_sellable', 'buy_fee_percent',
+                    'sell_fee_percent']
     search_fields = ['id', 'display_name', 'symbol']
     raw_id_fields = ('base_currency', 'reciprocal_currency')
     ordering = ('-id',)
@@ -513,6 +515,27 @@ class DocumentVerificationAdmin(admin.ModelAdmin):
     utilitybills_thumb.allow_tags = True
     selfie_thumb.short_description = 'Selfie'
     selfie_thumb.allow_tags = True
+
+
+@admin.register(LogEntry)
+class LogEntryAdmin(admin.ModelAdmin):
+    list_display = ['id', 'action_time', 'username', 'object_id', 'object_repr', 'actionflag', 'change_message']
+    search_fields = ['user__username', 'actionflag', 'object_repr']
+    ordering = ('-action_time','-id')
+
+    @staticmethod
+    def username(obj):
+        return obj.user.username
+
+    def actionflag(self, obj):
+        if obj.action_flag == CHANGE:
+            return 'CHANGE'
+        elif obj.action_flag == ADDITION:
+            return 'ADDITION'
+        elif obj.action_flag == DELETION:
+            return 'DELETION'
+        else:
+            return str(obj.action_flag)
 
 
 admin.site.unregister(EmailAddress)
