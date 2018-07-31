@@ -280,7 +280,7 @@ class DocumentAdmin(admin.ModelAdmin):
 class CurrencyAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'display_name', 'symbol', 'exchanger_address',
                     'view_address', 'controller_address', 'is_erc20_token', 'round_digits',
-                    'min_limit', 'max_limit', 'balance', 'abi']
+                    'min_limit', 'max_limit', 'balance']
     search_fields = ['id', 'display_name', 'symbol', 'exchanger_address',
                      'view_address', 'controller_address']
     ordering = ('-created_at',)
@@ -320,6 +320,7 @@ class CurrencyPairRateAdmin(admin.ModelAdmin):
 class ApplicationAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'username', 'address', 'currency_name', 'currency_rate',
                     'base_currency', 'reciprocal_currency', 'rate', 'base_amount', 'reciprocal_amount', 'status']
+    raw_id_fields = ('currency_pair_rate', 'address', 'user')
     ordering = ('-created_at',)
 
     @staticmethod

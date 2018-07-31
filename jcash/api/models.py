@@ -636,7 +636,9 @@ class Application(models.Model):
     reciprocal_currency = models.CharField(max_length=10)
     rate = models.FloatField()
     base_amount = models.FloatField()
+    base_amount_actual = models.FloatField(default=0.0)
     reciprocal_amount = models.FloatField()
+    reciprocal_amount_actual = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField(blank=True, null=True)
@@ -747,6 +749,7 @@ class Refund(models.Model):
     value = models.FloatField(default=0)
     status = models.CharField(max_length=20, default=TransactionStatus.not_confirmed)
     meta = JSONField(default=dict)
+    is_admin_approved = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'refund'
