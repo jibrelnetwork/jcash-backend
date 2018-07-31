@@ -636,7 +636,9 @@ class Application(models.Model):
     reciprocal_currency = models.CharField(max_length=10)
     rate = models.FloatField()
     base_amount = models.FloatField()
+    base_amount_actual = models.FloatField(default=0.0)
     reciprocal_amount = models.FloatField()
+    reciprocal_amount_actual = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField(blank=True, null=True)

@@ -29,7 +29,7 @@ from jcash.api.models import (
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
 )
-from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration
+from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration, exchange_utils as utils
 from jcash.commonutils.notify import send_email_reset_password
 from jcash.settings import (
     FRONTEND_URL,
@@ -1042,6 +1042,11 @@ class ApplicationSerializer(serializers.Serializer):
                                                        is_reverse_operation,
                                                        False)
 
+        if utils.get_currency_balance(
+                currency_pair.base_currency if is_reverse_operation else \
+                        currency_pair.reciprocal_currency) < attrs['reciprocal_amount']:
+            raise serializers.ValidationError(_('Exchange value is too large'))
+
         attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs
@@ -1059,7 +1064,9 @@ class ApplicationSerializer(serializers.Serializer):
                                                      reciprocal_currency=self.validated_data['rec_currency'],
                                                      rate=self.validated_data['rate'],
                                                      base_amount=self.validated_data['base_amount'],
+                                                     base_amount_actual=self.validated_data['base_amount'],
                                                      reciprocal_amount=self.validated_data['reciprocal_amount'],
+                                                     reciprocal_amount_actual=self.validated_data['reciprocal_amount'],
                                                      exchanger_address=self.validated_data['exchanger_address'],
                                                      expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC))
             application.save()

@@ -81,6 +81,24 @@ def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -
     return _tx_id
 
 
+def balanceEth(abi, contract_address) -> float:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.balanceEth().call()
+
+    return web3.fromWei(res, 'ether')
+
+
+def balanceToken(abi, contract_address, token_address) -> float:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.balanceToken(web3.toChecksumAddress(token_address)).call()
+
+    return web3.fromWei(res, 'ether')
+
+
 def isUserAdmitted(abi, contract_address, user_address) -> bool:
     web3 = create_web3()
 
@@ -116,6 +134,23 @@ def admitUser(license_registry_address, user_address) -> str:
     return _tx_id
 
 
+def denyUser(license_registry_address, user_address) -> str:
+    from web3.auto import w3
+
+    if not isUserAdmitted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                          license_registry_address,
+                          user_address):
+        return ''
+
+    _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                                license_registry_address,
+                                ETH_MANAGER__ADDRESS,
+                                "denyUser",
+                                ( w3.toChecksumAddress(user_address), ),
+                                ETH_MANAGER__PRIVATE_KEY)
+    return _tx_id
+
+
 def grantUserLicense(license_registry_address, user_address, license_name, expiration_time) -> str:
     from web3.auto import w3
 
@@ -134,7 +169,25 @@ def grantUserLicense(license_registry_address, user_address, license_name, expir
     return _tx_id
 
 
-def licenseUser(license_registry_address, user_address, expiration_time) -> dict:
+def revokeUserLicense(license_registry_address, user_address, license_name) -> str:
+    from web3.auto import w3
+
+    if not isUserGranted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                         license_registry_address,
+                         user_address,
+                         license_name):
+        return ''
+
+    _tx_id = __sendRawTxAndWait(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
+                                license_registry_address,
+                                ETH_MANAGER__ADDRESS,
+                                "revokeUserLicense",
+                                ( w3.toChecksumAddress(user_address), license_name ),
+                                ETH_MANAGER__PRIVATE_KEY)
+    return _tx_id
+
+
+def licenseUser(license_registry_address, user_address, is_revoke_license, expiration_time = None) -> dict:
     license_names_list = [
         'transfer_funds',
         'receive_funds',
@@ -144,13 +197,21 @@ def licenseUser(license_registry_address, user_address, expiration_time) -> dict
     ]
     res = {}
     for license_name in license_names_list:
-        tx_id = grantUserLicense(license_registry_address,
-                                 user_address,
-                                 license_name,
-                                 expiration_time)
+        if is_revoke_license:
+            tx_id = revokeUserLicense(license_registry_address,
+                                     user_address,
+                                     license_name)
+        else:
+            tx_id = grantUserLicense(license_registry_address,
+                                     user_address,
+                                     license_name,
+                                     expiration_time)
         res[license_name] = tx_id
 
-    tx_id = admitUser(license_registry_address, user_address)
+    if is_revoke_license:
+        tx_id = denyUser(license_registry_address, user_address)
+    else:
+        tx_id = admitUser(license_registry_address, user_address)
     res['admitUser'] = tx_id
 
     logging.getLogger(__name__).info("licensed address {} expiration {}".format(user_address, expiration_time))

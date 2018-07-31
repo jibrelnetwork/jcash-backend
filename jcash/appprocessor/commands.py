@@ -259,12 +259,14 @@ def process_linked_unconfirmed_events():
                         in_tx.application.status = str(ApplicationStatus.confirming)
                     # check that incoming tx value is not greater then currency balance (reversed exchange operation)
                     elif in_tx.application.is_reverse and \
-                            in_tx.application.currency_pair.base_currency.balance < in_tx.value:
+                        utils.get_currency_balance(in_tx.application.currency_pair.base_currency) < \
+                            math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
                         in_tx.status = TransactionStatus.rejected
                     #check that incoming tx value is not greater then currency balance (nonreversed exchange operation)
                     elif not in_tx.application.is_reverse and \
-                            in_tx.application.currency_pair.reciprocal_currency.balance < in_tx.value:
+                        utils.get_currency_balance(in_tx.application.currency_pair.reciprocal_currency) < \
+                            math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
                         in_tx.status = TransactionStatus.rejected
                     else:
@@ -340,6 +342,12 @@ def fetch_eth_events():
                                                                    status=TransactionStatus.not_confirmed)
                         in_tx.save()
                         if application_id:
+                            event_application.base_amount_actual = evnt[6]
+                            event_application.reciprocal_amount_actual = math.round_amount(
+                                math.calc_reciprocal_amount(evnt[6], event_application.rate),
+                                event_application.currency_pair,
+                                event_application.is_reverse,
+                                False)
                             event_application.status = str(ApplicationStatus.waiting)
                             event_application.save()
         except:
@@ -417,6 +425,32 @@ def process_applications():
     logger.info('Finished process applications')
 
 
+def fetch_currencies_state():
+    # noinspection PyBroadException
+    try:
+        logging.getLogger(__name__).info("Start to fetch currencies state")
+
+        currencies = Currency.objects.all()
+
+        for currency in currencies:
+            with transaction.atomic():
+                if currency.is_erc20_token:
+                    currency.balance = eth_contracts.balanceToken(currency.abi,
+                                                                  currency.exchanger_address,
+                                                                  currency.view_address)
+                else:
+                    currency.balance = eth_contracts.balanceEth(currency.abi,
+                                                                currency.exchanger_address)
+                currency.save()
+                logging.getLogger(__name__).info("Currency balance is {}".format(currency.balance))
+
+        logging.getLogger(__name__).info("Finished fetching currencies state")
+    except Exception:
+        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+        logging.getLogger(__name__).error("Failed to fetch currencies state due to exception:\n{}"
+                                          .format(exception_str))
+
+
 def process_license_users_addresses():
     # noinspection PyBroadException
     try:
@@ -433,18 +467,18 @@ def process_license_users_addresses():
                     la.status = LicenseAddressStatus.pending
                     la.save()
 
-                if not la.is_remove_license:
-                    expiration_time = round(time.time()) + (365 * 24 * 60 * 60)
-                    txs_data = eth_contracts.licenseUser(la.currency.license_registry_address,
-                                                         la.address.address,
-                                                         expiration_time)
-                    with transaction.atomic():
-                        la.status = LicenseAddressStatus.success
-                        for key in txs_data:
-                            la.meta[key] = txs_data[key]
-                        la.save()
-                        logger.info('address: {} currency: {} licensed successfully'.format(la.address.address,
-                                                                                            la.currency.display_name))
+                expiration_time = round(time.time()) + (365 * 24 * 60 * 60)
+                txs_data = eth_contracts.licenseUser(la.currency.license_registry_address,
+                                                     la.address.address,
+                                                     la.is_remove_license,
+                                                     expiration_time)
+                with transaction.atomic():
+                    la.status = LicenseAddressStatus.success
+                    for key in txs_data:
+                        la.meta[key] = txs_data[key]
+                    la.save()
+                    logger.info('address: {} currency: {} licensed successfully'.format(la.address.address,
+                                                                                        la.currency.display_name))
             except Exception:
                 exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
                 logging.getLogger(__name__).error(
