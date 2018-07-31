@@ -252,13 +252,8 @@ def process_linked_unconfirmed_events():
             with transaction.atomic():
                 if tx_info[0] is not None and tx_info[1] >= in_tx.block_height + ETH_TX__BLOCKS_CONFIRM_NUM:
                     in_tx.status = TransactionStatus.confirmed
-                    # check that absolute difference of incoming tx value and application value is not greater then
-                    # backend setting (LOGIC__MAX_DIFF_PERCENT)
-                    if math.calc_absolute_difference(in_tx.value,
-                                                     in_tx.application.base_amount) > LOGIC__MAX_DIFF_PERCENT:
-                        in_tx.application.status = str(ApplicationStatus.confirming)
                     # check that incoming tx value is not greater then currency balance (reversed exchange operation)
-                    elif in_tx.application.is_reverse and \
+                    if in_tx.application.is_reverse and \
                         utils.get_currency_balance(in_tx.application.currency_pair.base_currency) < \
                             math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
@@ -269,6 +264,11 @@ def process_linked_unconfirmed_events():
                             math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
                         in_tx.status = TransactionStatus.rejected
+                    # check that absolute difference of incoming tx value and application value is not greater then
+                    # backend setting (LOGIC__MAX_DIFF_PERCENT)
+                    elif math.calc_absolute_difference(in_tx.value,
+                                                       in_tx.application.base_amount) > LOGIC__MAX_DIFF_PERCENT:
+                        in_tx.application.status = str(ApplicationStatus.confirming)
                     else:
                         in_tx.application.status = str(ApplicationStatus.converting)
                     #check that incoming tx value is not over-limit
