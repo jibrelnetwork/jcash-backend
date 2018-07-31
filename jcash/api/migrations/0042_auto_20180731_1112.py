@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0040_auto_20180729_1346'),
+        ('api', '0041_refund_is_admin_approved'),
     ]
 
     operations = [
