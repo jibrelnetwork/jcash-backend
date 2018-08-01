@@ -36,7 +36,6 @@ from jcash.settings import (
     LOGIC__EXPIRATION_LIMIT_SEC,
     LOGIC__OUT_OF_DATE_PRICE_SEC,
     LOGIC__ADDRESS_VERIFY_TEXT,
-    LOGIC__CUSTOMER_DOCUMENTS_NUM,
 )
 
 
@@ -102,36 +101,8 @@ class AccountSerializer(serializers.Serializer):
         fields = ('success', 'username', 'fullname', 'birthday', 'nationality', 'residency',
                   'is_email_confirmed', 'status')
 
-    def get_customer(self, obj):
-        personal = None
-        corporate = None
-        if hasattr(obj, 'personal'):
-            personal = obj.personal
-        if hasattr(obj, 'corporate'):
-            corporate = obj.corporate
-
-        if personal and \
-            (personal.status == str(CustomerStatus.submitted) or \
-             personal.status == str(CustomerStatus.declined)):
-            return personal
-        elif corporate and \
-            (corporate.status == str(CustomerStatus.submitted) or \
-             corporate.status == str(CustomerStatus.declined)):
-            return corporate
-        elif corporate and personal:
-            if personal.last_updated_at >= corporate.last_updated_at:
-                return personal
-            else:
-                return corporate
-        elif corporate:
-            return corporate
-        elif personal:
-            return personal
-        else:
-            return None
-
     def get_fullname(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.fullname
         elif isinstance(customer, Corporate):
@@ -140,7 +111,7 @@ class AccountSerializer(serializers.Serializer):
             return ''
 
     def get_birthday(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.birthday
         elif isinstance(customer, Corporate):
@@ -149,7 +120,7 @@ class AccountSerializer(serializers.Serializer):
             return ''
 
     def get_nationality(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.nationality
         elif isinstance(customer, Corporate):
@@ -158,7 +129,7 @@ class AccountSerializer(serializers.Serializer):
             return ''
 
     def get_residency(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.country
         elif isinstance(customer, Corporate):
@@ -177,19 +148,21 @@ class AccountSerializer(serializers.Serializer):
 
     def get_status(self, obj):
         def is_personal_data_filled(obj):
-            customer = self.get_customer(obj)
+            customer = obj.get_customer() if obj else None
             return True if customer and \
-                           (customer.status == str(CustomerStatus.submitted) or \
+                           (customer.status == str(CustomerStatus.submitted) or
                             customer.status == str(CustomerStatus.declined)) else False
 
         if not obj:
             return ''
-        elif obj.is_blocked:
+
+        if obj.is_blocked:
             return str(AccountStatus.blocked)
-        elif not Account.is_user_email_confirmed(obj.user):
+
+        if not Account.is_user_email_confirmed(obj.user):
             return str(AccountStatus.email_confirmation)
-        elif is_personal_data_filled(obj) and \
-            obj.user.documents.count() >= LOGIC__CUSTOMER_DOCUMENTS_NUM and \
+
+        if is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
             return str(AccountStatus.pending)
@@ -201,10 +174,11 @@ class AccountSerializer(serializers.Serializer):
             not obj.is_identity_verified and \
             obj.is_identity_declined:
             return str(AccountStatus.declined)
-        elif obj.is_identity_verified:
+
+        if obj.is_identity_verified:
             return str(AccountStatus.verified)
-        else:
-            return str(AccountStatus.created)
+
+        return str(AccountStatus.created)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -1275,7 +1249,7 @@ class PersonalAddressSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
-                    personal.status = str(CustomerStatus.income_info)
+                personal.status = str(CustomerStatus.income_info)
                 personal.save()
 
 
@@ -1365,18 +1339,36 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
             personal.last_updated_at = timezone.now()
-            personal.status = str(CustomerStatus.submitted)
-            if hasattr(personal.account, Account.rel_corporate):
-                personal.account.corporate.status = str(CustomerStatus.unavailable)
             if personal.account is not None:
+                if personal.account.is_identity_declined:
+                    personal.account.is_identity_declined = False
                 personal.account.last_updated_at = personal.last_updated_at
+                personal.account.type = AccountType.personal
                 personal.account.save()
+            personal.status = str(CustomerStatus.submitted)
             personal.save()
-            doc_verification = DocumentVerification.objects.create(user=personal.account.user,
-                                                                   personal=personal,
-                                                                   passport=passport_document,
-                                                                   utilitybills=utilitybills_document,
-                                                                   selfie=selfie_document)
+
+            doc_verification = DocumentVerification.objects.create(
+                user=personal.account.user,
+                personal=personal,
+                passport=passport_document,
+                utilitybills=utilitybills_document,
+                selfie=selfie_document,
+                meta={'fullname': str(personal.fullname),
+                      'nationality': str(personal.nationality),
+                      'birthday': str(personal.birthday),
+                      'phone': str(personal.phone),
+                      'email': str(personal.email),
+                      'country': str(personal.country),
+                      'street': str(personal.street),
+                      'apartment': str(personal.apartment),
+                      'city': str(personal.city),
+                      'postcode': str(personal.postcode),
+                      'profession': str(personal.profession),
+                      'income_source': str(personal.income_source),
+                      'assets_origin': str(personal.assets_origin),
+                      'jcash_use': str(personal.jcash_use)})
+
             doc_verification.save()
             ga_integration.on_status_registration_complete(personal.account)
 
@@ -1474,7 +1466,7 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.business_address)
                 corporate.save()
@@ -1525,11 +1517,10 @@ class CorporateAddressSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.income_info)
                 corporate.save()
-
 
 
 class CorporateIncomeInfoSerializer(serializers.Serializer):
@@ -1578,7 +1569,7 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.primary_contact)
                 corporate.save()
@@ -1654,7 +1645,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.documents)
                 corporate.save()
@@ -1700,18 +1691,46 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
             corporate.last_updated_at = timezone.now()
-            corporate.status = str(CustomerStatus.submitted)
-            if hasattr(corporate.account, Account.rel_personal):
-                corporate.account.personal.status = str(CustomerStatus.unavailable)
             if corporate.account is not None:
+                if corporate.account.is_identity_declined:
+                    corporate.account.is_identity_declined = False
                 corporate.account.last_updated_at = corporate.last_updated_at
+                corporate.account.type = AccountType.corporate
                 corporate.account.save()
+            corporate.status = str(CustomerStatus.submitted)
             corporate.save()
-            doc_verification = DocumentVerification.objects.create(user=corporate.account.user,
-                                                                   corporate=corporate,
-                                                                   passport=passport_document,
-                                                                   utilitybills=utilitybills_document,
-                                                                   selfie=selfie_document)
+
+            doc_verification = DocumentVerification.objects.create(
+                user=corporate.account.user,
+                corporate=corporate,
+                passport=passport_document,
+                utilitybills=utilitybills_document,
+                selfie=selfie_document,
+                meta={'name': str(corporate.name),
+                      'domicile_country': str(corporate.domicile_country),
+                      'business_phone': str(corporate.business_phone),
+                      'business_email': str(corporate.business_email),
+                      'country': str(corporate.country),
+                      'street': str(corporate.street),
+                      'apartment': str(corporate.apartment),
+                      'city': str(corporate.city),
+                      'postcode': str(corporate.postcode),
+                      'industry': str(corporate.industry),
+                      'assets_origin': str(corporate.assets_origin),
+                      'currency_nature': str(corporate.currency_nature),
+                      'assets_origin_description': str(corporate.assets_origin_description),
+                      'jcash_use': str(corporate.jcash_use),
+                      'contact_fullname': str(corporate.contact_fullname),
+                      'contact_birthday': str(corporate.contact_birthday),
+                      'contact_nationality': str(corporate.contact_nationality),
+                      'contact_residency': str(corporate.contact_residency),
+                      'contact_phone': str(corporate.contact_phone),
+                      'contact_email': str(corporate.contact_email),
+                      'contact_street': str(corporate.contact_street),
+                      'contact_apartment': str(corporate.contact_apartment),
+                      'contact_city': str(corporate.contact_city),
+                      'contact_postcode': str(corporate.contact_postcode)})
+
             doc_verification.save()
             ga_integration.on_status_registration_complete(corporate.account)
 
