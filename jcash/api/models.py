@@ -119,19 +119,69 @@ class Account(models.Model):
         self.save()
 
     def approve_verification(self):
-        self.is_identity_verified = True
-        self.is_identity_declined = False
-        self.save()
-        notify.send_email_kyc_account_approved(self.user.email if self.user else None,
-                                               self.user.id if self.user else None)
+        with transaction.atomic():
+            self.is_identity_verified = True
+            self.is_identity_declined = False
+            self.save()
+            doc_verification = None
+            customer = self.get_customer()
+            if customer:
+                customer.status = str(CustomerStatus.submitted)
+                customer.save()
+                if hasattr(customer, 'document_verifications') and \
+                        customer.document_verifications.count() > 0:
+                    doc_verification = customer.document_verifications.latest('created_at')
+            if doc_verification:
+                doc_verification.is_identity_verified = True
+                doc_verification.is_identity_declined = False
+                doc_verification.save()
+
+            notify.send_email_kyc_account_approved(self.user.email if self.user else None,
+                                                   self.user.id if self.user else None)
+
+    def get_customer(self):
+        personal = None
+        corporate = None
+        if hasattr(self, 'personal'):
+            personal = self.personal
+        if hasattr(self, 'corporate'):
+            corporate = self.corporate
+
+        if corporate and personal:
+            if personal.last_updated_at >= corporate.last_updated_at:
+                return personal
+            else:
+                return corporate
+        elif corporate:
+            return corporate
+        elif personal:
+            return personal
+        else:
+            return None
 
     def decline_verification(self, reason):
-        self.is_identity_verified = False
-        self.is_identity_declined = True
-        self.save()
-        notify.send_email_kyc_account_rejected(self.user.email if self.user else None,
-                                               reason,
-                                               self.user.id if self.user else None)
+        with transaction.atomic():
+            self.is_identity_verified = False
+            self.is_identity_declined = True
+            self.save()
+            doc_verification = None
+            customer = self.get_customer()
+            if customer:
+                customer.status = str(CustomerStatus.declined)
+                customer.save()
+                if hasattr(customer, 'document_verifications') and \
+                        customer.document_verifications.count() > 0:
+
+                    doc_verification = customer.document_verifications.latest('created_at')
+            if doc_verification:
+                doc_verification.is_identity_verified = False
+                doc_verification.is_identity_declined = True
+                doc_verification.comment = reason
+                doc_verification.save()
+
+            notify.send_email_kyc_account_rejected(self.user.email if self.user else None,
+                                                   reason,
+                                                   self.user.id if self.user else None)
 
     @classmethod
     def is_user_email_confirmed(cls, user):
@@ -142,8 +192,36 @@ class Account(models.Model):
             logger.error('No EmailAddress for user %s!!', user.username)
             return False
 
+    @classmethod
+    def check_exchange_rights(cls, user):
+        if Account.is_user_email_confirmed(user) is False:
+            return False, "Please confirm the e-mail"
+        if not hasattr(user, 'account'):
+            return False, "Please fill KYC data"
+        if user.account.is_blocked:
+            return False, "Account is blocked"
+        if user.account.is_identity_declined:
+            return False, "KYC rejected"
+        if not user.account.is_identity_verified:
+            return False, "KYC data is not verified yet"
+        return True, None
+
+    @classmethod
+    def check_kyc_rights(cls, user):
+        if Account.is_user_email_confirmed(user) is False:
+            return False, "Please confirm the e-mail"
+        if hasattr(user, 'account'):
+            if user.account.is_blocked:
+                return False, "Account is blocked"
+            if not user.account.is_identity_declined and \
+                    not user.account.is_identity_verified and \
+                    hasattr(user, Account.rel_documentverification) and \
+                    user.documentverification.count() > 0:
+                return False, "KYC data is not verified yet"
+        return True, None
+
     def __str__(self):
-        return '{} {}'.format(self.first_name, self.last_name)
+        return '{} {}'.format(self.id, self.user.username if self.user else '')
 
 
 # Country types
@@ -185,7 +263,6 @@ class CustomerStatus:
     documents = ObjStatus('documents', 'documents required (personal, corporate)')
     submitted = ObjStatus('submitted', 'all fields submitted (personal, corporate)')
     declined = ObjStatus('declined', 'customer declined (personal, corporate)')
-    unavailable = ObjStatus('unavailable', 'customer unavailable (personal, corporate)')
 
 
 class Personal(models.Model):
@@ -389,6 +466,13 @@ class DocumentVerification(models.Model):
     selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
                                   blank=False, null=False, related_name=Document.rel_selfie_verification)
 
+    comment = models.TextField(null=True, blank=True)
+
+    meta = JSONField(default=dict)  # This field type is a guess.
+    is_identity_verified = models.BooleanField(default=False, verbose_name='Verified')
+    is_identity_declined = models.BooleanField(default=False, verbose_name='Declined')
+
+    # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_documentverification)
 
