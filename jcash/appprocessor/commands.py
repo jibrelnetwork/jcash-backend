@@ -185,27 +185,36 @@ def verify_document(document_verification_id):
                 logger.info('Applicant for %s already exists: %s', document_verification.user.username,
                             customer.onfido_applicant_id)
 
-            upload_document(document_verification.passport,
+            try:
+                upload_document(document_verification.passport,
+                                document_verification.user.username,
+                                customer.onfido_applicant_id)
+                upload_document(document_verification.utilitybills,
+                                document_verification.user.username,
+                                customer.onfido_applicant_id)
+                upload_document(document_verification.selfie,
+                                document_verification.user.username,
+                                customer.onfido_applicant_id)
+            except:
+                document_verification.status = DocumentVerificationStatus.upload_issue
+                document_verification.save()
+                exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+                logger.error('Check for {} verification {} failed due to error:\n{}'.format(
+                    document_verification.user.username,
+                    document_verification.pk,
+                    exception_str
+                ))
+            else:
+                check_id = person_verify.create_check(customer.onfido_applicant_id)
+                document_verification.onfido_check_id = check_id
+                document_verification.onfido_check_created = timezone.now()
+                document_verification.status = DocumentVerificationStatus.submitted
+                document_verification.save()
+                logger.info('Check for %s created: %s',
                             document_verification.user.username,
-                            customer.onfido_applicant_id)
-            upload_document(document_verification.utilitybills,
-                            document_verification.user.username,
-                            customer.onfido_applicant_id)
-            upload_document(document_verification.selfie,
-                            document_verification.user.username,
-                            customer.onfido_applicant_id)
-
-            check_id = person_verify.create_check(customer.onfido_applicant_id)
-            document_verification.onfido_check_id = check_id
-            document_verification.onfido_check_created = timezone.now()
-            document_verification.status = DocumentVerificationStatus.submitted
-            document_verification.save()
-            logger.info('Check for %s created: %s',
-                        document_verification.user.username,
-                        document_verification.onfido_check_id)
+                            document_verification.onfido_check_id)
 
 
-# нужно исправить запрос нс document_verifications
 def process_all_uncomplete_verifications():
     logger.info('Run process uncomplete verifications')
 

@@ -434,6 +434,7 @@ class Document(models.Model):
 class DocumentVerificationStatus:
     created = 'created'
     submitted = 'submitted'
+    upload_issue = 'upload_issue'
 
 
 # DocumentVerification
