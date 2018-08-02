@@ -285,8 +285,10 @@ class AddressVerifyAdmin(ReadonlyMixin, admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ['user', 'image']
+    list_display = ['user', 'group', 'type', 'image', 'created_at']
+    list_filter = ['group', 'type']
     search_fields = ['user__username']
+    ordering = ['-created_at']
 
 
 @admin.register(Currency)
