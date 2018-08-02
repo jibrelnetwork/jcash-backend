@@ -462,14 +462,14 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(Personal)
 class PersonalAdmin(admin.ModelAdmin):
-    list_display = ['uuid', 'fullname', 'nationality', 'birthday', 'phone', 'email',
+    list_display = ['uuid', 'fullname', 'nationality', 'birthday', 'phone',
                     'country', 'street', 'apartment', 'city', 'postcode',
                     'profession', 'income_source', 'assets_origin', 'jcash_use', 'created_at', 'last_updated_at']
 
 
 @admin.register(Corporate)
 class CorporateAdmin(admin.ModelAdmin):
-    list_display = ['uuid', 'name', 'domicile_country', 'business_phone', 'business_email', 'country',
+    list_display = ['uuid', 'name', 'domicile_country', 'business_phone', 'country',
                     'street', 'apartment', 'city', 'postcode', 'industry', 'assets_origin',
                     'currency_nature', 'assets_origin_description', 'jcash_use',
                     'contact_fullname', 'contact_birthday', 'contact_nationality', 'contact_residency',

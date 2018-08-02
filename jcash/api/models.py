@@ -271,7 +271,6 @@ class Personal(models.Model):
     nationality = models.CharField(max_length=PersonalFieldLength.nationality, null=False, blank=True)
     birthday = models.DateField(null=True, blank=True)
     phone = models.CharField(max_length=PersonalFieldLength.phone, null=False, blank=True)
-    email = models.CharField(max_length=PersonalFieldLength.email, null=False, blank=True)
 
     # Residential / address
     country = models.CharField(max_length=PersonalFieldLength.country, null=False, blank=True)
@@ -329,8 +328,6 @@ class Corporate(models.Model):
                                         null=False, blank=True)
     business_phone = models.CharField(max_length=CorporateFieldLength.phone,
                                       null=False, blank=True)
-    business_email = models.EmailField(max_length=CorporateFieldLength.email,
-                                       null=False, blank=True)
 
     # Business address.
     country = models.CharField(max_length=CorporateFieldLength.country,
