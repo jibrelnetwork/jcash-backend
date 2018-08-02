@@ -1163,12 +1163,10 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     birthday = serializers.DateField(required=True)
     phone = serializers.CharField(required=True, max_length=PersonalFieldLength.phone,
                                   min_length=1)
-    email = serializers.EmailField(required=True, max_length=PersonalFieldLength.email,
-                                   min_length=1)
 
     class Meta:
         model = Personal
-        fields = ('fullname', 'nationality', 'birthday', 'phone', 'email')
+        fields = ('fullname', 'nationality', 'birthday', 'phone')
 
     def save(self, personal):
         serializer_fields = self.get_fields()
@@ -1189,9 +1187,6 @@ class PersonalContactInfoSerializer(serializers.Serializer):
             if serializer_fields.get('phone') and self.validated_data.get('phone'):
                 is_updated = True
                 personal.phone = self.validated_data['phone']
-            if serializer_fields.get('email') and self.validated_data.get('email'):
-                is_updated = True
-                personal.email = self.validated_data['email']
             if is_updated:
                 personal.last_updated_at = timezone.now()
                 if personal.account is not None:
@@ -1358,7 +1353,6 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                       'nationality': str(personal.nationality),
                       'birthday': str(personal.birthday),
                       'phone': str(personal.phone),
-                      'email': str(personal.email),
                       'country': str(personal.country),
                       'street': str(personal.street),
                       'apartment': str(personal.apartment),
@@ -1390,7 +1384,7 @@ class PersonalSerializer(serializers.ModelSerializer):
 
         status = self.context.get('status', '')
         if status == '':
-            fields = ('success', 'fullname', 'nationality', 'birthday', 'phone', 'email')
+            fields = ('success', 'fullname', 'nationality', 'birthday', 'phone')
         elif status == str(CustomerStatus.address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
         elif status == str(CustomerStatus.income_info):
@@ -1408,7 +1402,7 @@ class PersonalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Personal
-        fields = ('success', 'fullname', 'nationality', 'birthday', 'phone', 'email',
+        fields = ('success', 'fullname', 'nationality', 'birthday', 'phone',
                   'country', 'street', 'apartment', 'city', 'postcode', 'profession',
                   'income_source', 'assets_origin', 'jcash_use', 'passport', 'utilitybills',
                   'selfie')
@@ -1436,12 +1430,10 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
                                              min_length=1)
     phone = serializers.CharField(required=True, max_length=CorporateFieldLength.phone,
                                   min_length=1)
-    email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
-                                   min_length=1)
 
     class Meta:
         model = Corporate
-        fields = ('name', 'country', 'phone', 'email')
+        fields = ('name', 'country', 'phone')
 
     def save(self, corporate):
         serializer_fields = self.get_fields()
@@ -1459,9 +1451,6 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
             if serializer_fields.get('phone') and self.validated_data.get('phone'):
                 is_updated = True
                 corporate.business_phone = self.validated_data['phone']
-            if serializer_fields.get('email') and self.validated_data.get('email'):
-                is_updated = True
-                corporate.business_email = self.validated_data['email']
             if is_updated:
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
@@ -1709,7 +1698,6 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 meta={'name': str(corporate.name),
                       'domicile_country': str(corporate.domicile_country),
                       'business_phone': str(corporate.business_phone),
-                      'business_email': str(corporate.business_email),
                       'country': str(corporate.country),
                       'street': str(corporate.street),
                       'apartment': str(corporate.apartment),
@@ -1752,7 +1740,7 @@ class CorporateSerializer(serializers.ModelSerializer):
 
         status = self.context.get('status', '')
         if status == '':
-            fields = ('success', 'name', 'domicile_country', 'business_phone', 'business_email')
+            fields = ('success', 'name', 'domicile_country', 'business_phone')
         elif status == str(CustomerStatus.business_address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
         elif status == str(CustomerStatus.income_info):
@@ -1775,7 +1763,7 @@ class CorporateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Corporate
-        fields = ('success', 'name', 'domicile_country', 'business_phone', 'business_email',
+        fields = ('success', 'name', 'domicile_country', 'business_phone',
                   'country', 'street', 'apartment', 'city', 'postcode',  'industry',
                   'assets_origin', 'currency_nature', 'assets_origin_description',
                   'jcash_use', 'contact_fullname', 'contact_birthday', 'contact_nationality',
