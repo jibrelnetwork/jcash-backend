@@ -50,7 +50,7 @@ def test_success_get_residential_countries(client, users):
     assert len(resp.json()['countries']) == 3
 
 
-def test_success_get_citizenship_countries(client, users):
+def test_success_get_citizenship_countries(client, users, countries):
     client.authenticate('user1@mail.local', 'password1')
     resp = client.get('/api/citizenship-countries/')
     assert resp.status_code == 200
@@ -93,7 +93,7 @@ def test_success_get_account_w_customers(client, customers):
     assert resp.json()['customers'][0]['status'] == 'submitted'
     assert resp.json()['customers'][1]['type'] == 'corporate'
     assert 'uuid' in resp.json()['customers'][1]
-    assert resp.json()['customers'][1]['status'] == 'unavailable'
+    assert resp.json()['customers'][1]['status'] == 'documents'
 
 
 def test_success_get_address_user_w_no_addresses(client, addresses):
@@ -382,7 +382,7 @@ def test_application(client, accounts, currencies, addresses, applications):
                        json.dumps({'address': addresses[0].address,
                                    'base_currency': 'ETH',
                                    'rec_currency': 'jAED',
-                                   'base_amount': 1000.0,
+                                   'base_amount': 100.0,
                                    'uuid': str(currencies[3].pk)}),
                        headers={'content-type': 'application/json'})
     assert resp.status_code != 200
@@ -409,7 +409,7 @@ def test_application(client, accounts, currencies, addresses, applications):
                        json.dumps({'address': addresses[0].address,
                                    'base_currency': 'ETH',
                                    'rec_currency': 'jAED',
-                                   'base_amount': 1000.0,
+                                   'base_amount': 100.0,
                                    'uuid': str(currencies[3].pk)}),
                        headers={'content-type': 'application/json'})
     assert resp.status_code == 200
