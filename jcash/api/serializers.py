@@ -1672,21 +1672,21 @@ class CorporateDocumentsSerializer(serializers.Serializer):
             if serializer_fields.get('passport') and self.validated_data.get('passport'):
                 passport_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
                 passport_document.image = self.validated_data['passport']
-                passport_document.group = DocumentGroup.personal
+                passport_document.group = DocumentGroup.corporate
                 passport_document.type = DocumentType.passport
                 passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
                 passport_document.save()
             if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
                 utilitybills_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
                 utilitybills_document.image = self.validated_data['utilitybills']
-                utilitybills_document.group = DocumentGroup.personal
+                utilitybills_document.group = DocumentGroup.corporate
                 utilitybills_document.type = DocumentType.utilitybills
                 utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
                 utilitybills_document.save()
             if serializer_fields.get('selfie') and self.validated_data.get('selfie'):
                 selfie_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
                 selfie_document.image = self.validated_data['selfie']
-                selfie_document.group = DocumentGroup.personal
+                selfie_document.group = DocumentGroup.corporate
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
