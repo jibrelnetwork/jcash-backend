@@ -127,7 +127,6 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-
             url(
                 r'^(?P<account_id>.+)/action/$',
                 self.admin_site.admin_view(self.account_action),
@@ -142,37 +141,51 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
 
     def customer_link(self, obj):
         if hasattr(obj.user, 'account'):
-            if hasattr(obj.user.account, Account.rel_personal):
-                personal = obj.user.account.personal
-                url = reverse('admin:api_personal_change', args=(personal.pk,))
-                return format_html('<a href="{url}">{type}</a>', url=url, type=AccountType.personal)
-            elif hasattr(obj.user.account, Account.rel_corporate):
-                corporate = obj.user.account.corporate
-                url = reverse('admin:api_corporate_change', args=(corporate.pk,))
-                return format_html('<a href="{url}">{type}</a>', url=url, type=AccountType.corporate)
+            doc_verification = None
+            url = ''
+            url_type = AccountType.personal
+            if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
+                doc_verification = obj.user.documentverification.latest('created_at')
+            if doc_verification:
+                if doc_verification.personal:
+                    url = reverse('admin:api_personal_change', args=(doc_verification.personal.pk,))
+                    url_type = AccountType.personal
+                elif doc_verification.corporate:
+                    url = reverse('admin:api_corporate_change', args=(doc_verification.corporate.pk,))
+                    url_type=AccountType.corporate
             else:
-                return ''
+                if hasattr(obj.user, 'account'):
+                    customer = obj.user.account.get_customer()
+                    if isinstance(customer, Personal):
+                        url = reverse('admin:api_personal_change', args=(customer.pk,))
+                        url_type = AccountType.personal
+                    elif isinstance(customer, Corporate):
+                        url = reverse('admin:api_corporate_change', args=(obj.user.account.corporate.pk,))
+                        url_type = AccountType.corporate
+
+            html_url = format_html('<a href="{url}">{type}</a>', url=url, type=url_type)
+            return html_url
         else:
-            return ''
-        customer_link.allow_tags = True
+            return '-'
+    customer_link.allow_tags = True
 
     def verification_link(self, obj):
-        if hasattr(obj.user, Account.rel_documentverification):
+        if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
             doc_verification = obj.user.documentverification.latest('created_at')
             url = reverse('admin:api_documentverification_change', args=(doc_verification.pk,))
             return format_html('<a href="{url}">{created_at}</a>',
                                url=url,
                                created_at=doc_verification.created_at)
         else:
-            return ''
+            return '-'
     verification_link.allow_tags = True
 
     def verification_status(self, obj):
-        if hasattr(obj.user, Account.rel_documentverification):
+        if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
             doc_verification = obj.user.documentverification.latest('created_at')
             return doc_verification.status
         else:
-            return ''
+            return '-'
 
     def account_actions(self, obj):
         return format_html(
@@ -272,8 +285,10 @@ class AddressVerifyAdmin(ReadonlyMixin, admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ['user', 'image']
+    list_display = ['user', 'group', 'type', 'image', 'created_at']
+    list_filter = ['group', 'type']
     search_fields = ['user__username']
+    ordering = ['-created_at']
 
 
 @admin.register(Currency)
@@ -441,7 +456,7 @@ class NotificationAdmin(admin.ModelAdmin):
 class PersonalAdmin(admin.ModelAdmin):
     list_display = ['uuid', 'fullname', 'nationality', 'birthday', 'phone', 'email',
                     'country', 'street', 'apartment', 'city', 'postcode',
-                    'profession', 'income_source', 'assets_origin', 'jcash_use', 'created_at']
+                    'profession', 'income_source', 'assets_origin', 'jcash_use', 'created_at', 'last_updated_at']
 
 
 @admin.register(Corporate)
@@ -451,7 +466,7 @@ class CorporateAdmin(admin.ModelAdmin):
                     'currency_nature', 'assets_origin_description', 'jcash_use',
                     'contact_fullname', 'contact_birthday', 'contact_nationality', 'contact_residency',
                     'contact_phone', 'contact_email', 'contact_street', 'contact_apartment',
-                    'contact_city', 'contact_postcode', 'created_at']
+                    'contact_city', 'contact_postcode', 'created_at', 'last_updated_at']
 
 
 @admin.register(Replenisher)
@@ -464,10 +479,9 @@ class ReplenisherAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentVerification)
 class DocumentVerificationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'username', 'created_at', 'status',
-                    'passport_thumb', 'passport_status',
-                    'utilitybills_thumb', 'utilitybills_status',
-                    'selfie_thumb', 'selfie_status']
+    list_display = ['id', 'username', 'created_at', 'status', 'passport_thumb',
+                    'passport_status', 'utilitybills_thumb', 'utilitybills_status',
+                    'selfie_thumb', 'selfie_status', 'is_identity_verified', 'is_identity_declined']
     search_fields = ['id']
     ordering = ('-id',)
 

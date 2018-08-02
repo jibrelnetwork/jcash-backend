@@ -206,7 +206,9 @@ class ResendEmailConfirmationView(GenericAPIView):
         try:
             send_email_confirmation(request, request.user)
         except:
+            logger.info('Resend email confirmation failed {}'.format(request.user.username))
             return Response({'success': False, 'error': [_('Resend email confirmation failed')]}, status=400)
+        logger.info('Resend email confirmation succeeded {}'.format(request.user.username))
         return Response({'success': True})
 
 
@@ -458,11 +460,9 @@ class AddressView(GenericAPIView):
         return self.get_account_addresses(request)
 
     def post(self, request):
-        if Account.is_user_email_confirmed(request.user) is False:
-            return Response({"success": False, "error":"Please confirm the e-mail before submitting the own addresses"}, status=400)
-
-        if not request.user.account.is_identity_verified:
-            return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
+        is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
+        if not is_have_exchange_rights:
+            return Response({"success": False, "error": error}, status=400)
 
         addresses = Address.objects.filter(user=request.user, is_removed=False)
         if len(addresses) >= LOGIC__MAX_ADDRESSES_NUM:
@@ -506,11 +506,9 @@ class RemoveAddressView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
-        if Account.is_user_email_confirmed(request.user) is False:
-            return Response({"success": False, "error":"Please confirm the e-mail"}, status=400)
-
-        if not request.user.account.is_identity_verified:
-            return Response({"success": False, "error":"Personal data is not verified yet."}, status=400)
+        is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
+        if not is_have_exchange_rights:
+            return Response({"success": False, "error": error}, status=400)
 
         serializer = RemoveAddressSerializer(data=request.data, context={'user': request.user})
         if serializer.is_valid(raise_exception=True):
@@ -592,6 +590,10 @@ class ApplicationView(GenericAPIView):
         return Response({"success": True, "application": applications})
 
     def post(self, request):
+        is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
+        if not is_have_exchange_rights:
+            return Response({"success": False, "error": error}, status=400)
+
         serializer = self.serializer_class(data=request.data, context={'user': request.user})
         if serializer.is_valid(raise_exception=True):
             serializer.save()
@@ -722,6 +724,10 @@ class ApplicationRefundView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
+        is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
+        if not is_have_exchange_rights:
+            return Response({"success": False, "error": error}, status=400)
+
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             serializer.save()
@@ -760,6 +766,10 @@ class ApplicationCancelView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
+        is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
+        if not is_have_exchange_rights:
+            return Response({"success": False, "error": error}, status=400)
+
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             serializer.save()
@@ -798,6 +808,10 @@ class ApplicationFinishView(GenericAPIView):
     parser_classes = (JSONParser,)
 
     def post(self, request):
+        is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
+        if not is_have_exchange_rights:
+            return Response({"success": False, "error": error}, status=400)
+
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             serializer.save()
@@ -986,13 +1000,18 @@ class PersonalContactInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
         with transaction.atomic():
             account = AccountView.ensure_account(request)
             personal = self.ensure_personal(account)
-            serializer = self.serializer_class(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save(personal)
-            return Response({'success': True})
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(personal)
+        return Response({'success': True})
 
 
 class PersonalAddressView(GenericAPIView):
@@ -1034,12 +1053,17 @@ class PersonalAddressView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        personal = PersonalContactInfoView.ensure_personal(account)
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(personal)
-        return Response({'success': True})
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            personal = PersonalContactInfoView.ensure_personal(account)
+            serializer = self.serializer_class(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(personal)
+            return Response({'success': True})
 
 
 class PersonalIncomeInfoView(GenericAPIView):
@@ -1081,8 +1105,14 @@ class PersonalIncomeInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        personal = PersonalContactInfoView.ensure_personal(account)
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            personal = PersonalContactInfoView.ensure_personal(account)
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(personal)
@@ -1108,8 +1138,14 @@ class PersonalDocumentsView(GenericAPIView):
     parser_classes = (MultiPartParser,)
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        personal = PersonalContactInfoView.ensure_personal(account)
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            personal = PersonalContactInfoView.ensure_personal(account)
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(personal)
@@ -1162,13 +1198,18 @@ class CorporateCompanyInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
         with transaction.atomic():
             account = AccountView.ensure_account(request)
             corporate = self.ensure_corporate(account)
-            serializer = self.serializer_class(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save(corporate)
-            return Response({'success': True})
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(corporate)
+        return Response({'success': True})
 
 
 class CorporateAddressView(GenericAPIView):
@@ -1210,8 +1251,14 @@ class CorporateAddressView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            corporate = CorporateCompanyInfoView.ensure_corporate(account)
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(corporate)
@@ -1258,8 +1305,14 @@ class CorporateIncomeInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            corporate = CorporateCompanyInfoView.ensure_corporate(account)
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(corporate)
@@ -1307,8 +1360,14 @@ class CorporateContactInfoView(GenericAPIView):
         return Response({'success': False, 'error': 'customer does not exist'})
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            corporate = CorporateCompanyInfoView.ensure_corporate(account)
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(corporate)
@@ -1334,8 +1393,14 @@ class CorporateDocumentsView(GenericAPIView):
     parser_classes = (MultiPartParser,)
 
     def post(self, request):
-        account = AccountView.ensure_account(request)
-        corporate = CorporateCompanyInfoView.ensure_corporate(account)
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            corporate = CorporateCompanyInfoView.ensure_corporate(account)
+
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(corporate)

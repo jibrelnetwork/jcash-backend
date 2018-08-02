@@ -36,7 +36,6 @@ from jcash.settings import (
     LOGIC__EXPIRATION_LIMIT_SEC,
     LOGIC__OUT_OF_DATE_PRICE_SEC,
     LOGIC__ADDRESS_VERIFY_TEXT,
-    LOGIC__CUSTOMER_DOCUMENTS_NUM,
 )
 
 
@@ -102,36 +101,8 @@ class AccountSerializer(serializers.Serializer):
         fields = ('success', 'username', 'fullname', 'birthday', 'nationality', 'residency',
                   'is_email_confirmed', 'status')
 
-    def get_customer(self, obj):
-        personal = None
-        corporate = None
-        if hasattr(obj, 'personal'):
-            personal = obj.personal
-        if hasattr(obj, 'corporate'):
-            corporate = obj.corporate
-
-        if personal and \
-            (personal.status == str(CustomerStatus.submitted) or \
-             personal.status == str(CustomerStatus.declined)):
-            return personal
-        elif corporate and \
-            (corporate.status == str(CustomerStatus.submitted) or \
-             corporate.status == str(CustomerStatus.declined)):
-            return corporate
-        elif corporate and personal:
-            if personal.last_updated_at >= corporate.last_updated_at:
-                return personal
-            else:
-                return corporate
-        elif corporate:
-            return corporate
-        elif personal:
-            return personal
-        else:
-            return None
-
     def get_fullname(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.fullname
         elif isinstance(customer, Corporate):
@@ -140,7 +111,7 @@ class AccountSerializer(serializers.Serializer):
             return ''
 
     def get_birthday(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.birthday
         elif isinstance(customer, Corporate):
@@ -149,7 +120,7 @@ class AccountSerializer(serializers.Serializer):
             return ''
 
     def get_nationality(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.nationality
         elif isinstance(customer, Corporate):
@@ -158,7 +129,7 @@ class AccountSerializer(serializers.Serializer):
             return ''
 
     def get_residency(self, obj):
-        customer = self.get_customer(obj)
+        customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
             return obj.personal.country
         elif isinstance(customer, Corporate):
@@ -177,19 +148,21 @@ class AccountSerializer(serializers.Serializer):
 
     def get_status(self, obj):
         def is_personal_data_filled(obj):
-            customer = self.get_customer(obj)
+            customer = obj.get_customer() if obj else None
             return True if customer and \
-                           (customer.status == str(CustomerStatus.submitted) or \
+                           (customer.status == str(CustomerStatus.submitted) or
                             customer.status == str(CustomerStatus.declined)) else False
 
         if not obj:
             return ''
-        elif obj.is_blocked:
+
+        if obj.is_blocked:
             return str(AccountStatus.blocked)
-        elif not Account.is_user_email_confirmed(obj.user):
+
+        if not Account.is_user_email_confirmed(obj.user):
             return str(AccountStatus.email_confirmation)
-        elif is_personal_data_filled(obj) and \
-            obj.user.documents.count() >= LOGIC__CUSTOMER_DOCUMENTS_NUM and \
+
+        if is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
             return str(AccountStatus.pending)
@@ -201,10 +174,11 @@ class AccountSerializer(serializers.Serializer):
             not obj.is_identity_verified and \
             obj.is_identity_declined:
             return str(AccountStatus.declined)
-        elif obj.is_identity_verified:
+
+        if obj.is_identity_verified:
             return str(AccountStatus.verified)
-        else:
-            return str(AccountStatus.created)
+
+        return str(AccountStatus.created)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -228,6 +202,7 @@ class RegisterSerializer(serializers.Serializer):
 
         if allauth_settings.UNIQUE_EMAIL:
             if email and email_address_exists(email):
+                logger.info('A user is already registered with this email address {}'.format(email))
                 raise serializers.ValidationError(
                     _("A user is already registered with this e-mail address."))
         return email
@@ -261,6 +236,9 @@ class RegisterSerializer(serializers.Serializer):
         tracking = self.validated_data.get('tracking', {})
         account = Account.objects.create(user=user, tracking=tracking)
         ga_integration.on_status_new(account)
+
+        logger.info('User {} successfully registered'.format(self.cleaned_data['email']))
+
         return user
 
 
@@ -404,6 +382,7 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         try:
             user = UserModel._default_manager.get(email=email)
         except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            logger.info('PasswordReset: Invalid email {}'.format(email))
             raise exceptions.ValidationError(_('Invalid email.'))
 
         # Create PasswordResetForm with the serializer
@@ -417,6 +396,7 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         CaptchaHelper.validate_captcha(captcha_token)
 
     def save(self):
+        logger.info('PasswordReset: email sent successfully {}'.format(self.validated_data['email']))
         request = self.context.get('request')
         # Set some values to trigger the send_email method.
         opts = {
@@ -490,6 +470,7 @@ class CustomPasswordChangeSerializer(serializers.Serializer):
         )
 
         if all(invalid_password_conditions):
+            logger.info('PasswordChange: invalid old_password user:{}'.format(self.user.username if self.user else '-'))
             raise serializers.ValidationError('Invalid password')
         return value
 
@@ -503,6 +484,7 @@ class CustomPasswordChangeSerializer(serializers.Serializer):
         return attrs
 
     def save(self):
+        logger.info('PasswordChange: password changed user: {}'.format(self.user.username if self.user else '-'))
         self.set_password_form.save()
         if not self.logout_on_password_change:
             from django.contrib.auth import update_session_auth_hash
@@ -530,6 +512,7 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
             uid = force_text(uid_decoder(attrs['uid']))
             self.user = UserModel._default_manager.get(pk=uid)
         except (TypeError, ValueError, OverflowError, UserModel.DoesNotExist):
+            logger.info('PasswordResetConfirm: invalid uid ({})'.format(attrs['uid']))
             raise exceptions.ValidationError({'uid': ['Invalid value']})
 
         self.custom_validation(attrs)
@@ -540,11 +523,13 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
         if not self.set_password_form.is_valid():
             raise serializers.ValidationError(self.set_password_form.errors)
         if not default_token_generator.check_token(self.user, attrs['token']):
+            logger.info('PasswordResetConfirm: invalid token ({}) user: {}'.format(attrs['token'], self.user.username))
             raise exceptions.ValidationError({'token': ['Invalid value']})
 
         return attrs
 
     def save(self):
+        logger.info('PasswordResetConfirm: successfully confirmed user: {}'.format(self.user.username))
         return self.set_password_form.save()
 
 
@@ -1188,6 +1173,8 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     def save(self, personal):
         serializer_fields = self.get_fields()
 
+        logger.info('PersonalContractInfo: succeeded {}'.format(personal.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
@@ -1237,6 +1224,8 @@ class PersonalAddressSerializer(serializers.Serializer):
     def save(self, personal):
         serializer_fields = self.get_fields()
 
+        logger.info('PersonalAddress: succeeded {}'.format(personal.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('country') and self.validated_data.get('country'):
@@ -1260,7 +1249,7 @@ class PersonalAddressSerializer(serializers.Serializer):
                     personal.account.last_updated_at = timezone.now()
                     personal.account.type = AccountType.personal
                     personal.account.save()
-                    personal.status = str(CustomerStatus.income_info)
+                personal.status = str(CustomerStatus.income_info)
                 personal.save()
 
 
@@ -1283,6 +1272,8 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
 
     def save(self, personal):
         serializer_fields = self.get_fields()
+
+        logger.info('PersonalIncomeInfo: succeeded {}'.format(personal.account.user.username))
 
         with transaction.atomic():
             is_updated = False
@@ -1323,6 +1314,8 @@ class PersonalDocumentsSerializer(serializers.Serializer):
     def save(self, personal):
         serializer_fields = self.get_fields()
 
+        logger.info('PersonalDocuments: succeeded {}'.format(personal.account.user.username))
+
         with transaction.atomic():
             if serializer_fields.get('passport') and self.validated_data.get('passport'):
                 passport_document = Document.objects.create(user=personal.account.user, personal=personal)
@@ -1346,18 +1339,36 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
             personal.last_updated_at = timezone.now()
-            personal.status = str(CustomerStatus.submitted)
-            if hasattr(personal.account, Account.rel_corporate):
-                personal.account.corporate.status = str(CustomerStatus.unavailable)
             if personal.account is not None:
+                if personal.account.is_identity_declined:
+                    personal.account.is_identity_declined = False
                 personal.account.last_updated_at = personal.last_updated_at
+                personal.account.type = AccountType.personal
                 personal.account.save()
+            personal.status = str(CustomerStatus.submitted)
             personal.save()
-            doc_verification = DocumentVerification.objects.create(user=personal.account.user,
-                                                                   personal=personal,
-                                                                   passport=passport_document,
-                                                                   utilitybills=utilitybills_document,
-                                                                   selfie=selfie_document)
+
+            doc_verification = DocumentVerification.objects.create(
+                user=personal.account.user,
+                personal=personal,
+                passport=passport_document,
+                utilitybills=utilitybills_document,
+                selfie=selfie_document,
+                meta={'fullname': str(personal.fullname),
+                      'nationality': str(personal.nationality),
+                      'birthday': str(personal.birthday),
+                      'phone': str(personal.phone),
+                      'email': str(personal.email),
+                      'country': str(personal.country),
+                      'street': str(personal.street),
+                      'apartment': str(personal.apartment),
+                      'city': str(personal.city),
+                      'postcode': str(personal.postcode),
+                      'profession': str(personal.profession),
+                      'income_source': str(personal.income_source),
+                      'assets_origin': str(personal.assets_origin),
+                      'jcash_use': str(personal.jcash_use)})
+
             doc_verification.save()
             ga_integration.on_status_registration_complete(personal.account)
 
@@ -1435,6 +1446,8 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateCompanyInfo: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('name') and self.validated_data.get('name'):
@@ -1453,7 +1466,7 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.business_address)
                 corporate.save()
@@ -1481,6 +1494,8 @@ class CorporateAddressSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateAddress: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('country') and self.validated_data.get('country'):
@@ -1502,11 +1517,10 @@ class CorporateAddressSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.income_info)
                 corporate.save()
-
 
 
 class CorporateIncomeInfoSerializer(serializers.Serializer):
@@ -1532,6 +1546,8 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateIncomeInfo: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('industry') and self.validated_data.get('industry'):
@@ -1553,7 +1569,7 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.primary_contact)
                 corporate.save()
@@ -1591,6 +1607,8 @@ class CorporateContactInfoSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateContactInfo: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             is_updated = False
             if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
@@ -1627,7 +1645,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                 corporate.last_updated_at = timezone.now()
                 if corporate.account is not None:
                     corporate.account.last_updated_at = timezone.now()
-                    corporate.account.type = AccountType.personal
+                    corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.documents)
                 corporate.save()
@@ -1648,41 +1666,71 @@ class CorporateDocumentsSerializer(serializers.Serializer):
     def save(self, corporate):
         serializer_fields = self.get_fields()
 
+        logger.info('CorporateDocuments: succeeded {}'.format(corporate.account.user.username))
+
         with transaction.atomic():
             if serializer_fields.get('passport') and self.validated_data.get('passport'):
                 passport_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
                 passport_document.image = self.validated_data['passport']
-                passport_document.group = DocumentGroup.personal
+                passport_document.group = DocumentGroup.corporate
                 passport_document.type = DocumentType.passport
                 passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
                 passport_document.save()
             if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
                 utilitybills_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
                 utilitybills_document.image = self.validated_data['utilitybills']
-                utilitybills_document.group = DocumentGroup.personal
+                utilitybills_document.group = DocumentGroup.corporate
                 utilitybills_document.type = DocumentType.utilitybills
                 utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
                 utilitybills_document.save()
             if serializer_fields.get('selfie') and self.validated_data.get('selfie'):
                 selfie_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
                 selfie_document.image = self.validated_data['selfie']
-                selfie_document.group = DocumentGroup.personal
+                selfie_document.group = DocumentGroup.corporate
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
             corporate.last_updated_at = timezone.now()
-            corporate.status = str(CustomerStatus.submitted)
-            if hasattr(corporate.account, Account.rel_personal):
-                corporate.account.personal.status = str(CustomerStatus.unavailable)
             if corporate.account is not None:
+                if corporate.account.is_identity_declined:
+                    corporate.account.is_identity_declined = False
                 corporate.account.last_updated_at = corporate.last_updated_at
+                corporate.account.type = AccountType.corporate
                 corporate.account.save()
+            corporate.status = str(CustomerStatus.submitted)
             corporate.save()
-            doc_verification = DocumentVerification.objects.create(user=corporate.account.user,
-                                                                   corporate=corporate,
-                                                                   passport=passport_document,
-                                                                   utilitybills=utilitybills_document,
-                                                                   selfie=selfie_document)
+
+            doc_verification = DocumentVerification.objects.create(
+                user=corporate.account.user,
+                corporate=corporate,
+                passport=passport_document,
+                utilitybills=utilitybills_document,
+                selfie=selfie_document,
+                meta={'name': str(corporate.name),
+                      'domicile_country': str(corporate.domicile_country),
+                      'business_phone': str(corporate.business_phone),
+                      'business_email': str(corporate.business_email),
+                      'country': str(corporate.country),
+                      'street': str(corporate.street),
+                      'apartment': str(corporate.apartment),
+                      'city': str(corporate.city),
+                      'postcode': str(corporate.postcode),
+                      'industry': str(corporate.industry),
+                      'assets_origin': str(corporate.assets_origin),
+                      'currency_nature': str(corporate.currency_nature),
+                      'assets_origin_description': str(corporate.assets_origin_description),
+                      'jcash_use': str(corporate.jcash_use),
+                      'contact_fullname': str(corporate.contact_fullname),
+                      'contact_birthday': str(corporate.contact_birthday),
+                      'contact_nationality': str(corporate.contact_nationality),
+                      'contact_residency': str(corporate.contact_residency),
+                      'contact_phone': str(corporate.contact_phone),
+                      'contact_email': str(corporate.contact_email),
+                      'contact_street': str(corporate.contact_street),
+                      'contact_apartment': str(corporate.contact_apartment),
+                      'contact_city': str(corporate.contact_city),
+                      'contact_postcode': str(corporate.contact_postcode)})
+
             doc_verification.save()
             ga_integration.on_status_registration_complete(corporate.account)
 
