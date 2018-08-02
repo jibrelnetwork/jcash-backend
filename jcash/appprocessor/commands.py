@@ -111,7 +111,7 @@ def check_document_verification_status_runner():
     for doc in doc_verifications:
         with transaction.atomic():
             logger.info('Run check verification status for document_verification id=%s', doc.pk)
-            check_document_verification_status(doc.selfie.pk)
+            check_document_verification_status(doc.pk)
 
     logger.info('Finished checking verification status')
 
