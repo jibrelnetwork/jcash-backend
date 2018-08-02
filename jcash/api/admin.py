@@ -110,7 +110,8 @@ class ReadonlyMixin:
 @admin.register(Account)
 class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
-                    'is_identity_verified', 'is_identity_declined', 'is_blocked', 'account_actions']
+                    'verification_result', 'is_identity_verified', 'is_identity_declined',
+                    'is_blocked', 'account_actions']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
     exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
                'country', 'street', 'town', 'postcode', 'terms_confirmed']
@@ -183,7 +184,14 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def verification_status(self, obj):
         if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
             doc_verification = obj.user.documentverification.latest('created_at')
-            return doc_verification.status
+            return doc_verification.onfido_check_status if doc_verification.onfido_check_status else '-'
+        else:
+            return '-'
+
+    def verification_result(self, obj):
+        if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
+            doc_verification = obj.user.documentverification.latest('created_at')
+            return doc_verification.onfido_check_status if doc_verification.onfido_check_result else '-'
         else:
             return '-'
 
@@ -479,9 +487,9 @@ class ReplenisherAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentVerification)
 class DocumentVerificationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'username', 'created_at', 'status', 'passport_thumb',
-                    'passport_status', 'utilitybills_thumb', 'utilitybills_status',
-                    'selfie_thumb', 'selfie_status', 'is_identity_verified', 'is_identity_declined']
+    list_display = ['id', 'username', 'created_at', 'passport_thumb', 'utilitybills_thumb',
+                    'selfie_thumb', 'onfido_check_status', 'onfido_check_result',
+                    'is_identity_verified', 'is_identity_declined']
     search_fields = ['id']
     ordering = ('-id',)
 
