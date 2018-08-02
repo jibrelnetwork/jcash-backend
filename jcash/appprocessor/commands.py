@@ -213,7 +213,6 @@ def process_all_uncomplete_verifications():
     condition = (
         Q(onfido_check_id=None) &
         Q(verification_attempts__lt=LOGIC__MAX_VERIFICATION_ATTEMPTS) &
-        ~Q(image='') &
         (Q(verification_started_at__lt=(now - timedelta(minutes=5))) |
          Q(verification_started_at=None))
     )
