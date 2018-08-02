@@ -1018,7 +1018,11 @@ class ApplicationSerializer(serializers.Serializer):
                                                  currency_pair,
                                                  is_reverse_operation,
                                                  True)
-        if not math.check_amount_limit(attrs['base_amount'], currency_pair, is_reverse_operation, True):
+
+        if not math.check_amount_min_limit(attrs['base_amount'], currency_pair, is_reverse_operation, True):
+            raise serializers.ValidationError(_('Exchange value is under-limit'))
+
+        if not math.check_amount_max_limit(attrs['base_amount'], currency_pair, is_reverse_operation, True):
             raise serializers.ValidationError(_('Exchange value is over-limit'))
 
         attrs['reciprocal_amount'] = math.round_amount(math.calc_reciprocal_amount(attrs['base_amount'],

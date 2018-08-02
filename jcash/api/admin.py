@@ -191,7 +191,7 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def verification_result(self, obj):
         if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
             doc_verification = obj.user.documentverification.latest('created_at')
-            return doc_verification.onfido_check_status if doc_verification.onfido_check_result else '-'
+            return doc_verification.onfido_check_result if doc_verification.onfido_check_result else '-'
         else:
             return '-'
 
