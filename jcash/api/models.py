@@ -79,7 +79,6 @@ class Account(models.Model):
 
     comment = models.TextField(null=True, blank=True)
     tracking = JSONField(blank=True, default=dict)
-    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     rel_applications = 'applications'
     rel_documents = 'documents'
@@ -292,6 +291,7 @@ class Personal(models.Model):
     last_updated_at = models.DateTimeField(auto_now_add=True)
 
     status = models.CharField(max_length=20, default='')
+    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     # Relationships
     account = models.OneToOneField(Account, on_delete=models.DO_NOTHING,
@@ -370,6 +370,7 @@ class Corporate(models.Model):
     last_updated_at = models.DateTimeField(auto_now_add=True)
 
     status = models.CharField(max_length=20, default='')
+    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     # Relationships
     account = models.OneToOneField(Account, on_delete=models.DO_NOTHING,
@@ -412,14 +413,6 @@ class Document(models.Model):
     group = models.CharField(max_length=20, null=False, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
-    onfido_check_id = models.CharField(max_length=200, null=True, blank=True)
-    onfido_check_status = models.CharField(max_length=200, null=True, blank=True)
-    onfido_check_result = models.CharField(max_length=200, null=True, blank=True)
-    onfido_check_created = models.DateTimeField(null=True, blank=True)
-    verification_started_at = models.DateTimeField(null=True, blank=True)
-    verification_attempts = models.IntegerField(default=0)
-
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_documents)
@@ -428,6 +421,7 @@ class Document(models.Model):
                                  related_name=Personal.rel_documents, null=True)
     corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
                                   related_name=Corporate.rel_documents, null=True)
+    onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
 
     rel_passport_verification = 'passport_verification'
     rel_utilitybills_verification = 'utilitybills_verification'
@@ -439,16 +433,13 @@ class Document(models.Model):
 
 class DocumentVerificationStatus:
     created = 'created'
-    pending = 'pending'
-    verified = 'verified'
-    declined = 'declined'
+    submitted = 'submitted'
 
 
 # DocumentVerification
 class DocumentVerification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, null=False, blank=False, default=DocumentVerificationStatus.created)
-    onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     # Relationships
     personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
@@ -471,6 +462,14 @@ class DocumentVerification(models.Model):
     meta = JSONField(default=dict)  # This field type is a guess.
     is_identity_verified = models.BooleanField(default=False, verbose_name='Verified')
     is_identity_declined = models.BooleanField(default=False, verbose_name='Declined')
+    is_applicant_changed = models.BooleanField(default=False)
+
+    onfido_check_id = models.CharField(max_length=200, null=True, blank=True)
+    onfido_check_status = models.CharField(max_length=200, null=True, blank=True)
+    onfido_check_result = models.CharField(max_length=200, null=True, blank=True)
+    onfido_check_created = models.DateTimeField(null=True, blank=True)
+    verification_started_at = models.DateTimeField(null=True, blank=True)
+    verification_attempts = models.IntegerField(default=0)
 
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
