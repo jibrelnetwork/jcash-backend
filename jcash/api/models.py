@@ -491,7 +491,7 @@ class Address(models.Model):
 
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
-                             blank=False, null=False, related_name=Account.rel_addresses)
+                             blank=True, null=True, related_name=Account.rel_addresses)
 
     class Meta:
         db_table = 'address'

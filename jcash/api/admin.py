@@ -278,7 +278,10 @@ class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
 
     @staticmethod
     def username(obj):
-        return obj.user.username
+        if obj.user:
+            return obj.user.username
+        else:
+            return '-'
 
 
 @admin.register(AddressVerify)

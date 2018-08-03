@@ -37,6 +37,7 @@ from jcash.commonutils import (
     math,
     exchange_utils as utils,
     ga_integration,
+    sql_utils,
 )
 from jcash.api.tasks import celery_refund_eth, celery_transfer_eth, celery_refund_token, celery_transfer_token
 from jcash.settings import (
@@ -711,11 +712,11 @@ def fetch_replenisher():
                                           .format(exception_str))
 
 
-def license_address(address_id: int, currency: Currency, is_removed: bool):
+def license_address(address_id: int, currency_id: int, is_removed: bool):
     logging.getLogger(__name__).info(
-        "Create LicenseAddress entry for address_id: {} currency: {} is_remove_license: {}" \
-            .format(address_id, currency.display_name, is_removed))
-    LicenseAddress.objects.create(address_id=address_id, currency=currency, is_remove_license=is_removed)
+        "Create LicenseAddress entry for address_id: {} currency_id: {} is_remove_license: {}" \
+            .format(address_id, currency_id, is_removed))
+    LicenseAddress.objects.create(address_id=address_id, currency_id=currency_id, is_remove_license=is_removed)
 
 
 def check_address_licenses():
@@ -723,34 +724,11 @@ def check_address_licenses():
     try:
         logging.getLogger(__name__).info("Start to check users licenses")
 
-        currencies = Currency.objects.filter(~Q(symbol__icontains='eth') &
-                                             Q(reciprocal_currencies__is_exchangeable=True))
-        for currency in currencies:
+        addresses = Address.objects.raw(sql_utils.generate_query_check_address_licenses())
 
-            addresses_with_rm_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
-                .values('address__address', 'currency__id') \
-                .annotate(max_id=Max('id')) \
-                .filter(is_remove_license=True)
-            addresses_with_add_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
-                .values('address__address', 'currency__id') \
-                .annotate(max_id=Max('id')) \
-                .filter(is_remove_license=False)
-            addresses_add_license = Address.objects.values('pk', 'licenseaddress__currency__id').annotate(
-                last_la_id=Max('licenseaddress__id'),
-                is_removed_lic=F('is_removed')) \
-                .filter(
-                    (~Q(licenseaddress__currency=currency) &
-                     Q(is_verified=True) &
-                     Q(is_removed=False)) |
-                    (Q(last_la_id__in=addresses_with_rm_license_qs.values('max_id')) &
-                     Q(is_verified=True) &
-                     Q(is_removed=False)) |
-                    (Q(last_la_id__in=addresses_with_add_license_qs.values('max_id')) &
-                     Q(is_verified=True) &
-                     Q(is_removed=True))
-            )
-            for address_entry in addresses_add_license:
-                license_address(address_entry['pk'], currency, address_entry['is_removed_lic'])
+        with transaction.atomic():
+            for address in addresses:
+                license_address(address.pk, address.currency_id, address.is_removed)
 
         logging.getLogger(__name__).info("Finished checking address licenses")
     except Exception:
