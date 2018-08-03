@@ -433,9 +433,9 @@ class RefundAdmin(admin.ModelAdmin):
 
 @admin.register(LicenseAddress)
 class LicenseAddressAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user_name', 'address', 'currency_name',
+    list_display = ['id', 'user_name', 'address_link', 'currency_name',
                     'created_at', 'status', 'is_remove_license']
-    search_fields = ['user__username', 'address__address', 'currency__display_name', 'status']
+    search_fields = ['address__user__username', 'address__address', 'currency__display_name', 'status']
     ordering = ('-created_at',)
 
     @staticmethod
@@ -455,6 +455,18 @@ class LicenseAddressAdmin(admin.ModelAdmin):
         if obj.currency is not None:
             return obj.currency.display_name
         return '-'
+
+    def address_link(self, obj):
+        if obj.address:
+            url = reverse('admin:api_address_changelist')
+
+            return format_html('<a href="{url}?{params}">{address}</a>',
+                               url=url,
+                               params=urlencode({'q': obj.address.address}),
+                               address=obj.address.address)
+        else:
+            return '-'
+    address_link.allow_tags = True
 
 
 @admin.register(Country)
