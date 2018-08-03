@@ -1,5 +1,6 @@
 import logging
 from wsgiref.util import FileWrapper
+from urllib.parse import urlencode
 
 from django.contrib import admin
 from django.utils.html import format_html
@@ -110,7 +111,8 @@ class ReadonlyMixin:
 @admin.register(Account)
 class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
-                    'is_identity_verified', 'is_identity_declined', 'is_blocked', 'account_actions']
+                    'verification_result', 'is_identity_verified', 'is_identity_declined',
+                    'is_blocked', 'account_actions']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
     exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
                'country', 'street', 'town', 'postcode', 'terms_confirmed']
@@ -148,22 +150,25 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                 doc_verification = obj.user.documentverification.latest('created_at')
             if doc_verification:
                 if doc_verification.personal:
-                    url = reverse('admin:api_personal_change', args=(doc_verification.personal.pk,))
+                    url = reverse('admin:api_personal_changelist')
                     url_type = AccountType.personal
                 elif doc_verification.corporate:
-                    url = reverse('admin:api_corporate_change', args=(doc_verification.corporate.pk,))
+                    url = reverse('admin:api_corporate_changelist')
                     url_type=AccountType.corporate
             else:
                 if hasattr(obj.user, 'account'):
                     customer = obj.user.account.get_customer()
                     if isinstance(customer, Personal):
-                        url = reverse('admin:api_personal_change', args=(customer.pk,))
+                        url = reverse('admin:api_personal_changelist')
                         url_type = AccountType.personal
                     elif isinstance(customer, Corporate):
-                        url = reverse('admin:api_corporate_change', args=(obj.user.account.corporate.pk,))
+                        url = reverse('admin:api_corporate_changelist')
                         url_type = AccountType.corporate
 
-            html_url = format_html('<a href="{url}">{type}</a>', url=url, type=url_type)
+            html_url = format_html('<a href="{url}?{params}">{type}</a>',
+                                   url=url,
+                                   params=urlencode({'q': obj.user.email}),
+                                   type=url_type)
             return html_url
         else:
             return '-'
@@ -172,9 +177,11 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def verification_link(self, obj):
         if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
             doc_verification = obj.user.documentverification.latest('created_at')
-            url = reverse('admin:api_documentverification_change', args=(doc_verification.pk,))
-            return format_html('<a href="{url}">{created_at}</a>',
+            url = reverse('admin:api_documentverification_changelist')
+
+            return format_html('<a href="{url}?{params}">{created_at}</a>',
                                url=url,
+                               params=urlencode({'q': obj.user.email}),
                                created_at=doc_verification.created_at)
         else:
             return '-'
@@ -183,7 +190,14 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def verification_status(self, obj):
         if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
             doc_verification = obj.user.documentverification.latest('created_at')
-            return doc_verification.status
+            return doc_verification.onfido_check_status if doc_verification.onfido_check_status else '-'
+        else:
+            return '-'
+
+    def verification_result(self, obj):
+        if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
+            doc_verification = obj.user.documentverification.latest('created_at')
+            return doc_verification.onfido_check_result if doc_verification.onfido_check_result else '-'
         else:
             return '-'
 
@@ -264,7 +278,10 @@ class AddressAdmin(ReadonlyMixin, admin.ModelAdmin):
 
     @staticmethod
     def username(obj):
-        return obj.user.username
+        if obj.user:
+            return obj.user.username
+        else:
+            return '-'
 
 
 @admin.register(AddressVerify)
@@ -416,9 +433,9 @@ class RefundAdmin(admin.ModelAdmin):
 
 @admin.register(LicenseAddress)
 class LicenseAddressAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user_name', 'address', 'currency_name',
+    list_display = ['id', 'user_name', 'address_link', 'currency_name',
                     'created_at', 'status', 'is_remove_license']
-    search_fields = ['user__username', 'address__address', 'currency__display_name', 'status']
+    search_fields = ['address__user__username', 'address__address', 'currency__display_name', 'status']
     ordering = ('-created_at',)
 
     @staticmethod
@@ -439,6 +456,18 @@ class LicenseAddressAdmin(admin.ModelAdmin):
             return obj.currency.display_name
         return '-'
 
+    def address_link(self, obj):
+        if obj.address:
+            url = reverse('admin:api_address_changelist')
+
+            return format_html('<a href="{url}?{params}">{address}</a>',
+                               url=url,
+                               params=urlencode({'q': obj.address.address}),
+                               address=obj.address.address)
+        else:
+            return '-'
+    address_link.allow_tags = True
+
 
 @admin.register(Country)
 class CountryAdmin(admin.ModelAdmin):
@@ -454,19 +483,35 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(Personal)
 class PersonalAdmin(admin.ModelAdmin):
-    list_display = ['uuid', 'fullname', 'nationality', 'birthday', 'phone', 'email',
+    list_display = ['user_name', 'fullname', 'nationality', 'birthday', 'phone',
                     'country', 'street', 'apartment', 'city', 'postcode',
                     'profession', 'income_source', 'assets_origin', 'jcash_use', 'created_at', 'last_updated_at']
+    search_fields = ['account__user__username']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def user_name(obj):
+        if obj.account and obj.account.user:
+            return obj.account.user.username
+        return '-'
 
 
 @admin.register(Corporate)
 class CorporateAdmin(admin.ModelAdmin):
-    list_display = ['uuid', 'name', 'domicile_country', 'business_phone', 'business_email', 'country',
+    list_display = ['user_name', 'name', 'domicile_country', 'business_phone', 'country',
                     'street', 'apartment', 'city', 'postcode', 'industry', 'assets_origin',
                     'currency_nature', 'assets_origin_description', 'jcash_use',
                     'contact_fullname', 'contact_birthday', 'contact_nationality', 'contact_residency',
                     'contact_phone', 'contact_email', 'contact_street', 'contact_apartment',
                     'contact_city', 'contact_postcode', 'created_at', 'last_updated_at']
+    search_fields = ['account__user__username']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def user_name(obj):
+        if obj.account and obj.account.user:
+            return obj.account.user.username
+        return '-'
 
 
 @admin.register(Replenisher)
@@ -479,10 +524,10 @@ class ReplenisherAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentVerification)
 class DocumentVerificationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'username', 'created_at', 'status', 'passport_thumb',
-                    'passport_status', 'utilitybills_thumb', 'utilitybills_status',
-                    'selfie_thumb', 'selfie_status', 'is_identity_verified', 'is_identity_declined']
-    search_fields = ['id']
+    list_display = ['id', 'username', 'created_at', 'passport_thumb', 'utilitybills_thumb',
+                    'selfie_thumb', 'onfido_check_status', 'onfido_check_result',
+                    'is_identity_verified', 'is_identity_declined']
+    search_fields = ['id', 'user__username']
     ordering = ('-id',)
 
     @staticmethod

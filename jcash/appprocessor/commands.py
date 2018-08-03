@@ -22,8 +22,11 @@ from jcash.api.models import (
     Exchange,
     Replenisher,
     DocumentVerification,
+    DocumentVerificationStatus,
     LicenseAddress,
     LicenseAddressStatus,
+    Personal,
+    Corporate,
 )
 from jcash.commonutils import (
     notify,
@@ -34,6 +37,7 @@ from jcash.commonutils import (
     math,
     exchange_utils as utils,
     ga_integration,
+    sql_utils,
 )
 from jcash.api.tasks import celery_refund_eth, celery_transfer_eth, celery_refund_token, celery_transfer_token
 from jcash.settings import (
@@ -64,123 +68,152 @@ def process_all_notifications_runner():
     logger.info('Finished notifications processing')
 
 
-def get_document_verification(document: Document) -> DocumentVerification:
+def get_customer_by_document_verification(document_verification: DocumentVerification):
     """
-    Get latest document verification
-    :param document: Document
-    :return: DocumentVerification
+    Get verification's customer
+    :param document_verification: DocumentVerification
+    :return: customer
     """
-    doc_verification = None
-
-    if hasattr(document, Document.rel_selfie_verification):
-        doc_verification = document.selfie_verification
-    elif hasattr(document, Document.rel_utilitybills_verification):
-        doc_verification = document.utilitybills_verification
-    elif hasattr(document, Document.rel_passport_verification):
-        doc_verification = document.passport_verification
-
-    return doc_verification
+    if document_verification and document_verification.personal:
+        return document_verification.personal
+    if document_verification and document_verification.corporate:
+        return document_verification.corporate
+    return None
 
 
-def check_document_verification_status(document_id):
+def check_document_verification_status(document_verification_id):
     """
     Check and store OnFido check status and result
     """
-    document = Document.objects.get(pk=document_id)
-    logger.info('Checking verification status for document id=%s', document_id)
-    if document.onfido_check_status == person_verify.STATUS_COMPLETE:
-        logger.warn('Verification completed')
+    document_verification = DocumentVerification.objects.get(pk=document_verification_id)
+    logger.info('Checking verification status for verification_id=%s', document_verification_id)
+    if document_verification.onfido_check_status == person_verify.STATUS_COMPLETE:
+        logger.warn('Document verification completed for %s', document_verification_id)
         return
     api = person_verify.get_client()
 
-    doc_verification = get_document_verification(document)
-
-    if doc_verification:
+    customer = get_customer_by_document_verification(document_verification)
+    if document_verification and customer:
         with transaction.atomic():
-            check = api.find_check(doc_verification.onfido_applicant_id, document.onfido_check_id)
-            logger.info('Verification status is: %s, result: %s', check.status, check.result)
-            document.onfido_check_status = check.status
-            document.onfido_check_result = check.result
-            document.save()
+            check = api.find_check(customer.onfido_applicant_id, document_verification.onfido_check_id)
+            logger.info('Document verification status is: %s, result: %s', check.status, check.result)
+            document_verification.onfido_check_status = check.status
+            document_verification.onfido_check_result = check.result
+            document_verification.save()
 
 
 def check_document_verification_status_runner():
-    documents_to_check = Document.objects.filter(onfido_check_result=None).exclude(onfido_check_id=None).all()
-    for document in documents_to_check:
-        logger.info('Run check verification status for document id=%s', document.pk)
-        check_document_verification_status(document.pk)
+    logger.info('Run check verification status')
+
+    doc_verifications = DocumentVerification.objects \
+        .filter(onfido_check_result=None) \
+        .exclude(onfido_check_id=None) \
+        .all()
+    for doc in doc_verifications:
+        with transaction.atomic():
+            logger.info('Run check verification status for document_verification id=%s', doc.pk)
+            check_document_verification_status(doc.pk)
+
+    logger.info('Finished checking verification status')
 
 
-def verify_document(document_id):
+def upload_document(document, user_name, onfido_applicant_id):
     """
-    Create OnFido check to verify customer document
+    Upload document to onfido
+    """
+    if not document.onfido_document_id:
+        document_id = person_verify.upload_document(onfido_applicant_id, document.image.path, document.ext, document.type)
+        document.onfido_document_id = document_id
+        document.save()
+        logger.info('Document for %s type: %s uploaded: %s', user_name, document.type, document_id)
+    else:
+        logger.info('Document for %s type: %s already uploaded: %s', user_name, document.type, document.onfido_document_id)
+
+
+def verify_document(document_verification_id):
+    """
+    Create OnFido check to verify customer's documents
     """
     with transaction.atomic():
         now = timezone.now()
-        document = Document.objects.select_for_update().get(id=document_id)
+        document_verification = DocumentVerification.objects.select_for_update().get(id=document_verification_id)
 
-        if document.onfido_check_status == person_verify.STATUS_COMPLETE:
-            logger.warn('Verification completed for id %s, exiting', document.pk)
+        if document_verification.onfido_check_status == person_verify.STATUS_COMPLETE:
+            logger.warn('Verification completed for id %s, exiting', document_verification.pk)
             return
 
-        if document.onfido_check_id is not None:
-            logger.warn('Check exists for id %s, exiting', document.pk)
+        if document_verification.onfido_check_id is not None:
+            logger.warn('Check exists for id %s, exiting', document_verification.pk)
             return
 
-        if (document.verification_started_at and
-            (now - document.verification_started_at) < timedelta(minutes=5)):
-            logger.info('Verification already started for id %s, exiting', document.pk)
+        if (document_verification.verification_started_at and
+            (now - document_verification.verification_started_at) < timedelta(minutes=5)):
+            logger.info('Verification already started for id %s, exiting', document_verification.pk)
             return
 
-        logger.info('Start verifying process for id %s', document.pk)
-        document.verification_started_at = now
-        document.verification_attempts += 1
-        document.save()
+        logger.info('Start verifying process for id %s', document_verification.pk)
+        document_verification.verification_started_at = now
+        document_verification.verification_attempts += 1
+        document_verification.save()
 
-    doc_verification = get_document_verification(document)
-    if doc_verification:
+    customer = get_customer_by_document_verification(document_verification)
+    if document_verification and customer:
         with transaction.atomic():
-            if not doc_verification.onfido_applicant_id:
-                if doc_verification.personal:
-                    full_name = doc_verification.personal.fullname
+            if not customer.onfido_applicant_id:
+                if isinstance(customer, Personal):
+                    full_name = document_verification.personal.fullname
                     first_name = full_name.split(" ")[0]
                     last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
-                    birtday = doc_verification.personal.birthday
-                elif doc_verification.corporate:
-                    full_name = doc_verification.corporate.contact_fullname
+                    birtday = document_verification.personal.birthday
+                elif isinstance(customer, Corporate):
+                    full_name = document_verification.corporate.contact_fullname
                     first_name = full_name.split(" ")[0]
                     last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
-                    birtday = doc_verification.corporate.contact_birthday
+                    birtday = document_verification.corporate.contact_birthday
                 else:
-                    logger.error('Document verification id=%s has no customer', doc_verification.pk)
+                    logger.error('Document verification id=%s has no customer', document_verification.pk)
                     return
 
-                email = doc_verification.user.email
-                applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
-                doc_verification.onfido_applicant_id = applicant_id
-                doc_verification.save()
-                logger.info('Applicant %s created for %s', doc_verification.onfido_applicant_id,
-                            doc_verification.user.username)
+                email = document_verification.user.email
+                if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
+                    applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
+                    customer.onfido_applicant_id = applicant_id
+                    customer.save()
+                logger.info('Applicant %s created for %s',
+                            customer.onfido_applicant_id,
+                            document_verification.user.username)
             else:
-                logger.info('Applicant for %s already exists: %s', doc_verification.user.username,
-                            doc_verification.onfido_applicant_id)
+                logger.info('Applicant for %s already exists: %s', document_verification.user.username,
+                            customer.onfido_applicant_id)
 
-            if not document.onfido_document_id:
-                document_id = person_verify.upload_document(doc_verification.onfido_applicant_id,
-                                                            document.image.path,
-                                                            document.ext,
-                                                            document.type)
-                document.onfido_document_id = document_id
-                document.save()
-                logger.info('Document for %s uploaded: %s', document.user.username, document.onfido_document_id)
+            try:
+                upload_document(document_verification.passport,
+                                document_verification.user.username,
+                                customer.onfido_applicant_id)
+                upload_document(document_verification.utilitybills,
+                                document_verification.user.username,
+                                customer.onfido_applicant_id)
+                upload_document(document_verification.selfie,
+                                document_verification.user.username,
+                                customer.onfido_applicant_id)
+            except:
+                document_verification.status = DocumentVerificationStatus.upload_issue
+                document_verification.save()
+                exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+                logger.error('Check for {} verification {} failed due to error:\n{}'.format(
+                    document_verification.user.username,
+                    document_verification.pk,
+                    exception_str
+                ))
             else:
-                logger.info('Document for %s already uploaded: %s', document.user.username, document.onfido_document_id)
-
-            check_id = person_verify.create_check(doc_verification.onfido_applicant_id)
-            document.onfido_check_id = check_id
-            document.onfido_check_created = timezone.now()
-            document.save()
-            logger.info('Check for %s created: %s', document.user.username, document.onfido_check_id)
+                check_id = person_verify.create_check(customer.onfido_applicant_id)
+                document_verification.onfido_check_id = check_id
+                document_verification.onfido_check_created = timezone.now()
+                document_verification.status = DocumentVerificationStatus.submitted
+                document_verification.save()
+                logger.info('Check for %s created: %s',
+                            document_verification.user.username,
+                            document_verification.onfido_check_id)
 
 
 def process_all_uncomplete_verifications():
@@ -190,14 +223,13 @@ def process_all_uncomplete_verifications():
     condition = (
         Q(onfido_check_id=None) &
         Q(verification_attempts__lt=LOGIC__MAX_VERIFICATION_ATTEMPTS) &
-        ~Q(image='') &
         (Q(verification_started_at__lt=(now - timedelta(minutes=5))) |
          Q(verification_started_at=None))
     )
-    documents_to_verify = Document.objects.filter(condition).all()
-    for document in documents_to_verify:
-        logger.info('Retry uncomplete document verification %s', document.pk)
-        verify_document(document.pk)
+    documents_verifications = DocumentVerification.objects.filter(condition).all()
+    for doc_verification in documents_verifications:
+        logger.info('Retry uncomplete document verification %s', doc_verification.pk)
+        verify_document(doc_verification.pk)
 
     logger.info('Finished process uncomplete verifications')
 
@@ -680,11 +712,11 @@ def fetch_replenisher():
                                           .format(exception_str))
 
 
-def license_address(address_id: int, currency: Currency, is_removed: bool):
+def license_address(address_id: int, currency_id: int, is_removed: bool):
     logging.getLogger(__name__).info(
-        "Create LicenseAddress entry for address_id: {} currency: {} is_remove_license: {}" \
-            .format(address_id, currency.display_name, is_removed))
-    LicenseAddress.objects.create(address_id=address_id, currency=currency, is_remove_license=is_removed)
+        "Create LicenseAddress entry for address_id: {} currency_id: {} is_remove_license: {}" \
+            .format(address_id, currency_id, is_removed))
+    LicenseAddress.objects.create(address_id=address_id, currency_id=currency_id, is_remove_license=is_removed)
 
 
 def check_address_licenses():
@@ -692,34 +724,11 @@ def check_address_licenses():
     try:
         logging.getLogger(__name__).info("Start to check users licenses")
 
-        currencies = Currency.objects.filter(~Q(symbol__icontains='eth') &
-                                             Q(reciprocal_currencies__is_exchangeable=True))
-        for currency in currencies:
+        addresses = Address.objects.raw(sql_utils.generate_query_check_address_licenses())
 
-            addresses_with_rm_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
-                .values('address__address', 'currency__id') \
-                .annotate(max_id=Max('id')) \
-                .filter(is_remove_license=True)
-            addresses_with_add_license_qs = LicenseAddress.objects.filter(currency_id=currency.pk) \
-                .values('address__address', 'currency__id') \
-                .annotate(max_id=Max('id')) \
-                .filter(is_remove_license=False)
-            addresses_add_license = Address.objects.values('pk', 'licenseaddress__currency__id').annotate(
-                last_la_id=Max('licenseaddress__id'),
-                is_removed_lic=F('is_removed')) \
-                .filter(
-                    (~Q(licenseaddress__currency=currency) &
-                     Q(is_verified=True) &
-                     Q(is_removed=False)) |
-                    (Q(last_la_id__in=addresses_with_rm_license_qs.values('max_id')) &
-                     Q(is_verified=True) &
-                     Q(is_removed=False)) |
-                    (Q(last_la_id__in=addresses_with_add_license_qs.values('max_id')) &
-                     Q(is_verified=True) &
-                     Q(is_removed=True))
-            )
-            for address_entry in addresses_add_license:
-                license_address(address_entry['pk'], currency, address_entry['is_removed_lic'])
+        with transaction.atomic():
+            for address in addresses:
+                license_address(address.pk, address.currency_id, address.is_removed)
 
         logging.getLogger(__name__).info("Finished checking address licenses")
     except Exception:

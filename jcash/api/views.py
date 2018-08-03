@@ -961,7 +961,7 @@ class PersonalContactInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "fullname": "", "nationality": "", "birthday": "", "phone": "", "email": ""} |
+    {"success": true, "fullname": "", "nationality": "", "birthday": "", "phone": ""} |
     {"success": false, "error": "error_description"}
     ```
 
@@ -1160,7 +1160,7 @@ class CorporateCompanyInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "name": "", "domicile_country": "", "business_phone": "", "business_email": ""} |
+    {"success": true, "name": "", "domicile_country": "", "business_phone": ""} |
     {"success": false, "error": "error_description"}
     ```
 

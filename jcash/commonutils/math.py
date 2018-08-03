@@ -60,33 +60,70 @@ def calc_absolute_difference(value1, value2) -> float:
     return abs(value1 - value2) / value2 * 100
 
 
-def check_amount_limit(value: float, currency_pair, is_reverse_operation, is_base = True) -> bool:
+def check_amount_min_limit(value: float, currency_pair, is_reverse_operation, is_base = True) -> bool:
     """
-    Check that amount value is greater or equal currency limits
+    Check that amount value is greater or equal currency min limit
     :param value:
     :param currency_pair: CurrencyPair of exchange operation
     :param is_reverse_operation: sign if it's reverse operation
     :param is_base: sign if it's base amount
     :return: bool
     """
-    result = False
+    result = True
     if is_base:
         if is_reverse_operation:
-            if value >= currency_pair.reciprocal_currency.min_limit and \
-                value <= currency_pair.reciprocal_currency.max_limit:
-                result = True
+            if value < currency_pair.reciprocal_currency.min_limit:
+                result = False
         else:
-            if value >= currency_pair.base_currency.min_limit and \
-                value <= currency_pair.base_currency.max_limit:
-                result = True
+            if value < currency_pair.base_currency.min_limit:
+                result = False
     else:
         if is_reverse_operation:
-            if value >= currency_pair.base_currency.min_limit and \
-                value <= currency_pair.base_currency.max_limit:
-                result = True
+            if value < currency_pair.base_currency.min_limit:
+                result = False
         else:
-            if value >= currency_pair.reciprocal_currency.min_limit and \
-                value <= currency_pair.reciprocal_currency.max_limit:
-                result = True
+            if value < currency_pair.reciprocal_currency.min_limit:
+                result = False
 
     return result
+
+
+def check_amount_max_limit(value: float, currency_pair, is_reverse_operation, is_base = True) -> bool:
+    """
+    Check that amount value is less or equal currency max limit
+    :param value:
+    :param currency_pair: CurrencyPair of exchange operation
+    :param is_reverse_operation: sign if it's reverse operation
+    :param is_base: sign if it's base amount
+    :return: bool
+    """
+    result = True
+    if is_base:
+        if is_reverse_operation:
+            if value > currency_pair.reciprocal_currency.max_limit:
+                result = False
+        else:
+            if value > currency_pair.base_currency.max_limit:
+                result = False
+    else:
+        if is_reverse_operation:
+            if value > currency_pair.base_currency.max_limit:
+                result = False
+        else:
+            if value > currency_pair.reciprocal_currency.max_limit:
+                result = False
+
+    return result
+
+
+def check_amount_limit(value: float, currency_pair, is_reverse_operation, is_base = True) -> bool:
+    """
+    Сheck that amount value within the specified limits
+    :param value:
+    :param currency_pair: CurrencyPair of exchange operation
+    :param is_reverse_operation: sign if it's reverse operation
+    :param is_base: sign if it's base amount
+    :return: bool
+    """
+    return check_amount_min_limit(value, currency_pair, is_reverse_operation, is_base) and \
+        check_amount_max_limit(value, currency_pair, is_reverse_operation, is_base)
