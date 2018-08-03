@@ -400,6 +400,7 @@ class DocumentType:
     passport = 'passport'
     utilitybills = 'utilitybills'
     selfie = 'selfie'
+    report = 'report'
 
 
 # Document model
@@ -423,6 +424,7 @@ class Document(models.Model):
     rel_passport_verification = 'passport_verification'
     rel_utilitybills_verification = 'utilitybills_verification'
     rel_selfie_verification = 'selfie_verification'
+    rel_report_verification = 'report_verification'
 
     class Meta:
         db_table = 'document'
@@ -454,6 +456,9 @@ class DocumentVerification(models.Model):
 
     selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
                                   blank=False, null=False, related_name=Document.rel_selfie_verification)
+
+    report = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                  blank=True, null=True, related_name=Document.rel_report_verification)
 
     comment = models.TextField(null=True, blank=True)
 
