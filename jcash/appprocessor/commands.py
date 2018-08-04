@@ -14,6 +14,7 @@ import requests
 
 from jcash.api.models import (
     Document,
+    DocumentType,
     DocumentHelper,
     Notification,
     IncomingTransaction,
@@ -98,10 +99,18 @@ def download_onfido_report(document_verification, url):
         tmp_file.flush()
 
         try:
-            document_verification.report.save(DocumentHelper.unique_document_filename(None, 'report.html'),
-                                              File(tmp_file))
+            if not document_verification.report:
+                document_verification.report = Document.objects.create(user=document_verification.user,
+                                                                       type=DocumentType.report,
+                                                                       ext='html')
+
+                document_verification.report.image.save(DocumentHelper.unique_document_filename(None, 'report.html'),
+                                                        File(tmp_file))
         except:
-            logger.info('download_onfido_report: failed downloading report from {}'.format(url))
+            logger.error('download_onfido_report: failed saving report into DB (verification:{})'
+                         .format(document_verification.pk))
+    else:
+        logger.info('download_onfido_report: failed downloading report from {}'.format(url))
 
 
 def check_document_verification_status(document_verification_id):
