@@ -8,9 +8,14 @@ import time
 from django.db import transaction
 from django.db.models import Q, F, Count, Max
 from django.utils import timezone
+from django.core.files import File
+from django.core.files.temp import NamedTemporaryFile
+import requests
 
 from jcash.api.models import (
     Document,
+    DocumentType,
+    DocumentHelper,
     Notification,
     IncomingTransaction,
     Currency,
@@ -46,7 +51,8 @@ from jcash.settings import (
     LOGIC__MAX_DIFF_PERCENT,
     LOGIC__EXPIRATION_LIMIT_SEC,
     LOGIC__REFUND_FEE_PERCENT,
-    ETH_TX__MAX_PENDING_TX_COUNT
+    ETH_TX__MAX_PENDING_TX_COUNT,
+    ONFIDO_API_KEY,
 )
 
 
@@ -81,6 +87,32 @@ def get_customer_by_document_verification(document_verification: DocumentVerific
     return None
 
 
+def download_onfido_report(document_verification, url):
+    """
+    Save onfido report into DB
+    """
+    r = requests.get(url, headers = {'Authorization': 'Token token={}'.format(ONFIDO_API_KEY)})
+
+    if r.status_code == 200:
+        tmp_file = NamedTemporaryFile(delete=True)
+        tmp_file.write(r.content)
+        tmp_file.flush()
+
+        try:
+            if not document_verification.report:
+                document_verification.report = Document.objects.create(user=document_verification.user,
+                                                                       type=DocumentType.report,
+                                                                       ext='html')
+
+                document_verification.report.image.save(DocumentHelper.unique_document_filename(None, 'report.html'),
+                                                        File(tmp_file))
+        except:
+            logger.error('download_onfido_report: failed saving report into DB (verification:{})'
+                         .format(document_verification.pk))
+    else:
+        logger.info('download_onfido_report: failed downloading report from {}'.format(url))
+
+
 def check_document_verification_status(document_verification_id):
     """
     Check and store OnFido check status and result
@@ -99,6 +131,8 @@ def check_document_verification_status(document_verification_id):
             logger.info('Document verification status is: %s, result: %s', check.status, check.result)
             document_verification.onfido_check_status = check.status
             document_verification.onfido_check_result = check.result
+            if check.download_uri:
+                download_onfido_report(document_verification, check.download_uri)
             document_verification.save()
 
 
