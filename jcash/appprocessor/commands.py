@@ -381,7 +381,7 @@ def fetch_eth_events():
         events = eth_events.get_incoming_txs(currency.view_address if currency.is_erc20_token else currency.exchanger_address,
                                              currency.exchanger_address,
                                              currency.abi,
-                                                'Transfer' if currency.is_erc20_token else 'ReceiveEvent',
+                                                'Transfer' if currency.is_erc20_token else 'ReceiveEthEvent',
                                              last_block)
         try:
             with transaction.atomic():
