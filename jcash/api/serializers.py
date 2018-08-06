@@ -30,7 +30,7 @@ from jcash.api.models import (
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration, exchange_utils as utils
-from jcash.commonutils.notify import send_email_reset_password
+from jcash.commonutils import notify
 from jcash.settings import (
     FRONTEND_URL,
     LOGIC__EXPIRATION_LIMIT_SEC,
@@ -358,7 +358,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         activate_url = FRONTEND_URL+'/auth/recovery/confirm/{uid}/{token}'.format(**context)
         logger.info("{} {}".format(to_email, activate_url))
-        send_email_reset_password(to_email, activate_url, None)
+        notify.send_email_password_reset(to_email, activate_url, None)
 
 
 class CustomPasswordResetSerializer(PasswordResetSerializer):
@@ -530,6 +530,8 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
 
     def save(self):
         logger.info('PasswordResetConfirm: successfully confirmed user: {}'.format(self.user.username))
+        notify.send_email_password_reset_confirmation(self.user.email if self.user else None,
+                                                      self.user.pk if self.user else None)
         return self.set_password_form.save()
 
 
@@ -852,6 +854,9 @@ class RemoveAddressSerializer(serializers.Serializer):
         with transaction.atomic():
             address.is_removed = True
             address.save()
+            notify.send_email_eth_address_removed(address.user.email if address.user else None,
+                                                  address.address,
+                                                  address.user.id if address.user else None)
 
     def validate(self, attrs):
         user = self.context.get('user')
@@ -903,6 +908,9 @@ class AddressSerializer(serializers.Serializer):
             address_verify = AddressVerify.objects.create(address=address,
                                                           message=self.generate_message(address))
             address_verify.save()
+            notify.send_email_eth_address_added(user.email if user else None,
+                                                address.address,
+                                                user.id if user else None)
 
         self.validated_data['message'] = address_verify.message
         self.validated_data['uuid'] = address_verify.id
@@ -1369,6 +1377,7 @@ class PersonalDocumentsSerializer(serializers.Serializer):
 
             doc_verification.save()
             ga_integration.on_status_registration_complete(personal.account)
+            notify.send_email_jcash_application_underway(personal.account.user.email, personal.account.user.pk)
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1725,6 +1734,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
 
             doc_verification.save()
             ga_integration.on_status_registration_complete(corporate.account)
+            notify.send_email_jcash_application_underway(corporate.account.user.email, corporate.account.user.pk)
 
 
 class CorporateSerializer(serializers.ModelSerializer):

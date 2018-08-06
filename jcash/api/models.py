@@ -11,8 +11,10 @@ from django.template.loader import render_to_string
 from django.utils.timezone import now
 from django.contrib.auth.tokens import default_token_generator as token_generator
 from django.contrib.sites.shortcuts import get_current_site
+from concurrency.fields import IntegerVersionField
 
 from jcash.commonutils import notify
+from jcash.settings import FRONTEND_URL
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,7 @@ class AccountType:
 
 # Account model
 class Account(models.Model):
+    version = IntegerVersionField()
     # Account type
     type = models.CharField(max_length=20, null=False, blank=True, default='')
     # Personal data
@@ -93,6 +96,14 @@ class Account(models.Model):
 
     class Meta:
         db_table = 'account'
+        indexes = (
+            models.Index(fields=['type']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['last_updated_at']),
+            models.Index(fields=['is_identity_verified']),
+            models.Index(fields=['is_identity_declined']),
+            models.Index(fields=['is_blocked']),
+        )
 
     def reset_verification_state(self, fullreset=True):
         self.is_identity_verified = False
@@ -135,8 +146,9 @@ class Account(models.Model):
                 doc_verification.is_identity_declined = False
                 doc_verification.save()
 
-            notify.send_email_kyc_account_approved(self.user.email if self.user else None,
-                                                   self.user.id if self.user else None)
+            notify.send_email_jcash_application_approved(self.user.email if self.user else None,
+                                                         FRONTEND_URL,
+                                                         self.user.id if self.user else None)
 
     def get_customer(self):
         personal = None
@@ -178,9 +190,8 @@ class Account(models.Model):
                 doc_verification.comment = reason
                 doc_verification.save()
 
-            notify.send_email_kyc_account_rejected(self.user.email if self.user else None,
-                                                   reason,
-                                                   self.user.id if self.user else None)
+            notify.send_email_jcash_application_unsuccessful(self.user.email if self.user else None,
+                                                             self.user.id if self.user else None)
 
     @classmethod
     def is_user_email_confirmed(cls, user):
@@ -235,6 +246,12 @@ class Country(models.Model):
     name = models.CharField(max_length=120, null=False, blank=False, verbose_name='Country name')
     is_removed = models.BooleanField(default=False, verbose_name='Removed')
 
+    class Meta:
+        indexes = (
+            models.Index(fields=['type']),
+            models.Index(fields=['is_removed']),
+        )
+
 
 # Personal fields length
 class PersonalFieldLength:
@@ -266,6 +283,7 @@ class CustomerStatus:
 
 class Personal(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = IntegerVersionField()
     # Contact information
     fullname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
     nationality = models.CharField(max_length=PersonalFieldLength.nationality, null=False, blank=True)
@@ -299,6 +317,19 @@ class Personal(models.Model):
     rel_documents = 'documents'
     rel_document_verifications = 'document_verifications'
 
+    class Meta:
+        indexes = (
+            models.Index(fields=['country']),
+            models.Index(fields=['city']),
+            models.Index(fields=['profession']),
+            models.Index(fields=['jcash_use']),
+            models.Index(fields=['income_source']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['last_updated_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['onfido_applicant_id']),
+        )
+
 
 # Corporate fields length
 class CorporateFieldLength:
@@ -321,6 +352,7 @@ class CorporateFieldLength:
 
 class Corporate(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = IntegerVersionField()
     # Company information
     name = models.CharField(max_length=CorporateFieldLength.name,
                             null=False, blank=True)
@@ -376,6 +408,19 @@ class Corporate(models.Model):
     rel_documents = 'documents'
     rel_document_verifications = 'document_verifications'
 
+    class Meta:
+        indexes = (
+            models.Index(fields=['country']),
+            models.Index(fields=['city']),
+            models.Index(fields=['industry']),
+            models.Index(fields=['jcash_use']),
+            models.Index(fields=['name']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['last_updated_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['onfido_applicant_id']),
+        )
+
 
 class DocumentHelper:
     @classmethod
@@ -405,6 +450,7 @@ class DocumentType:
 
 # Document model
 class Document(models.Model):
+    version = IntegerVersionField()
     image = models.FileField('uploaded document', upload_to=DocumentHelper.unique_document_filename)  # stores the uploaded documents
     ext = models.CharField(max_length=20, null=False, blank=True)
     type = models.CharField(max_length=20, null=False, blank=True)
@@ -428,6 +474,12 @@ class Document(models.Model):
 
     class Meta:
         db_table = 'document'
+        indexes = (
+            models.Index(fields=['ext']),
+            models.Index(fields=['type']),
+            models.Index(fields=['group']),
+            models.Index(fields=['created_at']),
+        )
 
 
 class DocumentVerificationStatus:
@@ -438,6 +490,7 @@ class DocumentVerificationStatus:
 
 # DocumentVerification
 class DocumentVerification(models.Model):
+    version = IntegerVersionField()
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, null=False, blank=False, default=DocumentVerificationStatus.created)
 
@@ -478,9 +531,25 @@ class DocumentVerification(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_documentverification)
 
+    class Meta:
+        indexes = (
+            models.Index(fields=['created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['is_identity_verified']),
+            models.Index(fields=['is_identity_declined']),
+            models.Index(fields=['is_applicant_changed']),
+            models.Index(fields=['onfido_check_id']),
+            models.Index(fields=['onfido_check_status']),
+            models.Index(fields=['onfido_check_result']),
+            models.Index(fields=['onfido_check_created']),
+            models.Index(fields=['verification_started_at']),
+            models.Index(fields=['verification_attempts']),
+        )
+
 
 # Address model
 class Address(models.Model):
+    version = IntegerVersionField()
     address = models.CharField(unique=True, max_length=255)
     type = models.CharField(max_length=10)
     is_verified = models.BooleanField(default=False)
@@ -500,6 +569,15 @@ class Address(models.Model):
 
     class Meta:
         db_table = 'address'
+        indexes = (
+            models.Index(fields=['address']),
+            models.Index(fields=['type']),
+            models.Index(fields=['is_verified']),
+            models.Index(fields=['is_rejected']),
+            models.Index(fields=['is_removed']),
+            models.Index(fields=['is_allowed']),
+            models.Index(fields=['created_at']),
+        )
 
     def __str__(self):
         return '{}: {}'.format(self.type, self.address)
@@ -508,6 +586,7 @@ class Address(models.Model):
 # AddressMessage
 class AddressVerify(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = IntegerVersionField()
     sig = models.CharField(unique=True, max_length=255, null=True, blank=True)
     message = models.CharField(unique=False, max_length=1024)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -519,19 +598,31 @@ class AddressVerify(models.Model):
 
     class Meta:
         db_table = 'address_verify'
+        indexes = (
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_verified']),
+        )
 
 
 class NotificationType:
-    # Registration
-    account_created         = 'account_created'
-    account_email_confirmed = 'account_email_confirmed'
-    password_change_request = 'password_change_request'
-    password_changed        = 'password_changed'
-    kyc_account_approved    = 'kyc_account_approved'
-    kyc_account_rejected    = 'kyc_account_rejected'
+    eth_address_added              = 'eth_address_added'
+    eth_address_removed            = 'eth_address_removed'
+    exchange_request               = 'exchange_request'
+    exchange_successful            = 'exchange_successful'
+    exchange_unsuccessful          = 'exchange_unsuccessful'
+    few_steps_away                 = 'few_steps_away'
+    jcash_application_approved     = 'jcash_application_approved'
+    jcash_application_underway     = 'jcash_application_underway'
+    jcash_application_unsuccessful = 'jcash_application_unsuccessful'
+    new_login_detected             = 'new_login_detected'
+    password_reset_confirmation    = 'password_reset_confirmation'
+    password_reset                 = 'password_reset'
+    refund_successful              = 'refund_successful'
+    verify_email                   = 'verify_email'
 
 
 class Notification(models.Model):
+    version = IntegerVersionField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=True, null=True, related_name='notifications')
 
@@ -546,23 +637,46 @@ class Notification(models.Model):
 
     class Meta:
         db_table = 'notification'
+        indexes = (
+            models.Index(fields=['type']),
+            models.Index(fields=['email']),
+            models.Index(fields=['created']),
+            models.Index(fields=['sended']),
+            models.Index(fields=['is_sended']),
+        )
 
     notification_keys = {
-        NotificationType.account_created: 'registration_01',
-        NotificationType.account_email_confirmed: 'registration_02',
-        NotificationType.password_change_request: 'account_01_01',
-        NotificationType.password_changed: 'account_01_02',
-        NotificationType.kyc_account_approved: 'kyc_01',
-        NotificationType.kyc_account_rejected: 'kyc_02',
+        NotificationType.eth_address_added: 'eth_address_added',
+        NotificationType.eth_address_removed: 'eth_address_removed',
+        NotificationType.exchange_request: 'exchange_request',
+        NotificationType.exchange_successful: 'exchange_successful',
+        NotificationType.exchange_unsuccessful: 'exchange_unsuccessful',
+        NotificationType.few_steps_away: 'few_steps_away',
+        NotificationType.jcash_application_approved: 'jcash_application_approved',
+        NotificationType.jcash_application_underway: 'jcash_application_underway',
+        NotificationType.jcash_application_unsuccessful: 'jcash_application_unsuccessful',
+        NotificationType.new_login_detected: 'new_login_detected',
+        NotificationType.password_reset_confirmation: 'password_reset_confirmation',
+        NotificationType.password_reset: 'password_reset',
+        NotificationType.refund_successful: 'refund_successful',
+        NotificationType.verify_email: 'verify_email',
     }
 
     notification_subjects = {
-        'account_01_01': 'Password change request',
-        'account_01_02': 'Your password was updated',
-        'registration_01': 'Verify your email address',
-        'registration_02': 'Accessing your jCash',
-        'kyc_01': 'Completing Your KYC',
-        'kyc_02': 'Completing Your KYC',
+        'eth_address_added': 'ETH address added',
+        'eth_address_removed': 'ETH address removed',
+        'exchange_request': 'Requested an exchange',
+        'exchange_successful': 'Exchange successful',
+        'exchange_unsuccessful': 'Uh oh...exchange unsuccessful',
+        'few_steps_away': 'You''re only a few steps away!',
+        'jcash_application_approved': 'Approved!',
+        'jcash_application_underway': 'Jcash application underway!',
+        'jcash_application_unsuccessful': 'Uh oh...application unsuccessful',
+        'new_login_detected': 'A new device was used to access your Jcash account',
+        'password_reset_confirmation': 'Your password was reset!',
+        'password_reset': 'Uh oh..forgot your password?',
+        'refund_successful': 'Refund successful!',
+        'verify_email': 'One Step away!',
     }
 
     def __str__(self):
@@ -586,6 +700,7 @@ class Notification(models.Model):
 
 
 class Affiliate(models.Model):
+    version = IntegerVersionField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING)
     event = models.CharField(max_length=20)
     url = models.CharField(max_length=300, null=False)
@@ -596,6 +711,13 @@ class Affiliate(models.Model):
 
     class Meta:
         db_table = 'affiliate'
+        indexes = (
+            models.Index(fields=['event']),
+            models.Index(fields=['url']),
+            models.Index(fields=['created']),
+            models.Index(fields=['sended']),
+            models.Index(fields=['status']),
+        )
 
 
 class OperationError(Exception):
@@ -605,6 +727,7 @@ class OperationError(Exception):
 
 # Currency
 class Currency(models.Model):
+    version = IntegerVersionField()
     display_name = models.CharField(max_length=10)
     symbol = models.CharField(max_length=10)
     exchanger_address = models.CharField(max_length=255, blank=True, null=True)
@@ -628,6 +751,16 @@ class Currency(models.Model):
 
     class Meta:
         db_table = 'currency'
+        indexes = (
+            models.Index(fields=['display_name']),
+            models.Index(fields=['symbol']),
+            models.Index(fields=['exchanger_address']),
+            models.Index(fields=['view_address']),
+            models.Index(fields=['controller_address']),
+            models.Index(fields=['license_registry_address']),
+            models.Index(fields=['is_erc20_token']),
+            models.Index(fields=['created_at']),
+        )
 
 
 # CurrencyPair
@@ -648,6 +781,14 @@ class CurrencyPair(models.Model):
 
     class Meta:
         db_table = 'currency_pair'
+        indexes = (
+            models.Index(fields=['display_name']),
+            models.Index(fields=['symbol']),
+            models.Index(fields=['is_exchangeable']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_buyable']),
+            models.Index(fields=['is_sellable']),
+        )
 
 
 # CurrencyPairRate
@@ -663,21 +804,14 @@ class CurrencyPairRate(models.Model):
 
     class Meta:
         db_table = 'currency_pair_rate'
-
-
-# AccountAddress
-class AccountAddress(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING)
-    address = models.CharField(unique=True, max_length=255)
-    is_verified = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'account_address'
+        indexes = (
+            models.Index(fields=['created_at']),
+        )
 
 
 # Replenisher
 class Replenisher(models.Model):
+    version = IntegerVersionField()
     transaction_id = models.CharField(max_length=120, null=False, blank=False, unique=True)
     type = models.CharField(max_length=40, null=False, blank=True, default='')
     mined_at = models.DateTimeField(null=True, blank=True)
@@ -689,6 +823,14 @@ class Replenisher(models.Model):
 
     class Meta:
         db_table = 'replenisher'
+        indexes = (
+            models.Index(fields=['type']),
+            models.Index(fields=['mined_at']),
+            models.Index(fields=['block_height']),
+            models.Index(fields=['is_removed']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['last_updated_at']),
+        )
 
 
 # ApplicationStatus
@@ -706,6 +848,7 @@ class ApplicationStatus:
 # Application
 class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = IntegerVersionField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, models.DO_NOTHING,
                              blank=True, null=True, related_name=Account.rel_applications)
     address = models.ForeignKey(Address,
@@ -739,6 +882,18 @@ class Application(models.Model):
 
     class Meta:
         db_table = 'application'
+        indexes = (
+            models.Index(fields=['exchanger_address']),
+            models.Index(fields=['base_currency']),
+            models.Index(fields=['reciprocal_currency']),
+            models.Index(fields=['base_amount_actual']),
+            models.Index(fields=['reciprocal_amount_actual']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['expired_at']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['is_reverse']),
+            models.Index(fields=['status']),
+        )
 
 
 # LicenseUserStatus
@@ -751,6 +906,7 @@ class LicenseAddressStatus:
 
 # LicenseUser
 class LicenseAddress(models.Model):
+    version = IntegerVersionField()
     status = models.CharField(max_length=20, default=LicenseAddressStatus.created)
     meta = JSONField(default=dict)
     is_remove_license = models.BooleanField(default=False)
@@ -765,6 +921,11 @@ class LicenseAddress(models.Model):
 
     class Meta:
         db_table = 'license_address'
+        indexes = (
+            models.Index(fields=['status']),
+            models.Index(fields=['is_remove_license']),
+            models.Index(fields=['created_at']),
+        )
 
 # TransactionStatus
 class TransactionStatus:
@@ -778,6 +939,7 @@ class TransactionStatus:
 
 # IncomingTransaction
 class IncomingTransaction(models.Model):
+    version = IntegerVersionField()
     transaction_id = models.CharField(max_length=120, null=False, blank=False, unique=True)
     application = models.ForeignKey(Application, models.DO_NOTHING,
                                     related_name=Application.rel_incoming_txs, null=True)
@@ -798,10 +960,22 @@ class IncomingTransaction(models.Model):
 
     class Meta:
         db_table = 'incoming_transaction'
+        indexes = (
+            models.Index(fields=['transaction_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['mined_at']),
+            models.Index(fields=['block_height']),
+            models.Index(fields=['from_address']),
+            models.Index(fields=['to_address']),
+            models.Index(fields=['value']),
+            models.Index(fields=['status']),
+            models.Index(fields=['is_linked']),
+        )
 
 
 # Exchange
 class Exchange(models.Model):
+    version = IntegerVersionField()
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
     application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_exchanges)
     incoming_transaction = models.ForeignKey(IncomingTransaction, models.DO_NOTHING,
@@ -818,10 +992,20 @@ class Exchange(models.Model):
 
     class Meta:
         db_table = 'exchange'
+        indexes = (
+            models.Index(fields=['transaction_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['mined_at']),
+            models.Index(fields=['block_height']),
+            models.Index(fields=['to_address']),
+            models.Index(fields=['value']),
+            models.Index(fields=['status']),
+        )
 
 
 # Refund
 class Refund(models.Model):
+    version = IntegerVersionField()
     transaction_id = models.CharField(max_length=120, null=True, blank=True)
     application = models.ForeignKey(Application, models.DO_NOTHING, related_name=Application.rel_refundes, null=True)
     incoming_transaction = models.ForeignKey(IncomingTransaction, models.DO_NOTHING,
@@ -839,65 +1023,13 @@ class Refund(models.Model):
 
     class Meta:
         db_table = 'refund'
-
-
-# SystemEvents
-class SystemEvents(models.Model):
-    SE_ACCOUNT_REG_DATA_FILLED   = 'account_reg_data_filled'
-    SE_ACCOUNT_APPROVED          = 'account_approved'
-    SE_ACCOUNT_REJECTED          = 'account_rejected'
-    SE_ACCOUNT_DOCS_UPPLOADED    = 'account_docs_uploaded'
-    SE_DOCUMENT_UPLOADED         = 'document_uploaded'
-    SE_APPLICATION_CREATED       = 'application_created'
-    SE_APPLICATION_REJECTED      = 'application_rejected'
-    SE_APPLICATION_APPROVED      = 'application approved'
-    SE_APPLICATION_REFUNDED      = 'application_refunded'
-    SE_TRANSACTION_RECEIVED      = 'transaction_received'
-    SE_EXCHANGE_CANCELLED        = 'exchane_cancelled'
-    SE_EXCHANGE_STARTED          = 'exchange_started'
-    SE_EXCHANGE_FAILED           = 'exchange_failed'
-    SE_EXCHANGE_SUCCESSED        = 'exchange_successed'
-    SE_NOTIFICATION_CREATED      = 'notification_created'
-    SE_NOTIFICATION_SENDED       = 'notification_sended'
-
-    SE_CHOICES = [
-        (SE_ACCOUNT_REG_DATA_FILLED, 'account_reg_data_filled'),
-        (SE_ACCOUNT_APPROVED, 'account_approved'),
-        (SE_ACCOUNT_REJECTED, 'account_rejected'),
-        (SE_ACCOUNT_DOCS_UPPLOADED, 'account_docs_uploaded'),
-        (SE_DOCUMENT_UPLOADED, 'document_uploaded'),
-        (SE_APPLICATION_CREATED, 'application_created'),
-        (SE_APPLICATION_REJECTED, 'application_rejected'),
-        (SE_APPLICATION_APPROVED, 'application approved'),
-        (SE_APPLICATION_REFUNDED, 'application_refunded'),
-        (SE_TRANSACTION_RECEIVED, 'transaction_received'),
-        (SE_EXCHANGE_CANCELLED, 'exchane_cancelled'),
-        (SE_EXCHANGE_STARTED, 'exchange_started'),
-        (SE_EXCHANGE_FAILED, 'exchange_failed'),
-        (SE_EXCHANGE_SUCCESSED, 'exchange_successed'),
-        (SE_NOTIFICATION_CREATED, 'notification_created'),
-        (SE_NOTIFICATION_SENDED, 'notification_sended'),
-    ]
-
-    handlers = {
-        #SE_APPLICATION_CREATED: ApplicationCreatedHandler(),
-        #SE_APPLICATION_REJECTED: ApplicationRejectedHandler(),
-    }
-
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING)
-    event_type = models.CharField(max_length=20, choices=SE_CHOICES)
-    created_at = models.DateTimeField(auto_now_add=True)
-    params = JSONField(default=dict)
-
-    class Meta:
-        db_table = 'systemevents'
-
-    @classmethod
-    def create_systemevent(cls, event_type, user, params):
-        with transaction.atomic():
-            op = cls.objects.create(
-                event_type=event_type,
-                user=user,
-                params=params
-            )
-            return op
+        indexes = (
+            models.Index(fields=['transaction_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['mined_at']),
+            models.Index(fields=['block_height']),
+            models.Index(fields=['to_address']),
+            models.Index(fields=['value']),
+            models.Index(fields=['status']),
+            models.Index(fields=['is_admin_approved']),
+        )
