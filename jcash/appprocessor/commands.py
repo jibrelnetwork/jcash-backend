@@ -508,11 +508,10 @@ def fetch_currencies_state():
             with transaction.atomic():
                 if currency.is_erc20_token:
                     currency.balance = eth_contracts.balanceToken(currency.abi,
-                                                                  currency.exchanger_address,
-                                                                  currency.view_address)
+                                                                  currency.view_address,
+                                                                  currency.exchanger_address)
                 else:
-                    currency.balance = eth_contracts.balanceEth(currency.abi,
-                                                                currency.exchanger_address)
+                    currency.balance = eth_contracts.balanceEth(currency.exchanger_address)
                 currency.save()
                 logging.getLogger(__name__).info("Currency balance is {}".format(currency.balance))
 

@@ -81,20 +81,19 @@ def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -
     return _tx_id
 
 
-def balanceEth(abi, contract_address) -> float:
+def balanceEth(holder_address) -> float:
     web3 = create_web3()
 
-    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
-    res = contract.functions.balanceEth().call()
+    res = web3.eth.getBalance(web3.toChecksumAddress(holder_address))
 
     return web3.fromWei(res, 'ether')
 
 
-def balanceToken(abi, contract_address, token_address) -> float:
+def balanceToken(abi, contract_address, holder_address) -> float:
     web3 = create_web3()
 
     contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
-    res = contract.functions.balanceToken(web3.toChecksumAddress(token_address)).call()
+    res = contract.functions.balanceOf(web3.toChecksumAddress(holder_address)).call()
 
     return web3.fromWei(res, 'ether')
 
