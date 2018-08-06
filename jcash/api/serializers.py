@@ -30,7 +30,15 @@ from jcash.api.models import (
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
     ApplicationCancelReason,
 )
-from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration, exchange_utils as utils
+from jcash.commonutils import (
+    eth_sign,
+    eth_address,
+    eth_contracts,
+    math,
+    currencyrates,
+    ga_integration,
+    exchange_utils as utils
+)
 from jcash.commonutils import notify
 from jcash.settings import (
     FRONTEND_URL,
@@ -1053,6 +1061,13 @@ class ApplicationSerializer(serializers.Serializer):
                 currency_pair.base_currency if is_reverse_operation else \
                         currency_pair.reciprocal_currency) < attrs['reciprocal_amount']:
             raise serializers.ValidationError(_('Exchange value is too large'))
+
+        feeJNT = eth_contracts.feeJNT(currency_pair.reciprocal_currency.abi,
+                                      currency_pair.reciprocal_currency.exchanger_address,
+                                      currency_pair.reciprocal_currency.is_erc20_token)
+
+        if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
+            raise serializers.ValidationError(_('No enough JNT'))
 
         attrs['is_reverse_operation'] = is_reverse_operation
 

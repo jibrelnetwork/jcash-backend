@@ -103,6 +103,15 @@ def balanceJnt(abi, holder_address) -> float:
     return balanceToken(abi, ETH_JNT_VIEW__ADDRESS, holder_address)
 
 
+def feeJNT(abi, contract_address, is_token=False):
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.getActionPrice('transfer_token' if is_token else 'transfer_eth').call()
+
+    return web3.fromWei(res, 'ether')
+
+
 def isUserAdmitted(abi, contract_address, user_address) -> bool:
     web3 = create_web3()
 
