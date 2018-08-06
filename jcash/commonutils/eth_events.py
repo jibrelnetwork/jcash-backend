@@ -72,7 +72,7 @@ def get_replenishers(
     """
     web3 = create_web3()
 
-    event_names = ['ReplenisherEnabledEvent', 'ReplenisherDisabledEvent']
+    event_names = ['ManagerPermissionGrantedEvent', 'ManagerPermissionRevokedEvent']
     contract_abi_json = contract_abi
     contract_events = ContractEvents(contract_abi_json, web3, contract_address)
 
@@ -92,11 +92,12 @@ def get_replenishers(
             mined_at = datetime.fromtimestamp(block_data.timestamp, tzlocal())
             evnt_args = get_event_data(event_abi, log_entry)
 
-            result.append((transaction_hash,
-                           block_number,
-                           mined_at,
-                           event_name,
-                           evnt_args.args['replenisher'].lower()))
+            if evnt_args.args['permission'] == 'replenish_eth':
+                result.append((transaction_hash,
+                               block_number,
+                               mined_at,
+                               event_name,
+                               evnt_args.args['manager'].lower()))
     return result
 
 

@@ -730,7 +730,7 @@ def fetch_replenisher():
                 for evnt in events:
                     tx_hash, block_height, mined_at, evnt_type, evnt_address = evnt
 
-                    if evnt_type == "ReplenisherDisabledEvent":
+                    if evnt_type == "ManagerPermissionRevokedEvent":
                         try:
                             replenisher = Replenisher.objects.filter(address__iexact=evnt_address).latest('block_height')
                             replenisher.is_removed = True
