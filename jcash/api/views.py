@@ -81,8 +81,8 @@ from jcash.api.serializers import (
     CheckTokenSerializer,
     ValidatePasswordSerializer,
 )
-from jcash.commonutils import currencyrates, math
-from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
+from jcash.commonutils import currencyrates, math, notify
+from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
 
 
 logger = logging.getLogger(__name__)
@@ -287,7 +287,10 @@ class CurrencyRateView(GenericAPIView):
             if not currency_pair:
                 return Response({'success': False, 'error': "Currency does not exists."}, status=400)
 
-            currency_pair_rate = currency_pair.currency_pair_rates.latest('created_at')
+            currency_pair_rate = None
+
+            if hasattr(currency_pair, 'currency_pair_rates') and currency_pair.currency_pair_rates.count() > 0:
+                currency_pair.currency_pair_rates.latest('created_at')
 
             if not currency_pair_rate:
                 return Response({'success': False, 'error': "Currency price does not exists."}, status=400)
@@ -349,7 +352,10 @@ class CurrencyRatesView(GenericAPIView):
         currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
         currencies = []
         for pair in currency_pairs:
-            last_rate = pair.currency_pair_rates.latest('created_at')
+            last_rate = None
+            if hasattr(pair, 'currency_pair_rates') and \
+                    pair.currency_pair_rates.count() > 0:
+                last_rate = pair.currency_pair_rates.latest('created_at')
 
             rate_buy = 0.0
             rate_sell = 0.0
@@ -914,6 +920,11 @@ class CustomVerifyEmailView(VerifyEmailView):
             return Response({'success': False, 'error': 'failed'}, status=404)
 
         confirmation.confirm(self.request)
+        notify.send_email_few_steps_away(confirmation.email_address.user.email \
+                                             if confirmation.email_address.user else None,
+                                         FRONTEND_URL,
+                                         confirmation.email_address.user.pk \
+                                             if confirmation.email_address.user else None)
         return Response({'success': True}, status=status.HTTP_200_OK)
 
 
