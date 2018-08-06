@@ -11,6 +11,7 @@ from jcash.settings import (
     ETH_NODE__CHAIN_ID,
     ETH_MANAGER__PRIVATE_KEY,
     ETH_MANAGER__ADDRESS,
+    ETH_JNT_VIEW__ADDRESS,
     ETH_EXCHANGER__PRIVATE_KEY,
     ETH_EXCHANGER__ADDRESS,
     ETH_LICENSE_REGISTRY_MANAGEMENT__ABI
@@ -96,6 +97,10 @@ def balanceToken(abi, contract_address, holder_address) -> float:
     res = contract.functions.balanceOf(web3.toChecksumAddress(holder_address)).call()
 
     return web3.fromWei(res, 'ether')
+
+
+def balanceJnt(abi, holder_address) -> float:
+    return balanceToken(abi, ETH_JNT_VIEW__ADDRESS, holder_address)
 
 
 def isUserAdmitted(abi, contract_address, user_address) -> bool:
