@@ -340,7 +340,7 @@ class CurrencyRatesView(GenericAPIView):
     Response example:
 
     ```
-    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED","rate_buy":1799.0,"rate_sell":1798.0}]}
+    {"success":true,"currencies":[{"id":1,"base_currency":"ETH","rec_currency":"jAED","rate_buy":1799.0,"rate_sell":1798.0}]}
     ```
     """
 
@@ -349,7 +349,7 @@ class CurrencyRatesView(GenericAPIView):
 
     @cache_response(20)
     def get(self, request):
-        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
+        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True).order_by('sort_id')
         currencies = []
         for pair in currency_pairs:
             last_rate = None
@@ -364,7 +364,8 @@ class CurrencyRatesView(GenericAPIView):
                 rate_buy = last_rate.buy_price
                 rate_sell = last_rate.sell_price
 
-            currencies.append({"base_currency": pair.base_currency.display_name,
+            currencies.append({"id": pair.sort_id,
+                               "base_currency": pair.base_currency.display_name,
                                "rec_currency": pair.reciprocal_currency.display_name,
                                "rate_buy": rate_buy,
                                "rate_sell": rate_sell})
