@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 from email.utils import formatdate
 from jinja2 import FileSystemLoader, Environment
+
 from jcash.api import models as api_models
 from jcash import settings as config
 
@@ -296,104 +297,130 @@ def send_notification(notification_id):
     )
 
 
+def company_links():
+    return {
+        'company_link': config.EMAIL_TEMPLATES__COMPANY_LINK,
+        'contact_support_link': config.EMAIL_TEMPLATES__CONTACT_SUPPORT_LINK,
+        'facebook_link': config.EMAIL_TEMPLATES__FACEBOOK_LINK,
+        'twitter_link': config.EMAIL_TEMPLATES__TWITTER_LINK,
+        'linkedin_link': config.EMAIL_TEMPLATES__LINKEDIN_LINK,
+        'medium_link': config.EMAIL_TEMPLATES__MEDIUM_LINK,
+        'email_support': config.EMAIL_TEMPLATES__EMAIL_SUPPORT,
+    }
+
+
 def send_email_exchange_request(email, base_curr, rec_curr, eth_address, fx_rate, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'base_curr': base_curr,
         'rec_curr': rec_curr,
         'eth_address': eth_address,
         'fx_rate': fx_rate,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_request, data=ctx)
 
 
 def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_rate, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'base_curr': base_curr,
         'rec_curr': rec_curr,
         'eth_address': eth_address,
         'fx_rate': fx_rate,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_successful, data=ctx)
 
 
 def send_email_exchange_unsuccessful(email, base_curr, reason, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'base_curr': base_curr,
         'reason': reason,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_unsuccessful, data=ctx)
     pass
 
 
 def send_email_refund_successful(email, base_curr, eth_address, reason, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'base_curr': base_curr,
         'eth_address': eth_address,
         'reason': reason,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.refund_successful, data=ctx)
 
 
 def send_email_eth_address_added(email, eth_address, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'eth_address': eth_address,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.eth_address_added, data=ctx)
 
 
 def send_email_eth_address_removed(email, eth_address, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'eth_address': eth_address,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.eth_address_removed, data=ctx)
 
 
 def send_email_few_steps_away(email, jcash_url, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'activate_url': jcash_url,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.few_steps_away, data=ctx)
 
 
 def send_email_jcash_application_approved(email, jcash_url, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'activate_url': jcash_url,
         'user_name': email,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_approved, data=ctx)
 
 
 def send_email_jcash_application_underway(email, user_id = None):
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_underway, data={})
+    ctx = company_links()
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_underway, data=ctx)
 
 
 def send_email_jcash_application_unsuccessful(email, user_id = None):
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_unsuccessful, data={})
+    ctx = company_links()
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_unsuccessful, data=ctx)
 
 
 # ToDo: device?, location?
 def send_email_new_login_detected(email, device, location, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'device': device,
         'location': location,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.new_login_detected, data=ctx)
 
 
 def send_email_password_reset_confirmation(email, user_id = None):
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset_confirmation, data={})
+    ctx = company_links()
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset_confirmation, data=ctx)
 
 
 def send_email_password_reset(email, activate_url, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'activate_url': activate_url,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset, data=ctx)
 
 
 def send_email_verify_email(email, activate_url, user_id = None):
-    ctx = {
+    ctx = company_links()
+    ctx.update({
         'activate_url': activate_url,
         'user_name': email,
-    }
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.verify_email, data=ctx)
