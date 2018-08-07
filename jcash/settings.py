@@ -283,6 +283,15 @@ EMAIL_NOTIFICATIONS__SUPPORT_ADDRESS = 'support@jibrel'
 EMAIL_NOTIFICATIONS__MAX_ATTEMPTS = 3
 EMAIL_NOTIFICATIONS__SENDGRID_DOMAINS = ["yahoo", "sina.cn", "increw.com.au", "moeboard.net", "hanmail.net", "daum.net"]
 
+# Email templates
+EMAIL_TEMPLATES__COMPANY_LINK = os.getenv('EMAIL_TEMPLATES_COMPANY_LINK', 'https://jibrel.network')
+EMAIL_TEMPLATES__FACEBOOK_LINK = os.getenv('EMAIL_TEMPLATES_FACEBOOK_LINK', 'https://www.facebook.com/jibrelnetwork')
+EMAIL_TEMPLATES__TWITTER_LINK = os.getenv('EMAIL_TEMPLATES_TWITTER_LINK', 'https://twitter.com/JibrelNetwork')
+EMAIL_TEMPLATES__LINKEDIN_LINK = os.getenv('EMAIL_TEMPLATES_LINKEDIN_LINK', 'https://www.linkedin.com/company/jibrel-network/')
+EMAIL_TEMPLATES__MEDIUM_LINK = os.getenv('EMAIL_TEMPLATES_MEDIUM_LINK', 'https://medium.com/@jibrelnetwork')
+EMAIL_TEMPLATES__CONTACT_SUPPORT_LINK = os.getenv('EMAIL_TEMPLATES_CONTACT_SUPPORT_LINK', 'https://jibrelnetwork.freshdesk.com/support/tickets/new')
+EMAIL_TEMPLATES__EMAIL_SUPPORT = os.getenv('EMAIL_TEMPLATES_EMAIL_SUPPORT', 'support@jibrel.network')
+
 # Force scanning address
 FORCE_SCANNING_ADDRESS__ENABLED = True
 FORCE_SCANNING_ADDRESS__EMAIL_RECIPIENT = 'Jibrel Presale <presale@jibrel.network>'
