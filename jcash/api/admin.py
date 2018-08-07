@@ -360,7 +360,8 @@ class CurrencyPairRateAdmin(admin.ModelAdmin):
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'username', 'address', 'currency_name', 'currency_rate',
-                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount', 'reciprocal_amount', 'status']
+                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount', 'reciprocal_amount',
+                    'status', 'reason']
     raw_id_fields = ('currency_pair_rate', 'address', 'user')
     ordering = ('-created_at',)
 

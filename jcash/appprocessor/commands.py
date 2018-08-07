@@ -32,6 +32,7 @@ from jcash.api.models import (
     LicenseAddressStatus,
     Personal,
     Corporate,
+    ApplicationCancelReason,
 )
 from jcash.commonutils import (
     notify,
@@ -323,12 +324,14 @@ def process_linked_unconfirmed_events():
                         utils.get_currency_balance(in_tx.application.currency_pair.base_currency) < \
                             math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.application.reason = str(ApplicationCancelReason.cancelled_by_currency_balance)
                         in_tx.status = TransactionStatus.rejected
                     #check that incoming tx value is not greater then currency balance (nonreversed exchange operation)
                     elif not in_tx.application.is_reverse and \
                         utils.get_currency_balance(in_tx.application.currency_pair.reciprocal_currency) < \
                             math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.application.reason = str(ApplicationCancelReason.cancelled_by_currency_balance)
                         in_tx.status = TransactionStatus.rejected
                     # check that absolute difference of incoming tx value and application value is not greater then
                     # backend setting (LOGIC__MAX_DIFF_PERCENT)
@@ -343,6 +346,7 @@ def process_linked_unconfirmed_events():
                                                    in_tx.application.is_reverse,
                                                    True):
                         in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.application.reason = str(ApplicationCancelReason.cancelled_by_currency_limits)
                         in_tx.status = TransactionStatus.rejected
                 elif tx_info[0] is None:
                     in_tx.application_id = None
@@ -443,6 +447,7 @@ def process_applications():
                 if application.status == str(ApplicationStatus.confirming):
                     if datetime.now(tzlocal()) > application.expired_at:
                         application.status = str(ApplicationStatus.refunding)
+                        application.reason = str(ApplicationCancelReason.cancelled_by_timeout)
                         application.is_active = False
                         application.save()
                 elif application.status == str(ApplicationStatus.refunding):
@@ -480,6 +485,7 @@ def process_applications():
                         application.expired_at < datetime.now(tzlocal()) and \
                         application.is_active:
                     application.status = str(ApplicationStatus.cancelled)
+                    application.reason = str(ApplicationCancelReason.cancelled_by_timeout)
                     application.save()
                     logger.info('cancel application {}'.format(application.pk))
 
@@ -521,7 +527,7 @@ def process_license_users_addresses():
     # noinspection PyBroadException
     try:
         logger.info('Start to process license users addresses')
-        license_limit_count = 3
+        license_limit_count = 1
         license_addresses = LicenseAddress.objects.filter(Q(status=LicenseAddressStatus.created)).order_by(
             'id'
         )[:license_limit_count]  # type: List[LicenseAddress]
@@ -675,6 +681,10 @@ def check_outgoing_transactions(txs, is_refund = False):
                         tx.application.save()
                 elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail
+                    if tx.application is not None:
+                        tx.application.status = str(ApplicationStatus.cancelled)
+                        tx.application.reason = str(ApplicationCancelReason.cancelled_by_contract)
+                        tx.application.save()
                     logger.info('outgoing transaction {} (is_refund: {}) failed'
                                 .format(tx.transaction_id, is_refund))
                 tx.save()
