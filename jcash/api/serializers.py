@@ -28,6 +28,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
+    ApplicationCancelReason,
 )
 from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration, exchange_utils as utils
 from jcash.commonutils import notify
@@ -665,6 +666,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "rate": 1810.0,
         "is_active": true
         "status": "created",
+        "reason": ""
     }]
     """
     app_uuid = serializers.SerializerMethodField()
@@ -683,7 +685,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
-                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse')
+                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason')
 
     def get_rate(self, obj):
         rate = obj.rate
@@ -1089,6 +1091,7 @@ class ApplicationRefundSerializer(serializers.Serializer):
         with transaction.atomic():
             if self.application:
                 self.application.status = str(ApplicationStatus.refunding)
+                self.application.reason = str(ApplicationCancelReason.cancelled_by_user)
                 self.application.save()
 
 
@@ -1160,6 +1163,7 @@ class ApplicationCancelSerializer(serializers.Serializer):
         with transaction.atomic():
             if self.application:
                 self.application.status = str(ApplicationStatus.cancelled)
+                self.application.reason = str(ApplicationCancelReason.cancelled_by_user)
                 self.application.is_active = False
                 self.application.save()
 

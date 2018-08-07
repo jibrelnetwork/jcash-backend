@@ -40,6 +40,7 @@ from jcash.api.models import (
     CurrencyPair,
     Application,
     ApplicationStatus,
+    ApplicationCancelReason,
     ObjStatus,
     Country,
     CountryType,
@@ -542,7 +543,8 @@ class CustomUserDetailsView(APIView):
         return Response({'success':True, 'username':request.user.username, 'email':request.user.email})
 
 
-@docstring_parameter(get_status_class_members(ApplicationStatus))
+@docstring_parameter(get_status_class_members(ApplicationStatus),
+                     get_status_class_members(ApplicationCancelReason))
 class ApplicationView(GenericAPIView):
     """
     View get/set exchange application.
@@ -574,13 +576,19 @@ class ApplicationView(GenericAPIView):
     "rate": 1799,
     "is_active": true,
     "is_reverse": false,
-    "status": "converting"
+    "status": "converting",
+    "reason": ""
     }}]}}
     ```
 
     **Statuses**
 
     {0}
+
+
+    **Reasons**
+
+    {1}
 
     post:
     Create a new exchange application for current user.
@@ -609,7 +617,8 @@ class ApplicationView(GenericAPIView):
             return Response({"success": False, "error": serializer.errors})
 
 
-@docstring_parameter(get_status_class_members(ApplicationStatus))
+@docstring_parameter(get_status_class_members(ApplicationStatus),
+                     get_status_class_members(ApplicationCancelReason))
 class ApplicationDetailView(GenericAPIView):
     """
     View get exchange application.
@@ -640,13 +649,18 @@ class ApplicationDetailView(GenericAPIView):
     "rate": 1799,
     "is_active": true,
     "is_reverse": false,
-    "status": "converting"
+    "status": "converting",
+    "reason": ""
     }}}}
     ```
 
     **Statuses**
 
     {0}
+
+    **Reasons**
+
+    {1}
     """
 
     authentication_classes = (authentication.TokenAuthentication,)

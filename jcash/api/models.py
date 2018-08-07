@@ -845,6 +845,15 @@ class ApplicationStatus:
     refunded = ObjStatus('refunded', 'refunded, tx is mined')
 
 
+# ApplicationCancelReason
+class ApplicationCancelReason:
+    cancelled_by_user = ObjStatus('cancelled_by_user', 'Cancelled by user')
+    cancelled_by_timeout = ObjStatus('cancelled_by_timeout', 'Cancelled by timeout')
+    cancelled_by_contract = ObjStatus('cancelled_by_contract', 'Cancelled due to execution error')
+    cancelled_by_currency_balance = ObjStatus('cancelled_by_currency_balance', 'Cancelled by currency limits')
+    cancelled_by_currency_limits = ObjStatus('cancelled_by_currency_limits', 'Cancelled by currency limits')
+
+
 # Application
 class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -874,6 +883,7 @@ class Application(models.Model):
     is_active = models.BooleanField(default=False)
     is_reverse = models.BooleanField(default=False)
     status = models.CharField(max_length=10, default=str(ApplicationStatus.created))
+    reason = models.CharField(max_length=35, blank=True, default='')
     meta = JSONField(default=dict)
 
     rel_exchanges = 'exchanges'
