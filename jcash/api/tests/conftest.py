@@ -246,7 +246,6 @@ def accounts(users):
 @pytest.fixture
 def customers(accounts):
     corporate = models.Corporate.objects.create(name='Alphabet', domicile_country='USA', business_phone='+123456789',
-                                                business_email='info@alphabet.com', country='USA', street='Jones Street',
                                                 apartment='1', city='NY', postcode='123456', industry='industry',
                                                 assets_origin='assets_origin', currency_nature='currency_nature',
                                                 assets_origin_description='assets_origin_description',
@@ -259,7 +258,7 @@ def customers(accounts):
                                                 account=accounts[1])
 
     personal = models.Personal.objects.create(fullname='Ivan Ivanov', nationality='Russia', birthday='1900-01-01',
-                                              phone='+1234567890', email=accounts[1].user.email, country='Russia',
+                                              phone='+1234567890', country='Russia',
                                               street='Rakhmanovskiy per', apartment='1', city='Moscow',
                                               postcode='123456', profession='composer', income_source='income_source',
                                               assets_origin='assets_origin', jcash_use='jcash_use',

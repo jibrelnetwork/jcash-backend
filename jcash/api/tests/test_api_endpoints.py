@@ -306,6 +306,20 @@ def test_success_get_currency_rate_by_base_amount1(client, users, currencies):
     assert resp.json()['base_amount'] == 1000.0
 
 
+def test_success_get_currency_rate_by_base_amount_lowercase(client, users, currencies):
+    client.authenticate('user4@mail.local', 'password4')
+
+    resp = client.post('/api/currency-rate/',
+                       json.dumps({'base_currency': 'eth', 'rec_currency': 'jaed', 'base_amount': 1000.0}),
+                       headers={'content-type': 'application/json'})
+    assert resp.status_code == 200
+    assert resp.json()['success'] == True
+    assert len(resp.json()['uuid']) > 0
+    assert resp.json()['rate'] == 1726.0
+    assert resp.json()['rec_amount'] == 1726000.0
+    assert resp.json()['base_amount'] == 1000.0
+
+
 def test_success_get_currency_rate_by_rec_amount1(client, users, currencies):
     client.authenticate('user4@mail.local', 'password4')
 
@@ -453,7 +467,6 @@ def test_fail_customer_personal_contact_info(client, accounts):
     assert 'nationality' in resp.json()['errors']
     assert 'birthday' in resp.json()['errors']
     assert 'phone' in resp.json()['errors']
-    assert 'email' in resp.json()['errors']
 
 
 def test_success_customer_personal_address_w_apartment(client, accounts):
@@ -571,7 +584,6 @@ def test_fail_corporate_company_info(client, accounts):
     assert 'name' in resp.json()['errors']
     assert 'domicile_country' in resp.json()['errors']
     assert 'phone' in resp.json()['errors']
-    assert 'email' in resp.json()['errors']
 
 
 def test_success_corporate_address_w_apartment(client, accounts):

@@ -113,7 +113,7 @@ def test_success_password_reset_and_confirm_and_isalive(client, users, accounts)
     assert resp.status_code == 200
     assert resp.json() == {'success': True}
     notifications = models.Notification.objects.filter(email=email,
-                                                       type=models.NotificationType.password_change_request)
+                                                       type=models.NotificationType.password_reset)
     assert notifications.count() == 1
     activate_url = notifications[0].meta['activate_url']
     frontend_password_reset_confirm_query = '/auth/recovery/confirm/'
@@ -278,7 +278,7 @@ def test_success_registration_and_registration_verify(live_server):
     assert EmailAddress.objects.get(email=user_data['email']).verified is False
 
     nots = models.Notification.objects.filter(email=user_data['email'],
-                                              type=models.NotificationType.account_created).all()
+                                              type=models.NotificationType.verify_email).all()
     assert len(nots) == 1
 
     data = {'key': nots[0].meta['activate_url'].split('/')[-1]}
