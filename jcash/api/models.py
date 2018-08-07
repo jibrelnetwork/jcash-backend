@@ -727,7 +727,6 @@ class OperationError(Exception):
 
 # Currency
 class Currency(models.Model):
-    version = IntegerVersionField()
     display_name = models.CharField(max_length=10)
     symbol = models.CharField(max_length=10)
     exchanger_address = models.CharField(max_length=255, blank=True, null=True)
