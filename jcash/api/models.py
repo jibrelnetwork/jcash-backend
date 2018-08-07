@@ -775,6 +775,7 @@ class CurrencyPair(models.Model):
     is_sellable = models.BooleanField(default=False)
     buy_fee_percent = models.FloatField(default=0.0)
     sell_fee_percent = models.FloatField(default=0.0)
+    sort_id = models.IntegerField(null=False, default=0)
 
     rel_currency_pair_rates = 'currency_pair_rates'
     rel_applications = 'applications'
