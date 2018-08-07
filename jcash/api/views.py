@@ -290,7 +290,7 @@ class CurrencyRateView(GenericAPIView):
             currency_pair_rate = None
 
             if hasattr(currency_pair, 'currency_pair_rates') and currency_pair.currency_pair_rates.count() > 0:
-                currency_pair.currency_pair_rates.latest('created_at')
+                currency_pair_rate = currency_pair.currency_pair_rates.latest('created_at')
 
             if not currency_pair_rate:
                 return Response({'success': False, 'error': "Currency price does not exists."}, status=400)
