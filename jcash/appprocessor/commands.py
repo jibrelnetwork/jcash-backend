@@ -487,6 +487,14 @@ def process_applications():
                     application.status = str(ApplicationStatus.cancelled)
                     application.reason = str(ApplicationCancelReason.cancelled_by_timeout)
                     application.save()
+                    notify.send_email_exchange_unsuccessful(
+                        application.user.email,
+                        notify._format_fiat_value(application.base_amount_actual,
+                                                  application.base_currency),
+                        ApplicationCancelReason.__dict__[application.reason].description \
+                            if application.reason in ApplicationCancelReason.__dict__ \
+                            else "An unexpected error occured",
+                        user_id=application.user.pk)
                     logger.info('cancel application {}'.format(application.pk))
 
         except:
@@ -674,9 +682,32 @@ def check_outgoing_transactions(txs, is_refund = False):
                     if tx.application is not None:
                         if is_refund:
                             tx.application.status = str(ApplicationStatus.refunded)
+                            notify.send_email_refund_successful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                tx.application.address.address,
+                                ApplicationCancelReason.__dict__[tx.application.reason].description \
+                                    if tx.application.reason in ApplicationCancelReason.__dict__ \
+                                    else "An unexpected error occured",
+                                user_id=tx.application.user.pk)
                         else:
                             tx.application.status = str(ApplicationStatus.converted)
                             ga_integration.on_exchange_completed(tx.application)
+                            notify.send_email_exchange_successful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                notify._format_fiat_value(tx.application.reciprocal_amount_actual,
+                                                          tx.application.reciprocal_currency),
+                                tx.application.address.address,
+                                notify._format_conversion_rate(
+                                    tx.application.rate if not tx.application.is_reverse else \
+                                        1.0 / tx.application.rate,
+                                    'ETH',
+                                    tx.application.base_currency if tx.application.is_reverse else \
+                                        tx.application.reciprocal_currency),
+                                user_id=tx.application.user.pk)
                         tx.application.save()
                 elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail
@@ -684,6 +715,14 @@ def check_outgoing_transactions(txs, is_refund = False):
                         tx.application.status = str(ApplicationStatus.cancelled)
                         tx.application.reason = str(ApplicationCancelReason.cancelled_by_contract)
                         tx.application.save()
+                        notify.send_email_exchange_unsuccessful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                ApplicationCancelReason.__dict__[tx.application.reason].description \
+                                    if tx.application.reason in ApplicationCancelReason.__dict__ \
+                                    else "An unexpected error occured",
+                                user_id=tx.application.user.pk)
                     logger.info('outgoing transaction {} (is_refund: {}) failed'
                                 .format(tx.transaction_id, is_refund))
                 tx.save()

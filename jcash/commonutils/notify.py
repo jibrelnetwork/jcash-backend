@@ -29,16 +29,16 @@ def _format_jnt_value_subject(value: float) -> str:
     return "{0:.0f}".format(int(value))
 
 
-def _format_fiat_value(value: float) -> str:
-    return "{0:.2f}".format(value)
+def _format_fiat_value(value: float, currency: str) -> str:
+    return "{0:.2f} {1:}".format(value, currency)
 
 
 def _format_coin_value(value: float) -> str:
     return "{0:.2f}".format(value)
 
 
-def _format_conversion_rate(value: float) -> str:
-    return "{0:.2f}".format(value)
+def _format_conversion_rate(value: float, base_cur: str, rec_cur: str) -> str:
+    return "1 {0:} = {1:.2f} {2:}".format(base_cur, value, rec_cur)
 
 
 def _format_date_period(start_date: datetime, end_date: datetime) -> str:

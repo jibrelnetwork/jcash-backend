@@ -1100,6 +1100,20 @@ class ApplicationSerializer(serializers.Serializer):
                                                      expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC))
             application.save()
             self.validated_data['application_id'] = application.pk
+            notify.send_email_exchange_request(
+                user.email,
+                notify._format_fiat_value(self.validated_data['base_amount'],
+                                          self.validated_data['base_currency']),
+                notify._format_fiat_value(self.validated_data['reciprocal_amount'],
+                                          self.validated_data['rec_currency']),
+                self.validated_data['address'],
+                notify._format_conversion_rate(
+                    self.validated_data['rate'] if not self.validated_data['is_reverse_operation'] else \
+                        1.0 / self.validated_data['rate'],
+                    'ETH',
+                    self.validated_data['base_currency'] if self.validated_data['is_reverse_operation'] else \
+                        self.validated_data['rec_currency']),
+                user_id=user.pk)
 
 
 class ApplicationRefundSerializer(serializers.Serializer):
@@ -1196,6 +1210,14 @@ class ApplicationCancelSerializer(serializers.Serializer):
                 self.application.reason = str(ApplicationCancelReason.cancelled_by_user)
                 self.application.is_active = False
                 self.application.save()
+                notify.send_email_exchange_unsuccessful(
+                    self.application.user.email,
+                    notify._format_fiat_value(self.application.base_amount_actual,
+                                              self.application.base_currency),
+                    ApplicationCancelReason.__dict__[self.application.reason].description \
+                        if self.application.reason in ApplicationCancelReason.__dict__ \
+                        else "An unexpected error occured",
+                    user_id=self.application.user.pk)
 
 
 class PersonalContactInfoSerializer(serializers.Serializer):
