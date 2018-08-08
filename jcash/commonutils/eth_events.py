@@ -6,6 +6,7 @@ from dateutil.tz import tzlocal
 from web3.utils.filters import construct_event_topic_set
 from web3.utils.events import get_event_data
 from web3.contract import ContractEvents
+from web3 import Web3
 
 from .eth_utils import create_web3
 
@@ -86,15 +87,15 @@ def get_replenishers(
         logs = web3.eth.getFilterLogs(filter.filter_id)
 
         for log_entry in logs:
-            block_number = log_entry['blockNumber']
-            block_data = web3.eth.getBlock(block_number)
+            log_block_number = log_entry['blockNumber']
+            block_data = web3.eth.getBlock(log_block_number)
             transaction_hash = HexBytes(log_entry['transactionHash']).hex()
             mined_at = datetime.fromtimestamp(block_data.timestamp, tzlocal())
             evnt_args = get_event_data(event_abi, log_entry)
 
-            if evnt_args.args['permission'] == 'replenish_eth':
+            if evnt_args.args['permission'] == Web3.sha3(text='replenish_eth'):
                 result.append((transaction_hash,
-                               block_number,
+                               log_block_number,
                                mined_at,
                                event_name,
                                evnt_args.args['manager'].lower()))
