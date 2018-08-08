@@ -688,6 +688,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     reciprocal_amount = serializers.SerializerMethodField()
     reciprocal_amount_actual = serializers.SerializerMethodField()
     rate = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
     round_digits = serializers.SerializerMethodField()
 
     class Meta:
@@ -702,6 +703,12 @@ class ApplicationsSerializer(serializers.ModelSerializer):
             obj.currency_pair.reciprocal_currency
 
         return rec_currency.round_digits
+
+    def get_status(self, obj):
+        if obj.status == str(ApplicationStatus.refunded):
+            return str(ApplicationStatus.cancelled)
+        else:
+            return obj.status
 
     def get_rate(self, obj):
         rate = obj.rate
