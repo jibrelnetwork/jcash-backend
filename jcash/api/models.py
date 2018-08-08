@@ -852,6 +852,7 @@ class ApplicationCancelReason:
     cancelled_by_contract = ObjStatus('cancelled_by_contract', 'Cancelled due to execution error')
     cancelled_by_currency_balance = ObjStatus('cancelled_by_currency_balance', 'Cancelled by currency limits')
     cancelled_by_currency_limits = ObjStatus('cancelled_by_currency_limits', 'Cancelled by currency limits')
+    not_enough_jnt = ObjStatus('not_enough_jnt', 'Not enough JNT')
 
 
 # Application

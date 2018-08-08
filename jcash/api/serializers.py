@@ -1067,7 +1067,7 @@ class ApplicationSerializer(serializers.Serializer):
                                       currency_pair.reciprocal_currency.is_erc20_token)
 
         if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
-            raise serializers.ValidationError(_('No enough JNT'))
+            raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
 
         attrs['is_reverse_operation'] = is_reverse_operation
 
