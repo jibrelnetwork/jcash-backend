@@ -19,14 +19,17 @@ from jcash.settings import (
 from jcash.api.models import Refund, Exchange, TransactionStatus
 
 
-def __waitTxConfirmation(tx_id):
+def __waitTxConfirmation(tx_id, blocks_confirm_num=None):
     pollingInterval = 2
     maxTimeoutSec = 5 * 60
     maxTimeoutBlocks = 20
 
     web3 = create_web3()
 
-    if ETH_TX__BLOCKS_CONFIRM_NUM <= 0:
+    if not blocks_confirm_num:
+        blocks_confirm_num = ETH_TX__BLOCKS_CONFIRM_NUM
+
+    if blocks_confirm_num <= 0:
         return
 
     startTime  = time.time()
@@ -76,9 +79,9 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
     return _tx_id
 
 
-def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -> str:
+def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key, blocks_confirm_num=None) -> str:
     _tx_id = __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key)
-    __waitTxConfirmation(_tx_id)
+    __waitTxConfirmation(_tx_id, blocks_confirm_num)
     return _tx_id
 
 
@@ -143,7 +146,8 @@ def admitUser(license_registry_address, user_address) -> str:
                                 ETH_MANAGER__ADDRESS,
                                 "admitUser",
                                 ( w3.toChecksumAddress(user_address), ),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
@@ -160,7 +164,8 @@ def denyUser(license_registry_address, user_address) -> str:
                                 ETH_MANAGER__ADDRESS,
                                 "denyUser",
                                 ( w3.toChecksumAddress(user_address), ),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
@@ -178,7 +183,8 @@ def grantUserLicense(license_registry_address, user_address, license_name, expir
                                 ETH_MANAGER__ADDRESS,
                                 "grantUserLicense",
                                 ( w3.toChecksumAddress(user_address), license_name, expiration_time),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
@@ -196,7 +202,8 @@ def revokeUserLicense(license_registry_address, user_address, license_name) -> s
                                 ETH_MANAGER__ADDRESS,
                                 "revokeUserLicense",
                                 ( w3.toChecksumAddress(user_address), license_name ),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
