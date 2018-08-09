@@ -510,7 +510,7 @@ def fetch_currencies_state():
     try:
         logging.getLogger(__name__).info("Start to fetch currencies state")
 
-        currencies = Currency.objects.all()
+        currencies = Currency.objects.filter(is_disabled=False)
 
         for currency in currencies:
             with transaction.atomic():
@@ -756,7 +756,8 @@ def fetch_replenisher():
         logging.getLogger(__name__).info("Start to fetch replenishers")
 
         try:
-            eth_currency = Currency.objects.get(symbol__icontains='eth')
+            eth_currency = Currency.objects.get(Q(symbol__icontains='eth') &
+                                                ~Q(is_disabled=True))
             try:
                 last_event = Replenisher.objects.latest('block_height')
                 last_block = last_event.block_height + 1

@@ -740,6 +740,7 @@ class Currency(models.Model):
     round_digits = models.IntegerField(null=False, default=8)
     min_limit = models.FloatField(null=False, default=0.0)
     max_limit = models.FloatField(null=False, default=999999999.0)
+    is_disabled = models.BooleanField(default=True)
 
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
