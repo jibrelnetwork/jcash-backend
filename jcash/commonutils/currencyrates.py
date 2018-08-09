@@ -3,6 +3,7 @@ from django.db import transaction
 import logging
 import sys
 import traceback
+from dateutil.tz import tzutc
 
 from .bitfinex import Bitfinex
 from .alphavantage import Alphavantage
@@ -71,16 +72,21 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
         bitfinex = Bitfinex()
         ticker_data_base = bitfinex.get_ticker("{}{}".format(currency_pair.base_currency.symbol, usd_symbol).lower())
 
-        alphavanatage = Alphavantage()
-        ticker_data_recip = alphavanatage.get_price(usd_symbol, currency_pair.reciprocal_currency.symbol)
+        ticker_data_recip = None
+        try:
+            alphavanatage = Alphavantage()
+            ticker_data_recip = alphavanatage.get_price(usd_symbol, currency_pair.reciprocal_currency.symbol)
+        except:
+            logging.getLogger(__name__).info("Fetch currency rate failed from Alphavantage API for symbol '{}/{}'."
+                                              .format(currency_pair.base_currency.display_name, usd_symbol))
 
         if not "bid" in ticker_data_base.keys() or not "timestamp" in ticker_data_base.keys():
-            logging.getLogger(__name__).error("Invalid response from Bitfinex API for symbol '{}/{}'."
+            logging.getLogger(__name__).info("Invalid response from Bitfinex API for symbol '{}/{}'."
                                               .format(currency_pair.base_currency.display_name, usd_symbol))
             return
 
         if not ticker_data_recip or len(ticker_data_recip)!=2:
-            logging.getLogger(__name__).error("Invalid response from Alphavantage API for symbol '{}/{}'."
+            logging.getLogger(__name__).info("Invalid response from Alphavantage API for symbol '{}/{}'."
                                               .format(usd_symbol, currency_pair.reciprocal_currency.display_name))
             return
 
@@ -95,7 +101,14 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
 
         with transaction.atomic():
             currency_pair_rate = CurrencyPairRate.objects.create(currency_pair=currency_pair,
-                                                                 created_at=price_pair_datetime,
+                                                                 created_at=datetime(price_pair_datetime.year,
+                                                                                     price_pair_datetime.month,
+                                                                                     price_pair_datetime.day,
+                                                                                     price_pair_datetime.hour,
+                                                                                     price_pair_datetime.minute,
+                                                                                     price_pair_datetime.second,
+                                                                                     price_pair_datetime.microsecond,
+                                                                                     tzinfo=tzutc()),
                                                                  buy_price=price_pair_value_buy,
                                                                  sell_price=price_pair_value_sell)
             currency_pair_rate.save()

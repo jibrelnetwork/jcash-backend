@@ -83,6 +83,7 @@ from jcash.api.serializers import (
     ValidatePasswordSerializer,
 )
 from jcash.commonutils import currencyrates, math, notify
+from jcash.commonutils.db_utils import require_lock
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
 
 
@@ -609,6 +610,8 @@ class ApplicationView(GenericAPIView):
         applications = ApplicationsSerializer(applications_qs, many=True).data
         return Response({"success": True, "application": applications})
 
+    @transaction.atomic
+    @require_lock(Application, 'ROW SHARE')
     def post(self, request):
         is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
         if not is_have_exchange_rights:

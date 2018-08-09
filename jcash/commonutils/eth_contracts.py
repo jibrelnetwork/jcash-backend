@@ -11,6 +11,7 @@ from jcash.settings import (
     ETH_NODE__CHAIN_ID,
     ETH_MANAGER__PRIVATE_KEY,
     ETH_MANAGER__ADDRESS,
+    ETH_JNT_VIEW__ADDRESS,
     ETH_EXCHANGER__PRIVATE_KEY,
     ETH_EXCHANGER__ADDRESS,
     ETH_LICENSE_REGISTRY_MANAGEMENT__ABI
@@ -18,14 +19,17 @@ from jcash.settings import (
 from jcash.api.models import Refund, Exchange, TransactionStatus
 
 
-def __waitTxConfirmation(tx_id):
+def __waitTxConfirmation(tx_id, blocks_confirm_num=None):
     pollingInterval = 2
     maxTimeoutSec = 5 * 60
     maxTimeoutBlocks = 20
 
     web3 = create_web3()
 
-    if ETH_TX__BLOCKS_CONFIRM_NUM <= 0:
+    if not blocks_confirm_num:
+        blocks_confirm_num = ETH_TX__BLOCKS_CONFIRM_NUM
+
+    if blocks_confirm_num <= 0:
         return
 
     startTime  = time.time()
@@ -62,7 +66,7 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
     _tx_gas_limit = 300000 #contract_func(*_args).estimateGas()
 
     if _nonce is None:
-        _nonce = web3.eth.getTransactionCount(_from)
+        _nonce = web3.eth.getTransactionCount(web3.toChecksumAddress(_from))
 
     _txn = contract_func(*_args).buildTransaction({'chainId': ETH_NODE__CHAIN_ID,
                                                   'gas': _tx_gas_limit,
@@ -75,26 +79,38 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
     return _tx_id
 
 
-def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key) -> str:
+def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key, blocks_confirm_num=None) -> str:
     _tx_id = __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key)
-    __waitTxConfirmation(_tx_id)
+    __waitTxConfirmation(_tx_id, blocks_confirm_num)
     return _tx_id
 
 
-def balanceEth(abi, contract_address) -> float:
+def balanceEth(holder_address) -> float:
     web3 = create_web3()
 
-    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
-    res = contract.functions.balanceEth().call()
+    res = web3.eth.getBalance(web3.toChecksumAddress(holder_address))
 
     return web3.fromWei(res, 'ether')
 
 
-def balanceToken(abi, contract_address, token_address) -> float:
+def balanceToken(abi, contract_address, holder_address) -> float:
     web3 = create_web3()
 
     contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
-    res = contract.functions.balanceToken(web3.toChecksumAddress(token_address)).call()
+    res = contract.functions.balanceOf(web3.toChecksumAddress(holder_address)).call()
+
+    return web3.fromWei(res, 'ether')
+
+
+def balanceJnt(abi, holder_address) -> float:
+    return balanceToken(abi, ETH_JNT_VIEW__ADDRESS, holder_address)
+
+
+def feeJNT(abi, contract_address, is_token=False):
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.getActionPrice('transfer_token' if is_token else 'transfer_eth').call()
 
     return web3.fromWei(res, 'ether')
 
@@ -130,7 +146,8 @@ def admitUser(license_registry_address, user_address) -> str:
                                 ETH_MANAGER__ADDRESS,
                                 "admitUser",
                                 ( w3.toChecksumAddress(user_address), ),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
@@ -147,7 +164,8 @@ def denyUser(license_registry_address, user_address) -> str:
                                 ETH_MANAGER__ADDRESS,
                                 "denyUser",
                                 ( w3.toChecksumAddress(user_address), ),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
@@ -165,7 +183,8 @@ def grantUserLicense(license_registry_address, user_address, license_name, expir
                                 ETH_MANAGER__ADDRESS,
                                 "grantUserLicense",
                                 ( w3.toChecksumAddress(user_address), license_name, expiration_time),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 
@@ -183,7 +202,8 @@ def revokeUserLicense(license_registry_address, user_address, license_name) -> s
                                 ETH_MANAGER__ADDRESS,
                                 "revokeUserLicense",
                                 ( w3.toChecksumAddress(user_address), license_name ),
-                                ETH_MANAGER__PRIVATE_KEY)
+                                ETH_MANAGER__PRIVATE_KEY,
+                                1)
     return _tx_id
 
 

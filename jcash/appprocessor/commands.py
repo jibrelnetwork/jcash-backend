@@ -381,7 +381,7 @@ def fetch_eth_events():
         events = eth_events.get_incoming_txs(currency.view_address if currency.is_erc20_token else currency.exchanger_address,
                                              currency.exchanger_address,
                                              currency.abi,
-                                                'Transfer' if currency.is_erc20_token else 'ReceiveEvent',
+                                                'Transfer' if currency.is_erc20_token else 'ReceiveEthEvent',
                                              last_block)
         try:
             with transaction.atomic():
@@ -487,6 +487,14 @@ def process_applications():
                     application.status = str(ApplicationStatus.cancelled)
                     application.reason = str(ApplicationCancelReason.cancelled_by_timeout)
                     application.save()
+                    notify.send_email_exchange_unsuccessful(
+                        application.user.email,
+                        notify._format_fiat_value(application.base_amount_actual,
+                                                  application.base_currency),
+                        ApplicationCancelReason.__dict__[application.reason].description \
+                            if application.reason in ApplicationCancelReason.__dict__ \
+                            else "An unexpected error occured",
+                        user_id=application.user.pk)
                     logger.info('cancel application {}'.format(application.pk))
 
         except:
@@ -502,17 +510,16 @@ def fetch_currencies_state():
     try:
         logging.getLogger(__name__).info("Start to fetch currencies state")
 
-        currencies = Currency.objects.all()
+        currencies = Currency.objects.filter(is_disabled=False)
 
         for currency in currencies:
             with transaction.atomic():
                 if currency.is_erc20_token:
                     currency.balance = eth_contracts.balanceToken(currency.abi,
-                                                                  currency.exchanger_address,
-                                                                  currency.view_address)
+                                                                  currency.view_address,
+                                                                  currency.exchanger_address)
                 else:
-                    currency.balance = eth_contracts.balanceEth(currency.abi,
-                                                                currency.exchanger_address)
+                    currency.balance = eth_contracts.balanceEth(currency.exchanger_address)
                 currency.save()
                 logging.getLogger(__name__).info("Currency balance is {}".format(currency.balance))
 
@@ -675,9 +682,32 @@ def check_outgoing_transactions(txs, is_refund = False):
                     if tx.application is not None:
                         if is_refund:
                             tx.application.status = str(ApplicationStatus.refunded)
+                            notify.send_email_refund_successful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                tx.application.address.address,
+                                ApplicationCancelReason.__dict__[tx.application.reason].description \
+                                    if tx.application.reason in ApplicationCancelReason.__dict__ \
+                                    else "An unexpected error occured",
+                                user_id=tx.application.user.pk)
                         else:
                             tx.application.status = str(ApplicationStatus.converted)
                             ga_integration.on_exchange_completed(tx.application)
+                            notify.send_email_exchange_successful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                notify._format_fiat_value(tx.application.reciprocal_amount_actual,
+                                                          tx.application.reciprocal_currency),
+                                tx.application.address.address,
+                                notify._format_conversion_rate(
+                                    tx.application.rate if not tx.application.is_reverse else \
+                                        1.0 / tx.application.rate,
+                                    'ETH',
+                                    tx.application.base_currency if tx.application.is_reverse else \
+                                        tx.application.reciprocal_currency),
+                                user_id=tx.application.user.pk)
                         tx.application.save()
                 elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail
@@ -685,6 +715,14 @@ def check_outgoing_transactions(txs, is_refund = False):
                         tx.application.status = str(ApplicationStatus.cancelled)
                         tx.application.reason = str(ApplicationCancelReason.cancelled_by_contract)
                         tx.application.save()
+                        notify.send_email_exchange_unsuccessful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                ApplicationCancelReason.__dict__[tx.application.reason].description \
+                                    if tx.application.reason in ApplicationCancelReason.__dict__ \
+                                    else "An unexpected error occured",
+                                user_id=tx.application.user.pk)
                     logger.info('outgoing transaction {} (is_refund: {}) failed'
                                 .format(tx.transaction_id, is_refund))
                 tx.save()
@@ -718,7 +756,8 @@ def fetch_replenisher():
         logging.getLogger(__name__).info("Start to fetch replenishers")
 
         try:
-            eth_currency = Currency.objects.get(symbol__icontains='eth')
+            eth_currency = Currency.objects.get(Q(symbol__icontains='eth') &
+                                                ~Q(is_disabled=True))
             try:
                 last_event = Replenisher.objects.latest('block_height')
                 last_block = last_event.block_height + 1
@@ -730,7 +769,7 @@ def fetch_replenisher():
                 for evnt in events:
                     tx_hash, block_height, mined_at, evnt_type, evnt_address = evnt
 
-                    if evnt_type == "ReplenisherDisabledEvent":
+                    if evnt_type == "ManagerPermissionRevokedEvent":
                         try:
                             replenisher = Replenisher.objects.filter(address__iexact=evnt_address).latest('block_height')
                             replenisher.is_removed = True
