@@ -63,7 +63,7 @@ def __sendRawTx(_abi, _to, _from, _functionName, _args, _from_priv_key, _nonce =
     _tx_gas_limit = 300000 #contract_func(*_args).estimateGas()
 
     if _nonce is None:
-        _nonce = web3.eth.getTransactionCount(_from)
+        _nonce = web3.eth.getTransactionCount(web3.toChecksumAddress(_from))
 
     _txn = contract_func(*_args).buildTransaction({'chainId': ETH_NODE__CHAIN_ID,
                                                   'gas': _tx_gas_limit,

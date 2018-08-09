@@ -8,4 +8,4 @@ def create_web3() -> Web3:
 
 
 def get_exchanger_nonce() -> int:
-    return create_web3().eth.getTransactionCount(ETH_EXCHANGER__ADDRESS)
+    return create_web3().eth.getTransactionCount(Web3.toChecksumAddress(ETH_EXCHANGER__ADDRESS))
