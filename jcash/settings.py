@@ -336,7 +336,7 @@ ETH_EXCHANGER__PRIVATE_KEY = os.getenv('ETH_EXCHANGER_PRIVATE_KEY', '')
 ETH_EXCHANGER__ADDRESS = os.getenv('ETH_EXCHANGER_ADDRESS', '')
 ETH_JNT_VIEW__ADDRESS = os.getenv('ETH_JNT_VIEW_ADDRESS', '')
 ETH_TX__GAZ_MULTIPLICATOR = os.getenv('ETH_TX_GAZ_MULTIPLICATOR', 1.2)
-ETH_TX__BLOCKS_CONFIRM_NUM = os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5)
+ETH_TX__BLOCKS_CONFIRM_NUM = int(os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5))
 ETH_TX__MAX_PENDING_TX_COUNT = os.getenv('ETH_TX_MAX_PENDING_TX_COUNT', 10)
 ETH_LICENSE_REGISTRY_MANAGEMENT__ABI =  b'[{"constant": true, ' \
                                         b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
