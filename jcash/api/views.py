@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model, logout as django_logout
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
 from rest_framework_extensions.cache.decorators import cache_response
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
@@ -234,7 +235,9 @@ class CurrencyView(APIView):
     serializer_class = CurrencySerializer
 
     def get(self, request):
-        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
+        currency_pairs = CurrencyPair.objects.filter(Q(is_exchangeable=True) &
+                                                     Q(base_currency__is_disabled=False) &
+                                                     Q(reciprocal_currency__is_disabled=False))
 
         data = {"success": True, "currencies": []}
         for pair in currency_pairs:
@@ -276,14 +279,19 @@ class CurrencyRateView(GenericAPIView):
         serializer = CurrencyRateSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             is_reverse_operation = False
-            currency_pair = CurrencyPair.objects.filter(base_currency__display_name__iexact=serializer.validated_data['base_currency'],
-                                                         reciprocal_currency__display_name__iexact=serializer.validated_data['rec_currency']) \
+            currency_pair = CurrencyPair.objects.filter(Q(base_currency__display_name__iexact=serializer.validated_data['base_currency']) &
+                                                        Q(reciprocal_currency__display_name__iexact=serializer.validated_data['rec_currency']),
+                                                        Q(base_currency__is_disabled=False) &
+                                                        Q(reciprocal_currency__is_disabled=False)) \
                                                 .first()
 
             if not currency_pair:
                 currency_pair = CurrencyPair.objects.filter(
-                    base_currency__display_name__iexact=serializer.validated_data['rec_currency'],
-                    reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']).first()
+                    Q(base_currency__display_name__iexact=serializer.validated_data['rec_currency']) &
+                    Q(reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']) &
+                    Q(base_currency__is_disabled=False) &
+                    Q(reciprocal_currency__is_disabled=False)
+                ).first()
                 is_reverse_operation = True
 
             if not currency_pair:
