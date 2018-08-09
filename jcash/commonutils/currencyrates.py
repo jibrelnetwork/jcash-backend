@@ -3,6 +3,7 @@ from django.db import transaction
 import logging
 import sys
 import traceback
+from dateutil.tz import tzutc
 
 from .bitfinex import Bitfinex
 from .alphavantage import Alphavantage
@@ -100,7 +101,14 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
 
         with transaction.atomic():
             currency_pair_rate = CurrencyPairRate.objects.create(currency_pair=currency_pair,
-                                                                 created_at=price_pair_datetime,
+                                                                 created_at=datetime(price_pair_datetime.year,
+                                                                                     price_pair_datetime.month,
+                                                                                     price_pair_datetime.day,
+                                                                                     price_pair_datetime.hour,
+                                                                                     price_pair_datetime.minute,
+                                                                                     price_pair_datetime.second,
+                                                                                     price_pair_datetime.microsecond,
+                                                                                     tzinfo=tzutc()),
                                                                  buy_price=price_pair_value_buy,
                                                                  sell_price=price_pair_value_sell)
             currency_pair_rate.save()
