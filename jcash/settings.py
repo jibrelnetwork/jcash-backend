@@ -328,7 +328,7 @@ LOGIN_REDIRECT_URL = '/'
 BITFINEX__TIMEOUT = 1
 
 # Ethereum settings
-ETH_NODE__CHAIN_ID = os.getenv('ETH_NODE__CHAIN_ID', 3)
+ETH_NODE__CHAIN_ID = int(os.getenv('ETH_NODE__CHAIN_ID', 3))
 ETH_NODE__URL = os.getenv('ETH_NODE_URL', 'https://ropsten-node.jwallet.network')
 ETH_MANAGER__PRIVATE_KEY = os.getenv('ETH_MANAGER_PRIVATE_KEY', '')
 ETH_MANAGER__ADDRESS = os.getenv('ETH_MANAGER_ADDRESS', '')
