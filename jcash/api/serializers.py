@@ -666,7 +666,8 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "rate": 1810.0,
         "is_active": true
         "status": "created",
-        "reason": ""
+        "reason": "",
+        "round_digits": 2
     }]
     """
     app_uuid = serializers.SerializerMethodField()
@@ -679,13 +680,20 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     reciprocal_amount = serializers.SerializerMethodField()
     reciprocal_amount_actual = serializers.SerializerMethodField()
     rate = serializers.SerializerMethodField()
+    round_digits = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
-                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason')
+                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits')
+
+    def get_round_digits(self, obj):
+        rec_currency = obj.currency_pair.base_currency if obj.is_reverse else \
+            obj.currency_pair.reciprocal_currency
+
+        return rec_currency.round_digits
 
     def get_rate(self, obj):
         rate = obj.rate

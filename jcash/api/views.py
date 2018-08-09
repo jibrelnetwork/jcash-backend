@@ -261,7 +261,7 @@ class CurrencyRateView(GenericAPIView):
     ```
     {"success":true,
     "uuid":"eb5c4978-c70a-4572-9f58-72250fce6b3f",
-    "rate":1799.0, "base_amount":1.0, "rec_amount":1799.0}
+    "rate":1799.0, "base_amount":1.0, "rec_amount":1799.0, "round_digits":2}
     ```
 
     * Requires token authentication.
@@ -301,6 +301,10 @@ class CurrencyRateView(GenericAPIView):
             if is_reverse_operation:
                 currency_pair_rate_price = math.calc_reverse_rate(currency_pair_rate_price)
 
+            rec_currency = currency_pair.base_currency if is_reverse_operation else \
+                currency_pair.reciprocal_currency
+
+            rec_currency_round_digits = rec_currency.round_digits
             base_amount = 0.0
             rec_amount = 0.0
 
@@ -330,7 +334,8 @@ class CurrencyRateView(GenericAPIView):
                     "uuid": currency_pair_rate.id,
                     "rate": currency_pair_rate_price,
                     "rec_amount": rec_amount,
-                    "base_amount": base_amount}
+                    "base_amount": base_amount,
+                    "round_digits": rec_currency_round_digits}
             return Response(data)
 
 
