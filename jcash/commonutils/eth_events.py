@@ -93,7 +93,7 @@ def get_replenishers(
             mined_at = datetime.fromtimestamp(block_data.timestamp, tzlocal())
             evnt_args = get_event_data(event_abi, log_entry)
 
-            if evnt_args.args['permission'] == Web3.sha3(text='replenish_eth'):
+            if HexBytes(evnt_args.args['permission']) == Web3.sha3(text='replenish_eth'):
                 result.append((transaction_hash,
                                log_block_number,
                                mined_at,
