@@ -111,8 +111,8 @@ class ReadonlyMixin:
 @admin.register(Account)
 class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
-                    'verification_result', 'is_identity_verified', 'is_identity_declined',
-                    'is_blocked', 'account_actions']
+                    'verification_result', 'verification_report_link', 'is_identity_verified',
+                    'is_identity_declined', 'is_blocked', 'account_actions']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
     exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
                'country', 'street', 'town', 'postcode', 'terms_confirmed']
@@ -200,6 +200,15 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
             return doc_verification.onfido_check_result if doc_verification.onfido_check_result else '-'
         else:
             return '-'
+
+    def verification_report_link(self, obj):
+        link = '-'
+        if hasattr(obj.user, Account.rel_documentverification) and obj.user.documentverification.count() > 0:
+            doc_verification = obj.user.documentverification.latest('created_at')
+            if doc_verification.report and doc_verification.report.image:
+                link = format_html('<a href="{url}">report</a>', url=doc_verification.report.image.url)
+        return link
+    verification_report_link.allow_tags = True
 
     def account_actions(self, obj):
         return format_html(
@@ -322,7 +331,7 @@ class CurrencyAdmin(admin.ModelAdmin):
 class CurrencyPairAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'display_name', 'symbol', 'base_cur','rec_cur',
                     'is_exchangeable', 'is_buyable', 'is_sellable', 'buy_fee_percent',
-                    'sell_fee_percent']
+                    'sell_fee_percent', 'sort_id']
     search_fields = ['id', 'display_name', 'symbol']
     raw_id_fields = ('base_currency', 'reciprocal_currency')
     ordering = ('-id',)
@@ -351,7 +360,8 @@ class CurrencyPairRateAdmin(admin.ModelAdmin):
 @admin.register(Application)
 class ApplicationAdmin(admin.ModelAdmin):
     list_display = ['id', 'created_at', 'username', 'address', 'currency_name', 'currency_rate',
-                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount', 'reciprocal_amount', 'status']
+                    'base_currency', 'reciprocal_currency', 'rate', 'base_amount', 'reciprocal_amount',
+                    'status', 'reason']
     raw_id_fields = ('currency_pair_rate', 'address', 'user')
     ordering = ('-created_at',)
 

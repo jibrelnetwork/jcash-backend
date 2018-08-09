@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 from email.utils import formatdate
 from jinja2 import FileSystemLoader, Environment
+
 from jcash.api import models as api_models
 from jcash import settings as config
 
@@ -28,16 +29,16 @@ def _format_jnt_value_subject(value: float) -> str:
     return "{0:.0f}".format(int(value))
 
 
-def _format_fiat_value(value: float) -> str:
-    return "{0:.2f}".format(value)
+def _format_fiat_value(value: float, currency: str) -> str:
+    return "{0:.2f} {1:}".format(value, currency)
 
 
 def _format_coin_value(value: float) -> str:
     return "{0:.2f}".format(value)
 
 
-def _format_conversion_rate(value: float) -> str:
-    return "{0:.2f}".format(value)
+def _format_conversion_rate(value: float, base_cur: str, rec_cur: str) -> str:
+    return "1 {0:} = {1:.2f} {2:}".format(base_cur, value, rec_cur)
 
 
 def _format_date_period(start_date: datetime, end_date: datetime) -> str:
@@ -161,10 +162,35 @@ def _send_email_sendgrid(sender: str,
         "html": email_body
     }
 
-    template_logo = "jibrel_logo.png"
-    with open(Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, template_logo), 'rb') as f:
-        data['files[' + template_logo + ']'] = f.read()
-    data["content[" + template_logo + "]"] = template_logo
+    # jibrel logo
+    template_jibrel_logo = "jibrel-logo-for-email.png"
+    with open(Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, template_jibrel_logo), 'rb') as f:
+        data['files[' + template_jibrel_logo + ']'] = f.read()
+    data["content[" + template_jibrel_logo + "]"] = template_jibrel_logo
+
+    # facebook logo
+    template_facebook_logo = "facebook.png"
+    with open(Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, template_facebook_logo), 'rb') as f:
+        data['files[' + template_facebook_logo + ']'] = f.read()
+    data["content[" + template_facebook_logo + "]"] = template_facebook_logo
+
+    # linkdin logo
+    template_linkdin_logo = "linkdin.png"
+    with open(Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, template_linkdin_logo), 'rb') as f:
+        data['files[' + template_linkdin_logo + ']'] = f.read()
+    data["content[" + template_linkdin_logo + "]"] = template_linkdin_logo
+
+    # medium logo
+    template_medium_logo = "medium.png"
+    with open(Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, template_medium_logo), 'rb') as f:
+        data['files[' + template_medium_logo + ']'] = f.read()
+    data["content[" + template_medium_logo + "]"] = template_medium_logo
+
+    # twitter logo
+    template_twitter_logo = "twitter.png"
+    with open(Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, template_twitter_logo), 'rb') as f:
+        data['files[' + template_twitter_logo + ']'] = f.read()
+    data["content[" + template_twitter_logo + "]"] = template_twitter_logo
 
     # send data
     max_attempts = 2
@@ -250,8 +276,17 @@ def send_notification(notification_id):
     subject = notification.get_subject(notification.type, notification.meta)
     body = notification.get_body(notification.type, notification.meta)
     email_files = _format_email_files(
-    attachments_inline=[("jibrel_logo.png",
-                         Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, "jibrel_logo.png"))])
+    attachments_inline=[("jibrel-logo-for-email.png",
+                         Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, "jibrel-logo-for-email.png")),
+                        ("facebook.png",
+                         Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, "facebook.png")),
+                        ("linkdin.png",
+                         Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, "linkdin.png")),
+                        ("medium.png",
+                         Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, "medium.png")),
+                        ("twitter.png",
+                         Path(EMAIL_NOTIFICATIONS__TEMPLATES_PATH, "twitter.png"))
+                        ])
     logger.info('Sending notification for %s, type %s', notification.email, notification.type)
     return _send_email(
         notification.email,
@@ -262,26 +297,130 @@ def send_notification(notification_id):
     )
 
 
-def send_email_verify_email(email, activate_url, user_id=None):
-    ctx = {
-        'activate_url': activate_url,
+def company_links():
+    return {
+        'company_link': config.EMAIL_TEMPLATES__COMPANY_LINK,
+        'contact_support_link': config.EMAIL_TEMPLATES__CONTACT_SUPPORT_LINK,
+        'facebook_link': config.EMAIL_TEMPLATES__FACEBOOK_LINK,
+        'twitter_link': config.EMAIL_TEMPLATES__TWITTER_LINK,
+        'linkedin_link': config.EMAIL_TEMPLATES__LINKEDIN_LINK,
+        'medium_link': config.EMAIL_TEMPLATES__MEDIUM_LINK,
+        'email_support': config.EMAIL_TEMPLATES__EMAIL_SUPPORT,
     }
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.account_created, data=ctx)
 
 
-def send_email_reset_password(email, activate_url, user_id=None):
-    ctx = {
-        'activate_url': activate_url,
-    }
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.password_change_request, data=ctx)
+def send_email_exchange_request(email, base_curr, rec_curr, eth_address, fx_rate, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'base_curr': base_curr,
+        'rec_curr': rec_curr,
+        'eth_address': eth_address,
+        'fx_rate': fx_rate,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_request, data=ctx)
 
 
-def send_email_kyc_account_rejected(email, reason, user_id=None):
-    ctx = {
+def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_rate, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'base_curr': base_curr,
+        'rec_curr': rec_curr,
+        'eth_address': eth_address,
+        'fx_rate': fx_rate,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_successful, data=ctx)
+
+
+def send_email_exchange_unsuccessful(email, base_curr, reason, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'base_curr': base_curr,
         'reason': reason,
-    }
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.kyc_account_rejected, data=ctx)
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_unsuccessful, data=ctx)
+    pass
 
 
-def send_email_kyc_account_approved(email, user_id=None):
-    add_notification(email, user_id=user_id, type=api_models.NotificationType.kyc_account_approved, data={})
+def send_email_refund_successful(email, base_curr, eth_address, reason, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'base_curr': base_curr,
+        'eth_address': eth_address,
+        'reason': reason,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.refund_successful, data=ctx)
+
+
+def send_email_eth_address_added(email, eth_address, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'eth_address': eth_address,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.eth_address_added, data=ctx)
+
+
+def send_email_eth_address_removed(email, eth_address, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'eth_address': eth_address,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.eth_address_removed, data=ctx)
+
+
+def send_email_few_steps_away(email, jcash_url, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'activate_url': jcash_url,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.few_steps_away, data=ctx)
+
+
+def send_email_jcash_application_approved(email, jcash_url, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'activate_url': jcash_url,
+        'user_name': email,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_approved, data=ctx)
+
+
+def send_email_jcash_application_underway(email, user_id = None):
+    ctx = company_links()
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_underway, data=ctx)
+
+
+def send_email_jcash_application_unsuccessful(email, user_id = None):
+    ctx = company_links()
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_unsuccessful, data=ctx)
+
+
+# ToDo: device?, location?
+def send_email_new_login_detected(email, device, location, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'device': device,
+        'location': location,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.new_login_detected, data=ctx)
+
+
+def send_email_password_reset_confirmation(email, user_id = None):
+    ctx = company_links()
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset_confirmation, data=ctx)
+
+
+def send_email_password_reset(email, activate_url, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'activate_url': activate_url,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset, data=ctx)
+
+
+def send_email_verify_email(email, activate_url, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'activate_url': activate_url,
+        'user_name': email,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.verify_email, data=ctx)

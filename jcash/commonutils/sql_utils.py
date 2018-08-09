@@ -8,12 +8,13 @@ def generate_query_check_address_licenses() -> str:
                           (SELECT MAX(cur_la.{la_id}) FROM license_address AS cur_la 
                           GROUP BY cur_la.{la_curr_id}, cur_la.{la_addr_id}) 
                           ) AS licenses ON licenses.{la_addr_id}=a.{addr_id} AND licenses.{la_curr_id}=c.{curr_id} 
-               WHERE c.{curr_is_erc20_token} AND (a.{addr_is_removed}<>licenses.{la_is_remove_license} OR 
-                                           licenses.{la_is_remove_license} IS NULL);""" \
+               WHERE c.{curr_is_erc20_token} AND c.{curr_is_disabled}=false AND
+                     (a.{addr_is_removed}<>licenses.{la_is_remove_license} OR licenses.{la_is_remove_license} IS NULL);""" \
     .format(addr_id=Address.id.field_name,
             addr_is_removed=Address.is_removed.field_name,
             curr_id=Currency.id.field_name,
             curr_is_erc20_token=Currency.is_erc20_token.field_name,
+            curr_is_disabled=Currency.is_disabled.field_name,
             la_id=LicenseAddress.id.field_name,
             la_addr_id=LicenseAddress.address.field.column,
             la_curr_id=LicenseAddress.currency.field.column,

@@ -28,9 +28,18 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
+    ApplicationCancelReason,
 )
-from jcash.commonutils import eth_sign, eth_address, math, currencyrates, ga_integration, exchange_utils as utils
-from jcash.commonutils.notify import send_email_reset_password
+from jcash.commonutils import (
+    eth_sign,
+    eth_address,
+    eth_contracts,
+    math,
+    currencyrates,
+    ga_integration,
+    exchange_utils as utils
+)
+from jcash.commonutils import notify
 from jcash.settings import (
     FRONTEND_URL,
     LOGIC__EXPIRATION_LIMIT_SEC,
@@ -358,7 +367,7 @@ class CustomPasswordResetForm(PasswordResetForm):
         """
         activate_url = FRONTEND_URL+'/auth/recovery/confirm/{uid}/{token}'.format(**context)
         logger.info("{} {}".format(to_email, activate_url))
-        send_email_reset_password(to_email, activate_url, None)
+        notify.send_email_password_reset(to_email, activate_url, None)
 
 
 class CustomPasswordResetSerializer(PasswordResetSerializer):
@@ -530,6 +539,8 @@ class CustomPasswordResetConfirmSerializer(serializers.Serializer):
 
     def save(self):
         logger.info('PasswordResetConfirm: successfully confirmed user: {}'.format(self.user.username))
+        notify.send_email_password_reset_confirmation(self.user.email if self.user else None,
+                                                      self.user.pk if self.user else None)
         return self.set_password_form.save()
 
 
@@ -663,6 +674,8 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "rate": 1810.0,
         "is_active": true
         "status": "created",
+        "reason": "",
+        "round_digits": 2
     }]
     """
     app_uuid = serializers.SerializerMethodField()
@@ -675,13 +688,27 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     reciprocal_amount = serializers.SerializerMethodField()
     reciprocal_amount_actual = serializers.SerializerMethodField()
     rate = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    round_digits = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
-                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse')
+                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits')
+
+    def get_round_digits(self, obj):
+        rec_currency = obj.currency_pair.base_currency if obj.is_reverse else \
+            obj.currency_pair.reciprocal_currency
+
+        return rec_currency.round_digits
+
+    def get_status(self, obj):
+        if obj.status == str(ApplicationStatus.refunded):
+            return str(ApplicationStatus.cancelled)
+        else:
+            return obj.status
 
     def get_rate(self, obj):
         rate = obj.rate
@@ -852,6 +879,9 @@ class RemoveAddressSerializer(serializers.Serializer):
         with transaction.atomic():
             address.is_removed = True
             address.save()
+            notify.send_email_eth_address_removed(address.user.email if address.user else None,
+                                                  address.address,
+                                                  address.user.id if address.user else None)
 
     def validate(self, attrs):
         user = self.context.get('user')
@@ -903,6 +933,9 @@ class AddressSerializer(serializers.Serializer):
             address_verify = AddressVerify.objects.create(address=address,
                                                           message=self.generate_message(address))
             address_verify.save()
+            notify.send_email_eth_address_added(user.email if user else None,
+                                                address.address,
+                                                user.id if user else None)
 
         self.validated_data['message'] = address_verify.message
         self.validated_data['uuid'] = address_verify.id
@@ -1036,6 +1069,16 @@ class ApplicationSerializer(serializers.Serializer):
                         currency_pair.reciprocal_currency) < attrs['reciprocal_amount']:
             raise serializers.ValidationError(_('Exchange value is too large'))
 
+        try:
+            feeJNT = eth_contracts.feeJNT(currency_pair.reciprocal_currency.abi,
+                                          currency_pair.reciprocal_currency.exchanger_address,
+                                          currency_pair.reciprocal_currency.is_erc20_token)
+
+            if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
+                raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
+        except:
+            raise serializers.ValidationError(_('Server error'))
+
         attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs
@@ -1060,6 +1103,20 @@ class ApplicationSerializer(serializers.Serializer):
                                                      expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC))
             application.save()
             self.validated_data['application_id'] = application.pk
+            notify.send_email_exchange_request(
+                user.email,
+                notify._format_fiat_value(self.validated_data['base_amount'],
+                                          self.validated_data['base_currency']),
+                notify._format_fiat_value(self.validated_data['reciprocal_amount'],
+                                          self.validated_data['rec_currency']),
+                self.validated_data['address'],
+                notify._format_conversion_rate(
+                    self.validated_data['rate'] if not self.validated_data['is_reverse_operation'] else \
+                        1.0 / self.validated_data['rate'],
+                    'ETH',
+                    self.validated_data['base_currency'] if self.validated_data['is_reverse_operation'] else \
+                        self.validated_data['rec_currency']),
+                user_id=user.pk)
 
 
 class ApplicationRefundSerializer(serializers.Serializer):
@@ -1081,6 +1138,7 @@ class ApplicationRefundSerializer(serializers.Serializer):
         with transaction.atomic():
             if self.application:
                 self.application.status = str(ApplicationStatus.refunding)
+                self.application.reason = str(ApplicationCancelReason.cancelled_by_user)
                 self.application.save()
 
 
@@ -1152,8 +1210,17 @@ class ApplicationCancelSerializer(serializers.Serializer):
         with transaction.atomic():
             if self.application:
                 self.application.status = str(ApplicationStatus.cancelled)
+                self.application.reason = str(ApplicationCancelReason.cancelled_by_user)
                 self.application.is_active = False
                 self.application.save()
+                notify.send_email_exchange_unsuccessful(
+                    self.application.user.email,
+                    notify._format_fiat_value(self.application.base_amount_actual,
+                                              self.application.base_currency),
+                    ApplicationCancelReason.__dict__[self.application.reason].description \
+                        if self.application.reason in ApplicationCancelReason.__dict__ \
+                        else "An unexpected error occured",
+                    user_id=self.application.user.pk)
 
 
 class PersonalContactInfoSerializer(serializers.Serializer):
@@ -1369,6 +1436,7 @@ class PersonalDocumentsSerializer(serializers.Serializer):
 
             doc_verification.save()
             ga_integration.on_status_registration_complete(personal.account)
+            notify.send_email_jcash_application_underway(personal.account.user.email, personal.account.user.pk)
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1725,6 +1793,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
 
             doc_verification.save()
             ga_integration.on_status_registration_complete(corporate.account)
+            notify.send_email_jcash_application_underway(corporate.account.user.email, corporate.account.user.pk)
 
 
 class CorporateSerializer(serializers.ModelSerializer):

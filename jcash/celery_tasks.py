@@ -138,9 +138,9 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_process_all_uncomplete_verifications,
                              expires=1 * 60,
                              name='process_all_uncomplete_verifications')
-    sender.add_periodic_task(crontab(minute='*/1'),
+    sender.add_periodic_task(15,
                              celery_process_license_users_addresses,
-                             expires=1 * 60,
+                             expires=5 * 60,
                              name='process_license_users_addresses')
     sender.add_periodic_task(crontab(minute='*/1'),
                              celery_process_applications,

@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model, logout as django_logout
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
 from rest_framework_extensions.cache.decorators import cache_response
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
@@ -40,6 +41,7 @@ from jcash.api.models import (
     CurrencyPair,
     Application,
     ApplicationStatus,
+    ApplicationCancelReason,
     ObjStatus,
     Country,
     CountryType,
@@ -81,8 +83,9 @@ from jcash.api.serializers import (
     CheckTokenSerializer,
     ValidatePasswordSerializer,
 )
-from jcash.commonutils import currencyrates, math
-from jcash.settings import LOGIC__MAX_ADDRESSES_NUM
+from jcash.commonutils import currencyrates, math, notify
+from jcash.commonutils.db_utils import require_lock
+from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
 
 
 logger = logging.getLogger(__name__)
@@ -232,7 +235,9 @@ class CurrencyView(APIView):
     serializer_class = CurrencySerializer
 
     def get(self, request):
-        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
+        currency_pairs = CurrencyPair.objects.filter(Q(is_exchangeable=True) &
+                                                     Q(base_currency__is_disabled=False) &
+                                                     Q(reciprocal_currency__is_disabled=False))
 
         data = {"success": True, "currencies": []}
         for pair in currency_pairs:
@@ -260,7 +265,7 @@ class CurrencyRateView(GenericAPIView):
     ```
     {"success":true,
     "uuid":"eb5c4978-c70a-4572-9f58-72250fce6b3f",
-    "rate":1799.0, "base_amount":1.0, "rec_amount":1799.0}
+    "rate":1799.0, "base_amount":1.0, "rec_amount":1799.0, "round_digits":2}
     ```
 
     * Requires token authentication.
@@ -274,20 +279,28 @@ class CurrencyRateView(GenericAPIView):
         serializer = CurrencyRateSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             is_reverse_operation = False
-            currency_pair = CurrencyPair.objects.filter(base_currency__display_name__iexact=serializer.validated_data['base_currency'],
-                                                         reciprocal_currency__display_name__iexact=serializer.validated_data['rec_currency']) \
+            currency_pair = CurrencyPair.objects.filter(Q(base_currency__display_name__iexact=serializer.validated_data['base_currency']) &
+                                                        Q(reciprocal_currency__display_name__iexact=serializer.validated_data['rec_currency']),
+                                                        Q(base_currency__is_disabled=False) &
+                                                        Q(reciprocal_currency__is_disabled=False)) \
                                                 .first()
 
             if not currency_pair:
                 currency_pair = CurrencyPair.objects.filter(
-                    base_currency__display_name__iexact=serializer.validated_data['rec_currency'],
-                    reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']).first()
+                    Q(base_currency__display_name__iexact=serializer.validated_data['rec_currency']) &
+                    Q(reciprocal_currency__display_name__iexact=serializer.validated_data['base_currency']) &
+                    Q(base_currency__is_disabled=False) &
+                    Q(reciprocal_currency__is_disabled=False)
+                ).first()
                 is_reverse_operation = True
 
             if not currency_pair:
                 return Response({'success': False, 'error': "Currency does not exists."}, status=400)
 
-            currency_pair_rate = currency_pair.currency_pair_rates.latest('created_at')
+            currency_pair_rate = None
+
+            if hasattr(currency_pair, 'currency_pair_rates') and currency_pair.currency_pair_rates.count() > 0:
+                currency_pair_rate = currency_pair.currency_pair_rates.latest('created_at')
 
             if not currency_pair_rate:
                 return Response({'success': False, 'error': "Currency price does not exists."}, status=400)
@@ -297,6 +310,10 @@ class CurrencyRateView(GenericAPIView):
             if is_reverse_operation:
                 currency_pair_rate_price = math.calc_reverse_rate(currency_pair_rate_price)
 
+            rec_currency = currency_pair.base_currency if is_reverse_operation else \
+                currency_pair.reciprocal_currency
+
+            rec_currency_round_digits = rec_currency.round_digits
             base_amount = 0.0
             rec_amount = 0.0
 
@@ -326,7 +343,8 @@ class CurrencyRateView(GenericAPIView):
                     "uuid": currency_pair_rate.id,
                     "rate": currency_pair_rate_price,
                     "rec_amount": rec_amount,
-                    "base_amount": base_amount}
+                    "base_amount": base_amount,
+                    "round_digits": rec_currency_round_digits}
             return Response(data)
 
 
@@ -337,7 +355,7 @@ class CurrencyRatesView(GenericAPIView):
     Response example:
 
     ```
-    {"success":true,"currencies":[{"base_currency":"ETH","rec_currency":"jAED","rate_buy":1799.0,"rate_sell":1798.0}]}
+    {"success":true,"currencies":[{"id":1,"base_currency":"ETH","rec_currency":"jAED","rate_buy":1799.0,"rate_sell":1798.0}]}
     ```
     """
 
@@ -346,10 +364,13 @@ class CurrencyRatesView(GenericAPIView):
 
     @cache_response(20)
     def get(self, request):
-        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True)
+        currency_pairs = CurrencyPair.objects.filter(is_exchangeable=True).order_by('sort_id')
         currencies = []
         for pair in currency_pairs:
-            last_rate = pair.currency_pair_rates.latest('created_at')
+            last_rate = None
+            if hasattr(pair, 'currency_pair_rates') and \
+                    pair.currency_pair_rates.count() > 0:
+                last_rate = pair.currency_pair_rates.latest('created_at')
 
             rate_buy = 0.0
             rate_sell = 0.0
@@ -358,7 +379,8 @@ class CurrencyRatesView(GenericAPIView):
                 rate_buy = last_rate.buy_price
                 rate_sell = last_rate.sell_price
 
-            currencies.append({"base_currency": pair.base_currency.display_name,
+            currencies.append({"id": pair.sort_id,
+                               "base_currency": pair.base_currency.display_name,
                                "rec_currency": pair.reciprocal_currency.display_name,
                                "rate_buy": rate_buy,
                                "rate_sell": rate_sell})
@@ -535,7 +557,8 @@ class CustomUserDetailsView(APIView):
         return Response({'success':True, 'username':request.user.username, 'email':request.user.email})
 
 
-@docstring_parameter(get_status_class_members(ApplicationStatus))
+@docstring_parameter(get_status_class_members(ApplicationStatus),
+                     get_status_class_members(ApplicationCancelReason))
 class ApplicationView(GenericAPIView):
     """
     View get/set exchange application.
@@ -567,13 +590,19 @@ class ApplicationView(GenericAPIView):
     "rate": 1799,
     "is_active": true,
     "is_reverse": false,
-    "status": "converting"
+    "status": "converting",
+    "reason": ""
     }}]}}
     ```
 
     **Statuses**
 
     {0}
+
+
+    **Reasons**
+
+    {1}
 
     post:
     Create a new exchange application for current user.
@@ -589,6 +618,8 @@ class ApplicationView(GenericAPIView):
         applications = ApplicationsSerializer(applications_qs, many=True).data
         return Response({"success": True, "application": applications})
 
+    @transaction.atomic
+    @require_lock(Application, 'ROW SHARE')
     def post(self, request):
         is_have_exchange_rights, error = Account.check_exchange_rights(request.user)
         if not is_have_exchange_rights:
@@ -602,7 +633,8 @@ class ApplicationView(GenericAPIView):
             return Response({"success": False, "error": serializer.errors})
 
 
-@docstring_parameter(get_status_class_members(ApplicationStatus))
+@docstring_parameter(get_status_class_members(ApplicationStatus),
+                     get_status_class_members(ApplicationCancelReason))
 class ApplicationDetailView(GenericAPIView):
     """
     View get exchange application.
@@ -633,13 +665,18 @@ class ApplicationDetailView(GenericAPIView):
     "rate": 1799,
     "is_active": true,
     "is_reverse": false,
-    "status": "converting"
+    "status": "converting",
+    "reason": ""
     }}}}
     ```
 
     **Statuses**
 
     {0}
+
+    **Reasons**
+
+    {1}
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -914,6 +951,11 @@ class CustomVerifyEmailView(VerifyEmailView):
             return Response({'success': False, 'error': 'failed'}, status=404)
 
         confirmation.confirm(self.request)
+        notify.send_email_few_steps_away(confirmation.email_address.user.email \
+                                             if confirmation.email_address.user else None,
+                                         FRONTEND_URL,
+                                         confirmation.email_address.user.pk \
+                                             if confirmation.email_address.user else None)
         return Response({'success': True}, status=status.HTTP_200_OK)
 
 

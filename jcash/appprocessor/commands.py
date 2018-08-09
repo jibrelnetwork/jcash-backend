@@ -8,9 +8,14 @@ import time
 from django.db import transaction
 from django.db.models import Q, F, Count, Max
 from django.utils import timezone
+from django.core.files import File
+from django.core.files.temp import NamedTemporaryFile
+import requests
 
 from jcash.api.models import (
     Document,
+    DocumentType,
+    DocumentHelper,
     Notification,
     IncomingTransaction,
     Currency,
@@ -27,6 +32,7 @@ from jcash.api.models import (
     LicenseAddressStatus,
     Personal,
     Corporate,
+    ApplicationCancelReason,
 )
 from jcash.commonutils import (
     notify,
@@ -46,7 +52,8 @@ from jcash.settings import (
     LOGIC__MAX_DIFF_PERCENT,
     LOGIC__EXPIRATION_LIMIT_SEC,
     LOGIC__REFUND_FEE_PERCENT,
-    ETH_TX__MAX_PENDING_TX_COUNT
+    ETH_TX__MAX_PENDING_TX_COUNT,
+    ONFIDO_API_KEY,
 )
 
 
@@ -81,6 +88,32 @@ def get_customer_by_document_verification(document_verification: DocumentVerific
     return None
 
 
+def download_onfido_report(document_verification, url):
+    """
+    Save onfido report into DB
+    """
+    r = requests.get(url, headers = {'Authorization': 'Token token={}'.format(ONFIDO_API_KEY)})
+
+    if r.status_code == 200:
+        tmp_file = NamedTemporaryFile(delete=True)
+        tmp_file.write(r.content)
+        tmp_file.flush()
+
+        try:
+            if not document_verification.report:
+                document_verification.report = Document.objects.create(user=document_verification.user,
+                                                                       type=DocumentType.report,
+                                                                       ext='html')
+
+                document_verification.report.image.save(DocumentHelper.unique_document_filename(None, 'report.html'),
+                                                        File(tmp_file))
+        except:
+            logger.error('download_onfido_report: failed saving report into DB (verification:{})'
+                         .format(document_verification.pk))
+    else:
+        logger.info('download_onfido_report: failed downloading report from {}'.format(url))
+
+
 def check_document_verification_status(document_verification_id):
     """
     Check and store OnFido check status and result
@@ -99,6 +132,8 @@ def check_document_verification_status(document_verification_id):
             logger.info('Document verification status is: %s, result: %s', check.status, check.result)
             document_verification.onfido_check_status = check.status
             document_verification.onfido_check_result = check.result
+            if check.download_uri:
+                download_onfido_report(document_verification, check.download_uri)
             document_verification.save()
 
 
@@ -289,12 +324,14 @@ def process_linked_unconfirmed_events():
                         utils.get_currency_balance(in_tx.application.currency_pair.base_currency) < \
                             math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.application.reason = str(ApplicationCancelReason.cancelled_by_currency_balance)
                         in_tx.status = TransactionStatus.rejected
                     #check that incoming tx value is not greater then currency balance (nonreversed exchange operation)
                     elif not in_tx.application.is_reverse and \
                         utils.get_currency_balance(in_tx.application.currency_pair.reciprocal_currency) < \
                             math.calc_reciprocal_amount(in_tx.value, in_tx.application.rate):
                         in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.application.reason = str(ApplicationCancelReason.cancelled_by_currency_balance)
                         in_tx.status = TransactionStatus.rejected
                     # check that absolute difference of incoming tx value and application value is not greater then
                     # backend setting (LOGIC__MAX_DIFF_PERCENT)
@@ -309,6 +346,7 @@ def process_linked_unconfirmed_events():
                                                    in_tx.application.is_reverse,
                                                    True):
                         in_tx.application.status = str(ApplicationStatus.refunding)
+                        in_tx.application.reason = str(ApplicationCancelReason.cancelled_by_currency_limits)
                         in_tx.status = TransactionStatus.rejected
                 elif tx_info[0] is None:
                     in_tx.application_id = None
@@ -343,7 +381,7 @@ def fetch_eth_events():
         events = eth_events.get_incoming_txs(currency.view_address if currency.is_erc20_token else currency.exchanger_address,
                                              currency.exchanger_address,
                                              currency.abi,
-                                                'Transfer' if currency.is_erc20_token else 'ReceiveEvent',
+                                                'Transfer' if currency.is_erc20_token else 'ReceiveEthEvent',
                                              last_block)
         try:
             with transaction.atomic():
@@ -409,6 +447,7 @@ def process_applications():
                 if application.status == str(ApplicationStatus.confirming):
                     if datetime.now(tzlocal()) > application.expired_at:
                         application.status = str(ApplicationStatus.refunding)
+                        application.reason = str(ApplicationCancelReason.cancelled_by_timeout)
                         application.is_active = False
                         application.save()
                 elif application.status == str(ApplicationStatus.refunding):
@@ -446,7 +485,16 @@ def process_applications():
                         application.expired_at < datetime.now(tzlocal()) and \
                         application.is_active:
                     application.status = str(ApplicationStatus.cancelled)
+                    application.reason = str(ApplicationCancelReason.cancelled_by_timeout)
                     application.save()
+                    notify.send_email_exchange_unsuccessful(
+                        application.user.email,
+                        notify._format_fiat_value(application.base_amount_actual,
+                                                  application.base_currency),
+                        ApplicationCancelReason.__dict__[application.reason].description \
+                            if application.reason in ApplicationCancelReason.__dict__ \
+                            else "An unexpected error occured",
+                        user_id=application.user.pk)
                     logger.info('cancel application {}'.format(application.pk))
 
         except:
@@ -462,17 +510,16 @@ def fetch_currencies_state():
     try:
         logging.getLogger(__name__).info("Start to fetch currencies state")
 
-        currencies = Currency.objects.all()
+        currencies = Currency.objects.filter(is_disabled=False)
 
         for currency in currencies:
             with transaction.atomic():
                 if currency.is_erc20_token:
                     currency.balance = eth_contracts.balanceToken(currency.abi,
-                                                                  currency.exchanger_address,
-                                                                  currency.view_address)
+                                                                  currency.view_address,
+                                                                  currency.exchanger_address)
                 else:
-                    currency.balance = eth_contracts.balanceEth(currency.abi,
-                                                                currency.exchanger_address)
+                    currency.balance = eth_contracts.balanceEth(currency.exchanger_address)
                 currency.save()
                 logging.getLogger(__name__).info("Currency balance is {}".format(currency.balance))
 
@@ -487,7 +534,7 @@ def process_license_users_addresses():
     # noinspection PyBroadException
     try:
         logger.info('Start to process license users addresses')
-        license_limit_count = 3
+        license_limit_count = 1
         license_addresses = LicenseAddress.objects.filter(Q(status=LicenseAddressStatus.created)).order_by(
             'id'
         )[:license_limit_count]  # type: List[LicenseAddress]
@@ -635,12 +682,47 @@ def check_outgoing_transactions(txs, is_refund = False):
                     if tx.application is not None:
                         if is_refund:
                             tx.application.status = str(ApplicationStatus.refunded)
+                            notify.send_email_refund_successful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                tx.application.address.address,
+                                ApplicationCancelReason.__dict__[tx.application.reason].description \
+                                    if tx.application.reason in ApplicationCancelReason.__dict__ \
+                                    else "An unexpected error occured",
+                                user_id=tx.application.user.pk)
                         else:
                             tx.application.status = str(ApplicationStatus.converted)
                             ga_integration.on_exchange_completed(tx.application)
+                            notify.send_email_exchange_successful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                notify._format_fiat_value(tx.application.reciprocal_amount_actual,
+                                                          tx.application.reciprocal_currency),
+                                tx.application.address.address,
+                                notify._format_conversion_rate(
+                                    tx.application.rate if not tx.application.is_reverse else \
+                                        1.0 / tx.application.rate,
+                                    'ETH',
+                                    tx.application.base_currency if tx.application.is_reverse else \
+                                        tx.application.reciprocal_currency),
+                                user_id=tx.application.user.pk)
                         tx.application.save()
                 elif tx_info.status == 0:
                     tx.status = TransactionStatus.fail
+                    if tx.application is not None:
+                        tx.application.status = str(ApplicationStatus.cancelled)
+                        tx.application.reason = str(ApplicationCancelReason.cancelled_by_contract)
+                        tx.application.save()
+                        notify.send_email_exchange_unsuccessful(
+                                tx.application.user.email,
+                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                                          tx.application.base_currency),
+                                ApplicationCancelReason.__dict__[tx.application.reason].description \
+                                    if tx.application.reason in ApplicationCancelReason.__dict__ \
+                                    else "An unexpected error occured",
+                                user_id=tx.application.user.pk)
                     logger.info('outgoing transaction {} (is_refund: {}) failed'
                                 .format(tx.transaction_id, is_refund))
                 tx.save()
@@ -674,7 +756,8 @@ def fetch_replenisher():
         logging.getLogger(__name__).info("Start to fetch replenishers")
 
         try:
-            eth_currency = Currency.objects.get(symbol__icontains='eth')
+            eth_currency = Currency.objects.get(Q(symbol__icontains='eth') &
+                                                ~Q(is_disabled=True))
             try:
                 last_event = Replenisher.objects.latest('block_height')
                 last_block = last_event.block_height + 1
@@ -686,7 +769,7 @@ def fetch_replenisher():
                 for evnt in events:
                     tx_hash, block_height, mined_at, evnt_type, evnt_address = evnt
 
-                    if evnt_type == "ReplenisherDisabledEvent":
+                    if evnt_type == "ManagerPermissionRevokedEvent":
                         try:
                             replenisher = Replenisher.objects.filter(address__iexact=evnt_address).latest('block_height')
                             replenisher.is_removed = True

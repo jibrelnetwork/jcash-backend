@@ -283,6 +283,15 @@ EMAIL_NOTIFICATIONS__SUPPORT_ADDRESS = 'support@jibrel'
 EMAIL_NOTIFICATIONS__MAX_ATTEMPTS = 3
 EMAIL_NOTIFICATIONS__SENDGRID_DOMAINS = ["yahoo", "sina.cn", "increw.com.au", "moeboard.net", "hanmail.net", "daum.net"]
 
+# Email templates
+EMAIL_TEMPLATES__COMPANY_LINK = os.getenv('EMAIL_TEMPLATES_COMPANY_LINK', 'https://jibrel.network')
+EMAIL_TEMPLATES__FACEBOOK_LINK = os.getenv('EMAIL_TEMPLATES_FACEBOOK_LINK', 'https://www.facebook.com/jibrelnetwork')
+EMAIL_TEMPLATES__TWITTER_LINK = os.getenv('EMAIL_TEMPLATES_TWITTER_LINK', 'https://twitter.com/JibrelNetwork')
+EMAIL_TEMPLATES__LINKEDIN_LINK = os.getenv('EMAIL_TEMPLATES_LINKEDIN_LINK', 'https://www.linkedin.com/company/jibrel-network/')
+EMAIL_TEMPLATES__MEDIUM_LINK = os.getenv('EMAIL_TEMPLATES_MEDIUM_LINK', 'https://medium.com/@jibrelnetwork')
+EMAIL_TEMPLATES__CONTACT_SUPPORT_LINK = os.getenv('EMAIL_TEMPLATES_CONTACT_SUPPORT_LINK', 'https://jibrelnetwork.freshdesk.com/support/tickets/new')
+EMAIL_TEMPLATES__EMAIL_SUPPORT = os.getenv('EMAIL_TEMPLATES_EMAIL_SUPPORT', 'support@jibrel.network')
+
 # Force scanning address
 FORCE_SCANNING_ADDRESS__ENABLED = True
 FORCE_SCANNING_ADDRESS__EMAIL_RECIPIENT = 'Jibrel Presale <presale@jibrel.network>'
@@ -301,7 +310,7 @@ LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)
 LOGIC__MAX_VERIFICATION_ATTEMPTS = os.getenv('LOGIC_MAX_VERIFICATION_ATTEMPTS', 3)
 LOGIC__MAX_DIFF_PERCENT = os.getenv('LOGIC_MAX_DIFF_PERCENT', 1.0)
 LOGIC__MAX_ADDRESSES_NUM = os.getenv('LOGIC_MAX_ADDRESSES_NUM', 5)
-LOGIC__REFUND_FEE_PERCENT = os.getenv('LOGIC_REFUND_FEE_PERCENT', 1.0)
+LOGIC__REFUND_FEE_PERCENT = os.getenv('LOGIC_REFUND_FEE_PERCENT', 0.0)
 LOGIC__OUT_OF_DATE_PRICE_SEC = os.getenv('LOGIC_OUT_OF_DATE_PRICE_SEC', 10*60)
 LOGIC__ADDRESS_VERIFY_TEXT = os.getenv('LOGIC_ADDRESS_VERIFY_TEXT',
     "I, {} {}, hereby confirm that I and only I own and have access to the private key of the address {}. Date: {} UTC")
@@ -319,14 +328,15 @@ LOGIN_REDIRECT_URL = '/'
 BITFINEX__TIMEOUT = 1
 
 # Ethereum settings
-ETH_NODE__CHAIN_ID = os.getenv('ETH_NODE__CHAIN_ID', 3)
+ETH_NODE__CHAIN_ID = int(os.getenv('ETH_NODE__CHAIN_ID', 3))
 ETH_NODE__URL = os.getenv('ETH_NODE_URL', 'https://ropsten-node.jwallet.network')
 ETH_MANAGER__PRIVATE_KEY = os.getenv('ETH_MANAGER_PRIVATE_KEY', '')
 ETH_MANAGER__ADDRESS = os.getenv('ETH_MANAGER_ADDRESS', '')
 ETH_EXCHANGER__PRIVATE_KEY = os.getenv('ETH_EXCHANGER_PRIVATE_KEY', '')
 ETH_EXCHANGER__ADDRESS = os.getenv('ETH_EXCHANGER_ADDRESS', '')
+ETH_JNT_VIEW__ADDRESS = os.getenv('ETH_JNT_VIEW_ADDRESS', '')
 ETH_TX__GAZ_MULTIPLICATOR = os.getenv('ETH_TX_GAZ_MULTIPLICATOR', 1.2)
-ETH_TX__BLOCKS_CONFIRM_NUM = os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5)
+ETH_TX__BLOCKS_CONFIRM_NUM = int(os.getenv('ETH_TX_BLOCKS_CONFIRM_NUM', 5))
 ETH_TX__MAX_PENDING_TX_COUNT = os.getenv('ETH_TX_MAX_PENDING_TX_COUNT', 10)
 ETH_LICENSE_REGISTRY_MANAGEMENT__ABI =  b'[{"constant": true, ' \
                                         b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
