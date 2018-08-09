@@ -1069,12 +1069,15 @@ class ApplicationSerializer(serializers.Serializer):
                         currency_pair.reciprocal_currency) < attrs['reciprocal_amount']:
             raise serializers.ValidationError(_('Exchange value is too large'))
 
-        feeJNT = eth_contracts.feeJNT(currency_pair.reciprocal_currency.abi,
-                                      currency_pair.reciprocal_currency.exchanger_address,
-                                      currency_pair.reciprocal_currency.is_erc20_token)
+        try:
+            feeJNT = eth_contracts.feeJNT(currency_pair.reciprocal_currency.abi,
+                                          currency_pair.reciprocal_currency.exchanger_address,
+                                          currency_pair.reciprocal_currency.is_erc20_token)
 
-        if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
-            raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
+            if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
+                raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
+        except:
+            raise serializers.ValidationError(_('Server error'))
 
         attrs['is_reverse_operation'] = is_reverse_operation
 
