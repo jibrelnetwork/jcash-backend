@@ -97,8 +97,10 @@ def get_status_class_members(obj):
                                 getattr(getattr(obj,attr), 'description'))
 
     _obj = obj()
+
     return ", ".join([get_description(_obj, attr) for attr in dir(_obj) \
-                         if not callable(getattr(_obj, attr)) and not attr.startswith("__")])
+                      if not callable(getattr(_obj, attr)) and not attr.startswith("__") and \
+                      (not hasattr(getattr(obj, attr), 'hide') or not getattr(obj, attr).hide)])
 
 
 def docstring_parameter(*sub):
@@ -591,7 +593,8 @@ class ApplicationView(GenericAPIView):
     "is_active": true,
     "is_reverse": false,
     "status": "converting",
-    "reason": ""
+    "reason": "",
+    "round_digits": 2
     }}]}}
     ```
 
@@ -606,6 +609,19 @@ class ApplicationView(GenericAPIView):
 
     post:
     Create a new exchange application for current user.
+
+    Response example:
+
+    ```{{"success":true, "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b"]}}```
+
+    or
+
+    ```{{"success":false, "error": "error_description"}}```
+
+    ```{{"success":false, "errors": {{"jnt": ["not_enough_jnt"]}}}}```
+
+
+    * Requires token authentication.
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -666,7 +682,8 @@ class ApplicationDetailView(GenericAPIView):
     "is_active": true,
     "is_reverse": false,
     "status": "converting",
-    "reason": ""
+    "reason": "",
+    "round_digits": 2
     }}}}
     ```
 
