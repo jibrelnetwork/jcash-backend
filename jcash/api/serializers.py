@@ -1051,6 +1051,8 @@ class ApplicationSerializer(serializers.Serializer):
                                                  currency_pair,
                                                  is_reverse_operation,
                                                  True)
+        if attrs['base_amount'] == 0.0:
+            raise serializers.ValidationError(_('A valid number is required.'))
 
         if not math.check_amount_min_limit(attrs['base_amount'], currency_pair, is_reverse_operation, True):
             raise serializers.ValidationError(_('Exchange value is under-limit'))
