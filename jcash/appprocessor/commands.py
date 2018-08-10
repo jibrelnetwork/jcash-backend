@@ -211,9 +211,17 @@ def verify_document(document_verification_id):
 
                 email = document_verification.user.email
                 if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
-                    applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
-                    customer.onfido_applicant_id = applicant_id
-                    customer.save()
+                    applicant_id = ''
+                    try:
+                        applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
+                    except:
+                        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+                        logging.getLogger(__name__).info("Failed to create onfido applicant {}{}{}{} due to error:\n{}"
+                                                          .format(first_name, last_name, email, birtday, exception_str))
+                    else:
+                        customer.onfido_applicant_id = applicant_id
+                        customer.save()
+
                 logger.info('Applicant %s created for %s',
                             customer.onfido_applicant_id,
                             document_verification.user.username)
