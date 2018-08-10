@@ -514,6 +514,7 @@ LOGGING = {
         'loggers': {
             '': {'handlers': appHandlers, 'level': appLogLevel, 'propagate': False},
             'sqlalchemy': {'handlers': appHandlers, 'level': sqlAlchemyLogLevel, 'propagate': False},
+            'django.db.backends': {'handlers': appHandlers, 'level': 'DEBUG', 'propagate': False},
         },
     }
 

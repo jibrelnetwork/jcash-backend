@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 
 # ObjStatus
 class ObjStatus:
-    def __init__(self, name, description):
+    def __init__(self, name, description, hide=False):
         self.name = name
         self.description = description
+        self.hide = hide
 
     def __repr__(self):
         return self.name
@@ -837,13 +838,13 @@ class Replenisher(models.Model):
 # ApplicationStatus
 class ApplicationStatus:
     created = ObjStatus('created', 'new application')
-    cancelled = ObjStatus('cancelled', 'user clicked back')
+    cancelled = ObjStatus('cancelled', 'cancelled application')
     waiting = ObjStatus('waiting', 'waiting for user tx')
     confirming = ObjStatus('confirming', 'we received unexpected value (and CAN go further)')
     converting = ObjStatus('converting', 'we sent tx but it was not mined')
     converted = ObjStatus('converted', 'converted, tx is mined')
     refunding = ObjStatus('refunding', 'clicked "No, refund" (tx is in progress, not mined yet)')
-    refunded = ObjStatus('refunded', 'refunded, tx is mined')
+    refunded = ObjStatus('refunded', 'refunded, tx is mined', True)
 
 
 # ApplicationCancelReason

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from dateutil.tz import tzlocal
 
 from django.db import transaction
@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model, authenticate, password_validatio
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.sites.models import Site
+from django.core.validators import MinValueValidator
 from django.utils.http import urlsafe_base64_decode as uid_decoder
 from django.utils import timezone, dateformat
 from django.utils.encoding import force_text
@@ -22,6 +23,7 @@ from rest_framework import serializers, exceptions
 from rest_framework.fields import CurrentUserDefault
 import requests
 
+from jcash.api.fields import CustomDateField
 from jcash.api.models import (
     Address, Account, Document,
     DocumentHelper, AddressVerify, Application, CurrencyPair, ApplicationStatus,
@@ -30,6 +32,7 @@ from jcash.api.models import (
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
     ApplicationCancelReason,
 )
+from jcash.api.validators import MinAgeValidator
 from jcash.commonutils import (
     eth_sign,
     eth_address,
@@ -1051,6 +1054,8 @@ class ApplicationSerializer(serializers.Serializer):
                                                  currency_pair,
                                                  is_reverse_operation,
                                                  True)
+        if attrs['base_amount'] == 0.0:
+            raise serializers.ValidationError(_('A valid number is required.'))
 
         if not math.check_amount_min_limit(attrs['base_amount'], currency_pair, is_reverse_operation, True):
             raise serializers.ValidationError(_('Exchange value is under-limit'))
@@ -1231,7 +1236,12 @@ class PersonalContactInfoSerializer(serializers.Serializer):
                                      min_length=1)
     nationality = serializers.CharField(required=True, max_length=PersonalFieldLength.nationality,
                                         min_length=1)
-    birthday = serializers.DateField(required=True)
+    birthday = CustomDateField(
+        required=True,
+        validators=[
+            MinAgeValidator(18),
+            MinValueValidator(date(1900, 1, 1), message="Require year >= 1900.")
+        ])
     phone = serializers.CharField(required=True, max_length=PersonalFieldLength.phone,
                                   min_length=1)
 
@@ -1642,7 +1652,12 @@ class CorporateContactInfoSerializer(serializers.Serializer):
     """
     fullname = serializers.CharField(required=True,max_length=CorporateFieldLength.fullname,
                                      min_length=1)
-    birthday = serializers.DateField(required=True)
+    birthday = CustomDateField(
+        required=True,
+        validators=[
+            MinAgeValidator(18),
+            MinValueValidator(date(1900, 1, 1), message="Require year >= 1900.")
+        ])
     email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
                                    min_length=1)
     phone = serializers.CharField(required=True, max_length=CorporateFieldLength.phone,
