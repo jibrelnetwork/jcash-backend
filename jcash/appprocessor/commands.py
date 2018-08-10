@@ -171,7 +171,7 @@ def upload_document(document, user_name, onfido_applicant_id):
         else:
             document.onfido_document_id = document_id
             document.save()
-        logger.info('Document for %s type: %s uploaded: %s', user_name, document.type, document_id)
+            logger.info('Document for %s type: %s uploaded: %s', user_name, document.type, document_id)
     else:
         logger.info('Document for %s type: %s already uploaded: %s', user_name, document.type, document.onfido_document_id)
 
