@@ -157,9 +157,20 @@ def upload_document(document, user_name, onfido_applicant_id):
     Upload document to onfido
     """
     if not document.onfido_document_id:
-        document_id = person_verify.upload_document(onfido_applicant_id, document.image.path, document.ext, document.type)
-        document.onfido_document_id = document_id
-        document.save()
+        try:
+            document_id = person_verify.upload_document(onfido_applicant_id,
+                                                        document.image.path,
+                                                        document.ext,
+                                                        document.type)
+        except:
+            exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+            logging.getLogger(__name__).info(
+                "Failed to upload document aplic_id:{} doc_id:{} doc_type:{} onto onfido  due to error:\n{}"
+                    .format(onfido_applicant_id, document.pk, document.type, exception_str)
+            )
+        else:
+            document.onfido_document_id = document_id
+            document.save()
         logger.info('Document for %s type: %s uploaded: %s', user_name, document.type, document_id)
     else:
         logger.info('Document for %s type: %s already uploaded: %s', user_name, document.type, document.onfido_document_id)
@@ -211,7 +222,6 @@ def verify_document(document_verification_id):
 
                 email = document_verification.user.email
                 if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
-                    applicant_id = ''
                     try:
                         applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
                     except:
