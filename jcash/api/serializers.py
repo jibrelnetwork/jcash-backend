@@ -1041,6 +1041,7 @@ class ApplicationSerializer(serializers.Serializer):
             raise serializers.ValidationError(_('Wrong currency price.'))
 
         if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > LOGIC__OUT_OF_DATE_PRICE_SEC:
+            logger.error('Сurrency price {} is out of date'.format(currency_pair.display_name))
             raise serializers.ValidationError(_('Сurrency price is out of date.'))
 
         currency_pair_rate_price = currencyrates.get_currency_pair_rate(currency_pair_rate, is_reverse_operation)
