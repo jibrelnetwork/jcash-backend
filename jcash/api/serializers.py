@@ -1079,11 +1079,11 @@ class ApplicationSerializer(serializers.Serializer):
             feeJNT = eth_contracts.feeJNT(currency_pair.reciprocal_currency.abi,
                                           currency_pair.reciprocal_currency.exchanger_address,
                                           currency_pair.reciprocal_currency.is_erc20_token)
-
-            if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
-                raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
         except:
             raise serializers.ValidationError(_('Server error'))
+        else:
+            if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
+                raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
 
         attrs['is_reverse_operation'] = is_reverse_operation
 

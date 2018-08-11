@@ -228,6 +228,7 @@ def verify_document(document_verification_id):
                         exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
                         logging.getLogger(__name__).info("Failed to create onfido applicant {}{}{}{} due to error:\n{}"
                                                           .format(first_name, last_name, email, birtday, exception_str))
+                        return
                     else:
                         customer.onfido_applicant_id = applicant_id
                         customer.save()
@@ -385,7 +386,7 @@ def fetch_eth_events():
     replenisher_entries = Replenisher.objects.filter(is_removed=False)
     replenishers = [replenisher.address.lower() for replenisher in replenisher_entries]
 
-    currencies = Currency.objects.all()
+    currencies = Currency.objects.filter(is_disabled=False)
     for currency in currencies:
         if len(replenishers) == 0:
             break
