@@ -157,10 +157,21 @@ def upload_document(document, user_name, onfido_applicant_id):
     Upload document to onfido
     """
     if not document.onfido_document_id:
-        document_id = person_verify.upload_document(onfido_applicant_id, document.image.path, document.ext, document.type)
-        document.onfido_document_id = document_id
-        document.save()
-        logger.info('Document for %s type: %s uploaded: %s', user_name, document.type, document_id)
+        try:
+            document_id = person_verify.upload_document(onfido_applicant_id,
+                                                        document.image.path,
+                                                        document.ext,
+                                                        document.type)
+        except:
+            exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+            logging.getLogger(__name__).info(
+                "Failed to upload document aplic_id:{} doc_id:{} doc_type:{} onto onfido  due to error:\n{}"
+                    .format(onfido_applicant_id, document.pk, document.type, exception_str)
+            )
+        else:
+            document.onfido_document_id = document_id
+            document.save()
+            logger.info('Document for %s type: %s uploaded: %s', user_name, document.type, document_id)
     else:
         logger.info('Document for %s type: %s already uploaded: %s', user_name, document.type, document.onfido_document_id)
 
@@ -211,9 +222,17 @@ def verify_document(document_verification_id):
 
                 email = document_verification.user.email
                 if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
-                    applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
-                    customer.onfido_applicant_id = applicant_id
-                    customer.save()
+                    try:
+                        applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
+                    except:
+                        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+                        logging.getLogger(__name__).info("Failed to create onfido applicant {}{}{}{} due to error:\n{}"
+                                                          .format(first_name, last_name, email, birtday, exception_str))
+                        return
+                    else:
+                        customer.onfido_applicant_id = applicant_id
+                        customer.save()
+
                 logger.info('Applicant %s created for %s',
                             customer.onfido_applicant_id,
                             document_verification.user.username)
@@ -367,7 +386,7 @@ def fetch_eth_events():
     replenisher_entries = Replenisher.objects.filter(is_removed=False)
     replenishers = [replenisher.address.lower() for replenisher in replenisher_entries]
 
-    currencies = Currency.objects.all()
+    currencies = Currency.objects.filter(is_disabled=False)
     for currency in currencies:
         if len(replenishers) == 0:
             break
@@ -489,7 +508,7 @@ def process_applications():
                     application.save()
                     notify.send_email_exchange_unsuccessful(
                         application.user.email,
-                        notify._format_fiat_value(application.base_amount_actual,
+                        notify._format_float_value(application.base_amount_actual,
                                                   application.base_currency),
                         ApplicationCancelReason.__dict__[application.reason].description \
                             if application.reason in ApplicationCancelReason.__dict__ \
@@ -684,7 +703,7 @@ def check_outgoing_transactions(txs, is_refund = False):
                             tx.application.status = str(ApplicationStatus.refunded)
                             notify.send_email_refund_successful(
                                 tx.application.user.email,
-                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                notify._format_float_value(tx.application.base_amount_actual,
                                                           tx.application.base_currency),
                                 tx.application.address.address,
                                 ApplicationCancelReason.__dict__[tx.application.reason].description \
@@ -696,14 +715,14 @@ def check_outgoing_transactions(txs, is_refund = False):
                             ga_integration.on_exchange_completed(tx.application)
                             notify.send_email_exchange_successful(
                                 tx.application.user.email,
-                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                notify._format_float_value(tx.application.base_amount_actual,
                                                           tx.application.base_currency),
-                                notify._format_fiat_value(tx.application.reciprocal_amount_actual,
+                                notify._format_float_value(tx.application.reciprocal_amount_actual,
                                                           tx.application.reciprocal_currency),
                                 tx.application.address.address,
                                 notify._format_conversion_rate(
-                                    tx.application.rate if not tx.application.is_reverse else \
-                                        1.0 / tx.application.rate,
+                                    math._roundDown(tx.application.rate, 2) if not tx.application.is_reverse else \
+                                        math._roundUp(1.0 / tx.application.rate, 2),
                                     'ETH',
                                     tx.application.base_currency if tx.application.is_reverse else \
                                         tx.application.reciprocal_currency),
@@ -717,7 +736,7 @@ def check_outgoing_transactions(txs, is_refund = False):
                         tx.application.save()
                         notify.send_email_exchange_unsuccessful(
                                 tx.application.user.email,
-                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                notify._format_float_value(tx.application.base_amount_actual,
                                                           tx.application.base_currency),
                                 ApplicationCancelReason.__dict__[tx.application.reason].description \
                                     if tx.application.reason in ApplicationCancelReason.__dict__ \

@@ -69,8 +69,13 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
                                                       currency_pair.reciprocal_currency.display_name))
             return
 
-        bitfinex = Bitfinex()
-        ticker_data_base = bitfinex.get_ticker("{}{}".format(currency_pair.base_currency.symbol, usd_symbol).lower())
+        ticker_data_base = None
+        try:
+            bitfinex = Bitfinex()
+            ticker_data_base = bitfinex.get_ticker("{}{}".format(currency_pair.base_currency.symbol, usd_symbol).lower())
+        except:
+            logging.getLogger(__name__).info("Fetch currency rate failed from Bitfinex API for symbol '{}/{}'."
+                                             .format(currency_pair.base_currency.display_name, usd_symbol))
 
         ticker_data_recip = None
         try:
@@ -78,9 +83,11 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
             ticker_data_recip = alphavanatage.get_price(usd_symbol, currency_pair.reciprocal_currency.symbol)
         except:
             logging.getLogger(__name__).info("Fetch currency rate failed from Alphavantage API for symbol '{}/{}'."
-                                              .format(currency_pair.base_currency.display_name, usd_symbol))
+                                              .format(currency_pair.reciprocal_currency.display_name, usd_symbol))
 
-        if not "bid" in ticker_data_base.keys() or not "timestamp" in ticker_data_base.keys():
+        if not ticker_data_base or \
+            not "bid" in ticker_data_base.keys() or \
+                not "timestamp" in ticker_data_base.keys():
             logging.getLogger(__name__).info("Invalid response from Bitfinex API for symbol '{}/{}'."
                                               .format(currency_pair.base_currency.display_name, usd_symbol))
             return

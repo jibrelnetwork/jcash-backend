@@ -97,8 +97,10 @@ def get_status_class_members(obj):
                                 getattr(getattr(obj,attr), 'description'))
 
     _obj = obj()
+
     return ", ".join([get_description(_obj, attr) for attr in dir(_obj) \
-                         if not callable(getattr(_obj, attr)) and not attr.startswith("__")])
+                      if not callable(getattr(_obj, attr)) and not attr.startswith("__") and \
+                      (not hasattr(getattr(obj, attr), 'hide') or not getattr(obj, attr).hide)])
 
 
 def docstring_parameter(*sub):
@@ -265,6 +267,7 @@ class CurrencyRateView(GenericAPIView):
     ```
     {"success":true,
     "uuid":"eb5c4978-c70a-4572-9f58-72250fce6b3f",
+    "is_reverse": false,
     "rate":1799.0, "base_amount":1.0, "rec_amount":1799.0, "round_digits":2}
     ```
 
@@ -341,10 +344,12 @@ class CurrencyRateView(GenericAPIView):
 
             data = {"success": True,
                     "uuid": currency_pair_rate.id,
-                    "rate": currency_pair_rate_price,
+                    "rate": math.calc_reverse_rate(currency_pair_rate_price) if is_reverse_operation else \
+                        currency_pair_rate_price,
                     "rec_amount": rec_amount,
                     "base_amount": base_amount,
-                    "round_digits": rec_currency_round_digits}
+                    "round_digits": rec_currency_round_digits,
+                    "is_reverse": is_reverse_operation}
             return Response(data)
 
 
@@ -591,7 +596,8 @@ class ApplicationView(GenericAPIView):
     "is_active": true,
     "is_reverse": false,
     "status": "converting",
-    "reason": ""
+    "reason": "",
+    "round_digits": 2
     }}]}}
     ```
 
@@ -606,6 +612,19 @@ class ApplicationView(GenericAPIView):
 
     post:
     Create a new exchange application for current user.
+
+    Response example:
+
+    ```{{"success":true, "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b"]}}```
+
+    or
+
+    ```{{"success":false, "error": "error_description"}}```
+
+    ```{{"success":false, "errors": {{"jnt": ["not_enough_jnt"]}}}}```
+
+
+    * Requires token authentication.
     """
 
     authentication_classes = (authentication.TokenAuthentication,)
@@ -666,7 +685,8 @@ class ApplicationDetailView(GenericAPIView):
     "is_active": true,
     "is_reverse": false,
     "status": "converting",
-    "reason": ""
+    "reason": "",
+    "round_digits": 2
     }}}}
     ```
 

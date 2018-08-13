@@ -1041,6 +1041,7 @@ class ApplicationSerializer(serializers.Serializer):
             raise serializers.ValidationError(_('Wrong currency price.'))
 
         if abs((datetime.now(tzlocal()) - currency_pair_rate.created_at).seconds) > LOGIC__OUT_OF_DATE_PRICE_SEC:
+            logger.error('Сurrency price {} is out of date'.format(currency_pair.display_name))
             raise serializers.ValidationError(_('Сurrency price is out of date.'))
 
         currency_pair_rate_price = currencyrates.get_currency_pair_rate(currency_pair_rate, is_reverse_operation)
@@ -1078,11 +1079,11 @@ class ApplicationSerializer(serializers.Serializer):
             feeJNT = eth_contracts.feeJNT(currency_pair.reciprocal_currency.abi,
                                           currency_pair.reciprocal_currency.exchanger_address,
                                           currency_pair.reciprocal_currency.is_erc20_token)
-
-            if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
-                raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
         except:
             raise serializers.ValidationError(_('Server error'))
+        else:
+            if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
+                raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
 
         attrs['is_reverse_operation'] = is_reverse_operation
 
@@ -1110,14 +1111,14 @@ class ApplicationSerializer(serializers.Serializer):
             self.validated_data['application_id'] = application.pk
             notify.send_email_exchange_request(
                 user.email,
-                notify._format_fiat_value(self.validated_data['base_amount'],
+                notify._format_float_value(self.validated_data['base_amount'],
                                           self.validated_data['base_currency']),
-                notify._format_fiat_value(self.validated_data['reciprocal_amount'],
+                notify._format_float_value(self.validated_data['reciprocal_amount'],
                                           self.validated_data['rec_currency']),
                 self.validated_data['address'],
                 notify._format_conversion_rate(
-                    self.validated_data['rate'] if not self.validated_data['is_reverse_operation'] else \
-                        1.0 / self.validated_data['rate'],
+                    math._roundDown(self.validated_data['rate'], 2) if not self.validated_data['is_reverse_operation'] else \
+                        math._roundUp(1.0 / self.validated_data['rate'], 2),
                     'ETH',
                     self.validated_data['base_currency'] if self.validated_data['is_reverse_operation'] else \
                         self.validated_data['rec_currency']),
@@ -1220,7 +1221,7 @@ class ApplicationCancelSerializer(serializers.Serializer):
                 self.application.save()
                 notify.send_email_exchange_unsuccessful(
                     self.application.user.email,
-                    notify._format_fiat_value(self.application.base_amount_actual,
+                    notify._format_float_value(self.application.base_amount_actual,
                                               self.application.base_currency),
                     ApplicationCancelReason.__dict__[self.application.reason].description \
                         if self.application.reason in ApplicationCancelReason.__dict__ \
