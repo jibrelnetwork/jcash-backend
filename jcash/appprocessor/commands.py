@@ -721,8 +721,8 @@ def check_outgoing_transactions(txs, is_refund = False):
                                                           tx.application.reciprocal_currency),
                                 tx.application.address.address,
                                 notify._format_conversion_rate(
-                                    tx.application.rate if not tx.application.is_reverse else \
-                                        1.0 / tx.application.rate,
+                                    math._roundDown(tx.application.rate) if not tx.application.is_reverse else \
+                                        math._roundUp(1.0 / tx.application.rate),
                                     'ETH',
                                     tx.application.base_currency if tx.application.is_reverse else \
                                         tx.application.reciprocal_currency),
