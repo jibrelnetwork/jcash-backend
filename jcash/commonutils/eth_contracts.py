@@ -169,7 +169,7 @@ def denyUser(license_registry_address, user_address) -> str:
     return _tx_id
 
 
-def grantUserLicense(license_registry_address, user_address, license_name, expiration_time) -> str:
+def grantUserLicense(license_registry_address, user_address, license_name) -> str:
     from web3.auto import w3
 
     if isUserGranted(json.loads(ETH_LICENSE_REGISTRY_MANAGEMENT__ABI),
@@ -182,7 +182,7 @@ def grantUserLicense(license_registry_address, user_address, license_name, expir
                                 license_registry_address,
                                 ETH_MANAGER__ADDRESS,
                                 "grantUserLicense",
-                                ( w3.toChecksumAddress(user_address), license_name, expiration_time),
+                                ( w3.toChecksumAddress(user_address), license_name),
                                 ETH_MANAGER__PRIVATE_KEY,
                                 1)
     return _tx_id
@@ -224,8 +224,7 @@ def licenseUser(license_registry_address, user_address, is_revoke_license, expir
         else:
             tx_id = grantUserLicense(license_registry_address,
                                      user_address,
-                                     license_name,
-                                     expiration_time)
+                                     license_name)
         res[license_name] = tx_id
 
     if is_revoke_license:
