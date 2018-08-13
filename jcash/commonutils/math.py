@@ -1,7 +1,7 @@
 from math import ceil
 
 
-def _round(value, round_digits):
+def _roundUp(value, round_digits):
     """
     Round UP a value
     :param value:
@@ -9,6 +9,16 @@ def _round(value, round_digits):
     :return:
     """
     return ceil(value*(10**round_digits))/(10**round_digits)
+
+
+def _roundDown(value, round_digits):
+    """
+    Round Down a value
+    :param value:
+    :param round_digits:
+    :return:
+    """
+    return int(value*(10**round_digits))/float(10**round_digits)
 
 
 def round_amount(value: float, currency_pair, is_reverse_operation: bool, is_base=True) -> float:
@@ -21,15 +31,15 @@ def round_amount(value: float, currency_pair, is_reverse_operation: bool, is_bas
     :return: float
     """
     if (is_base):
-        rounded_value = _round(value,
-                               currency_pair.reciprocal_currency.round_digits \
-                                   if is_reverse_operation else \
-                                   currency_pair.base_currency.round_digits)
+        rounded_value = _roundUp(value,
+                                 currency_pair.reciprocal_currency.round_digits \
+                                     if is_reverse_operation else \
+                                     currency_pair.base_currency.round_digits)
     else:
-        rounded_value = _round(value,
-                               currency_pair.base_currency.round_digits \
-                                   if is_reverse_operation else \
-                                   currency_pair.reciprocal_currency.round_digits)
+        rounded_value = _roundUp(value,
+                                 currency_pair.base_currency.round_digits \
+                                     if is_reverse_operation else \
+                                     currency_pair.reciprocal_currency.round_digits)
     return rounded_value
 
 
