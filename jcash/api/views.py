@@ -54,6 +54,7 @@ from jcash.api.models import (
     CustomerStatus,
     ExchangeFee,
     VideoVerification,
+    get_email_templates,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -89,6 +90,7 @@ from jcash.api.serializers import (
     CheckTokenSerializer,
     ValidatePasswordSerializer,
     VideoVerificationSerializer,
+    SendEmailSerializer,
 )
 from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
@@ -1756,3 +1758,52 @@ class ProofOfSolvencyView(GenericAPIView):
         response_data.update({'success': True})
 
         return Response(response_data)
+
+
+class EmailTemplatesView(GenericAPIView):
+    """
+    get:
+    Get email templates
+
+    Response example:
+
+    ```
+    {"success": true, templates: [{'name':'password_reset','parameters':['activate_url','reason']}]}
+
+    or
+
+    {"success": false, "error": "error_description"}
+    ```
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    permission_classes = (permissions.IsAdminUser,)
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        templates = get_email_templates()
+        response_data = {'success': True, 'templates': templates}
+        return Response(response_data)
+
+
+class SendEmailView(GenericAPIView):
+    """
+    post:
+    Send email
+
+    Response example:
+
+    ```
+    {"success": true} |
+    {"success": false, "error": "error_description"}
+    ```
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    permission_classes = (permissions.IsAdminUser,)
+    serializer_class = SendEmailSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({'success': True})
