@@ -1,3 +1,15 @@
+from math import ceil
+
+
+def _round(value, round_digits):
+    """
+    Round UP a value
+    :param value:
+    :param round_digits:
+    :return:
+    """
+    return ceil(value*(10**round_digits))/(10**round_digits)
+
 
 def round_amount(value: float, currency_pair, is_reverse_operation: bool, is_base=True) -> float:
     """
