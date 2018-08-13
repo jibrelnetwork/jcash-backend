@@ -32,7 +32,7 @@ from jcash.api.models import (
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
     ApplicationCancelReason,
 )
-from jcash.api.validators import MinAgeValidator
+from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
     eth_sign,
     eth_address,
@@ -1240,8 +1240,7 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     birthday = CustomDateField(
         required=True,
         validators=[
-            MinAgeValidator(18),
-            MinValueValidator(date(1900, 1, 1), message="Require year >= 1900.")
+            BirthdayValidator(18),
         ])
     phone = serializers.CharField(required=True, max_length=PersonalFieldLength.phone,
                                   min_length=1)
@@ -1656,8 +1655,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
     birthday = CustomDateField(
         required=True,
         validators=[
-            MinAgeValidator(18),
-            MinValueValidator(date(1900, 1, 1), message="Require year >= 1900.")
+            BirthdayValidator(18),
         ])
     email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
                                    min_length=1)
