@@ -42,7 +42,7 @@ def _format_coin_value(value: float) -> str:
 
 
 def _format_conversion_rate(value: float, base_cur: str, rec_cur: str) -> str:
-    return "1 {0:} = {1:} {2:}".format(base_cur, value, rec_cur)
+    return "1 {0:} ≈ {1:} {2:}".format(base_cur, value, rec_cur)
 
 
 def _format_date_period(start_date: datetime, end_date: datetime) -> str:
