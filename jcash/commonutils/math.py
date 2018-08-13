@@ -21,15 +21,15 @@ def round_amount(value: float, currency_pair, is_reverse_operation: bool, is_bas
     :return: float
     """
     if (is_base):
-        rounded_value = round(value,
-                              currency_pair.reciprocal_currency.round_digits \
-                                  if is_reverse_operation else \
-                                  currency_pair.base_currency.round_digits)
+        rounded_value = _round(value,
+                               currency_pair.reciprocal_currency.round_digits \
+                                   if is_reverse_operation else \
+                                   currency_pair.base_currency.round_digits)
     else:
-        rounded_value = round(value,
-                              currency_pair.base_currency.round_digits \
-                                  if is_reverse_operation else \
-                                  currency_pair.reciprocal_currency.round_digits)
+        rounded_value = _round(value,
+                               currency_pair.base_currency.round_digits \
+                                   if is_reverse_operation else \
+                                   currency_pair.reciprocal_currency.round_digits)
     return rounded_value
 
 
