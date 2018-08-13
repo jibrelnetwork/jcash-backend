@@ -508,7 +508,7 @@ def process_applications():
                     application.save()
                     notify.send_email_exchange_unsuccessful(
                         application.user.email,
-                        notify._format_fiat_value(application.base_amount_actual,
+                        notify._format_float_value(application.base_amount_actual,
                                                   application.base_currency),
                         ApplicationCancelReason.__dict__[application.reason].description \
                             if application.reason in ApplicationCancelReason.__dict__ \
@@ -703,7 +703,7 @@ def check_outgoing_transactions(txs, is_refund = False):
                             tx.application.status = str(ApplicationStatus.refunded)
                             notify.send_email_refund_successful(
                                 tx.application.user.email,
-                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                notify._format_float_value(tx.application.base_amount_actual,
                                                           tx.application.base_currency),
                                 tx.application.address.address,
                                 ApplicationCancelReason.__dict__[tx.application.reason].description \
@@ -715,14 +715,14 @@ def check_outgoing_transactions(txs, is_refund = False):
                             ga_integration.on_exchange_completed(tx.application)
                             notify.send_email_exchange_successful(
                                 tx.application.user.email,
-                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                notify._format_float_value(tx.application.base_amount_actual,
                                                           tx.application.base_currency),
-                                notify._format_fiat_value(tx.application.reciprocal_amount_actual,
+                                notify._format_float_value(tx.application.reciprocal_amount_actual,
                                                           tx.application.reciprocal_currency),
                                 tx.application.address.address,
                                 notify._format_conversion_rate(
-                                    math._roundDown(tx.application.rate) if not tx.application.is_reverse else \
-                                        math._roundUp(1.0 / tx.application.rate),
+                                    math._roundDown(tx.application.rate, 2) if not tx.application.is_reverse else \
+                                        math._roundUp(1.0 / tx.application.rate, 2),
                                     'ETH',
                                     tx.application.base_currency if tx.application.is_reverse else \
                                         tx.application.reciprocal_currency),
@@ -736,7 +736,7 @@ def check_outgoing_transactions(txs, is_refund = False):
                         tx.application.save()
                         notify.send_email_exchange_unsuccessful(
                                 tx.application.user.email,
-                                notify._format_fiat_value(tx.application.base_amount_actual,
+                                notify._format_float_value(tx.application.base_amount_actual,
                                                           tx.application.base_currency),
                                 ApplicationCancelReason.__dict__[tx.application.reason].description \
                                     if tx.application.reason in ApplicationCancelReason.__dict__ \
