@@ -1118,7 +1118,7 @@ class ApplicationSerializer(serializers.Serializer):
                 self.validated_data['address'],
                 notify._format_conversion_rate(
                     math._roundDown(self.validated_data['rate'], 2) if not self.validated_data['is_reverse_operation'] else \
-                        math._roundUp(1.0 / self.validated_data['rate']),
+                        math._roundUp(1.0 / self.validated_data['rate'], 2),
                     'ETH',
                     self.validated_data['base_currency'] if self.validated_data['is_reverse_operation'] else \
                         self.validated_data['rec_currency']),
