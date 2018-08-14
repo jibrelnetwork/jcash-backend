@@ -669,7 +669,7 @@ class Notification(models.Model):
         'exchange_request': 'Requested an exchange',
         'exchange_successful': 'Exchange successful',
         'exchange_unsuccessful': 'Uh oh...exchange unsuccessful',
-        'few_steps_away': 'You''re only a few steps away!',
+        'few_steps_away': 'You\'re only a few steps away!',
         'jcash_application_approved': 'Approved!',
         'jcash_application_underway': 'Jcash application underway!',
         'jcash_application_unsuccessful': 'Uh oh...application unsuccessful',
