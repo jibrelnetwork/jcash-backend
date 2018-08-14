@@ -32,7 +32,7 @@ from jcash.api.models import (
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
     ApplicationCancelReason,
 )
-from jcash.api.validators import MinAgeValidator
+from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
     eth_sign,
     eth_address,
@@ -1111,14 +1111,14 @@ class ApplicationSerializer(serializers.Serializer):
             self.validated_data['application_id'] = application.pk
             notify.send_email_exchange_request(
                 user.email,
-                notify._format_fiat_value(self.validated_data['base_amount'],
+                notify._format_float_value(self.validated_data['base_amount'],
                                           self.validated_data['base_currency']),
-                notify._format_fiat_value(self.validated_data['reciprocal_amount'],
+                notify._format_float_value(self.validated_data['reciprocal_amount'],
                                           self.validated_data['rec_currency']),
                 self.validated_data['address'],
                 notify._format_conversion_rate(
-                    self.validated_data['rate'] if not self.validated_data['is_reverse_operation'] else \
-                        1.0 / self.validated_data['rate'],
+                    math._roundDown(self.validated_data['rate'], 2) if not self.validated_data['is_reverse_operation'] else \
+                        math._roundUp(1.0 / self.validated_data['rate'], 2),
                     'ETH',
                     self.validated_data['base_currency'] if self.validated_data['is_reverse_operation'] else \
                         self.validated_data['rec_currency']),
@@ -1221,7 +1221,7 @@ class ApplicationCancelSerializer(serializers.Serializer):
                 self.application.save()
                 notify.send_email_exchange_unsuccessful(
                     self.application.user.email,
-                    notify._format_fiat_value(self.application.base_amount_actual,
+                    notify._format_float_value(self.application.base_amount_actual,
                                               self.application.base_currency),
                     ApplicationCancelReason.__dict__[self.application.reason].description \
                         if self.application.reason in ApplicationCancelReason.__dict__ \
@@ -1240,8 +1240,7 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     birthday = CustomDateField(
         required=True,
         validators=[
-            MinAgeValidator(18),
-            MinValueValidator(date(1900, 1, 1), message="Require year >= 1900.")
+            BirthdayValidator(18),
         ])
     phone = serializers.CharField(required=True, max_length=PersonalFieldLength.phone,
                                   min_length=1)
@@ -1656,8 +1655,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
     birthday = CustomDateField(
         required=True,
         validators=[
-            MinAgeValidator(18),
-            MinValueValidator(date(1900, 1, 1), message="Require year >= 1900.")
+            BirthdayValidator(18),
         ])
     email = serializers.EmailField(required=True, max_length=CorporateFieldLength.email,
                                    min_length=1)
