@@ -361,15 +361,6 @@ ETH_LICENSE_REGISTRY_MANAGEMENT__ABI =  b'[{"constant": true, ' \
                                         b'      "payable": false, ' \
                                         b'      "stateMutability": "nonpayable", ' \
                                         b'      "type": "function"}, ' \
-                                        b' {"constant": false, ' \
-                                        b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
-                                        b'                 {"name": "_licenseName", "type": "string"}, ' \
-                                        b'                 {"name": "_expirationTimestamp", "type": "uint256"}], ' \
-                                        b'      "name": "renewUserLicense", ' \
-                                        b'      "outputs": [], ' \
-                                        b'      "payable": false, ' \
-                                        b'      "stateMutability": "nonpayable", ' \
-                                        b'      "type": "function"}, ' \
                                         b' {"constant": true, ' \
                                         b'      "inputs": [{"name": "_userAddress", "type": "address"}], ' \
                                         b'      "name": "isUserAdmitted", ' \
@@ -402,8 +393,7 @@ ETH_LICENSE_REGISTRY_MANAGEMENT__ABI =  b'[{"constant": true, ' \
                                         b'      "type": "function"}, ' \
                                         b' {"constant": false, ' \
                                         b'      "inputs": [{"name": "_userAddress", "type": "address"}, ' \
-                                        b'                 {"name": "_licenseName", "type": "string"}, ' \
-                                        b'                 {"name": "_expirationTimestamp", "type": "uint256"}], ' \
+                                        b'                 {"name": "_licenseName", "type": "string"}], ' \
                                         b'      "name": "grantUserLicense", ' \
                                         b'      "outputs": [], ' \
                                         b'      "payable": false, ' \
