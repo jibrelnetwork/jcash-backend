@@ -386,6 +386,9 @@ def fetch_eth_events():
     replenisher_entries = Replenisher.objects.filter(is_removed=False)
     replenishers = [replenisher.address.lower() for replenisher in replenisher_entries]
 
+    first_replenisher_event = Replenisher.objects.all().order_by('block_height').first()
+    first_block = first_replenisher_event.block_height if first_replenisher_event else 0
+
     currencies = Currency.objects.filter(is_disabled=False)
     for currency in currencies:
         if len(replenishers) == 0:
@@ -395,7 +398,7 @@ def fetch_eth_events():
             last_event = IncomingTransaction.objects.latest('block_height')
             last_block = last_event.block_height + 1
         except IncomingTransaction.DoesNotExist:
-            last_block = 0
+            last_block = 0 if first_block == 0 else first_block
 
         events = eth_events.get_incoming_txs(currency.view_address if currency.is_erc20_token else currency.exchanger_address,
                                              currency.exchanger_address,
