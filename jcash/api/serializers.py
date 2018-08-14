@@ -974,11 +974,17 @@ class AddressSerializer(serializers.Serializer):
         return attrs
 
 
+class ApplicationAmountType:
+    base = 'base'
+    rec = 'rec'
+
+
 class ApplicationSerializer(serializers.Serializer):
     address = serializers.CharField(required=False)
     base_currency = serializers.CharField(required=True)
     rec_currency = serializers.CharField(required=True)
-    base_amount = serializers.FloatField(required=True)
+    amount = serializers.FloatField(required=True)
+    type = serializers.CharField(required=True, help_text='base | rec')
     uuid = serializers.CharField(required=True)
 
     def validate(self, attrs):
@@ -996,7 +1002,7 @@ class ApplicationSerializer(serializers.Serializer):
         address_attr = attrs.get('address')
         base_currency_attr = attrs.get('base_currency')
         rec_currency_attr = attrs.get('rec_currency')
-        base_amount_attr = attrs.get('base_amount')
+        amount_attr = attrs.get('amount')
         rate_uuid = attrs.get('uuid')
 
         user_addresses = Address.objects.filter(user=user, is_verified=True, is_removed=False)
@@ -1051,10 +1057,30 @@ class ApplicationSerializer(serializers.Serializer):
 
         attrs['currency_pair_rate_id'] = currency_pair_rate.pk
         attrs['rate'] = currency_pair_rate_price
-        attrs['base_amount'] = math.round_amount(base_amount_attr,
-                                                 currency_pair,
-                                                 is_reverse_operation,
-                                                 True)
+
+        if attrs['type'] == ApplicationAmountType.base:
+            attrs['base_amount'] = math.round_amount(amount_attr,
+                                                     currency_pair,
+                                                     is_reverse_operation,
+                                                     True)
+            attrs['reciprocal_amount'] = math.round_amount(math.calc_reciprocal_amount(attrs['base_amount'],
+                                                                                       currency_pair_rate_price),
+                                                           currency_pair,
+                                                           is_reverse_operation,
+                                                           False)
+        elif attrs['type'] == ApplicationAmountType.rec:
+            attrs['reciprocal_amount'] = math.round_amount(amount_attr,
+                                                           currency_pair,
+                                                           is_reverse_operation,
+                                                           False)
+            attrs['base_amount'] = math.round_amount(math.calc_base_amount(attrs['reciprocal_amount'],
+                                                                           currency_pair_rate_price),
+                                                     currency_pair,
+                                                     is_reverse_operation,
+                                                     True)
+        else:
+            raise serializers.ValidationError(_('Wrong amount type.'))
+
         if attrs['base_amount'] == 0.0:
             raise serializers.ValidationError(_('A valid number is required.'))
 
@@ -1063,12 +1089,6 @@ class ApplicationSerializer(serializers.Serializer):
 
         if not math.check_amount_max_limit(attrs['base_amount'], currency_pair, is_reverse_operation, True):
             raise serializers.ValidationError(_('Exchange value is over-limit'))
-
-        attrs['reciprocal_amount'] = math.round_amount(math.calc_reciprocal_amount(attrs['base_amount'],
-                                                                                   currency_pair_rate_price),
-                                                       currency_pair,
-                                                       is_reverse_operation,
-                                                       False)
 
         if utils.get_currency_balance(
                 currency_pair.base_currency if is_reverse_operation else \
