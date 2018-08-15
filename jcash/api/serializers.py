@@ -701,7 +701,8 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
-                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits')
+                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits',
+                  'fee')
 
     def get_fee(self, obj):
         return obj.fee
@@ -1136,7 +1137,8 @@ class ApplicationSerializer(serializers.Serializer):
                                                      reciprocal_amount=self.validated_data['reciprocal_amount'],
                                                      reciprocal_amount_actual=self.validated_data['reciprocal_amount'],
                                                      exchanger_address=self.validated_data['exchanger_address'],
-                                                     expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC))
+                                                     expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC),
+                                                     fee=self.validated_data['fee'])
             application.save()
             self.validated_data['application_id'] = application.pk
             notify.send_email_exchange_request(
