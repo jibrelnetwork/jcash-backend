@@ -30,7 +30,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
-    ApplicationCancelReason,
+    ApplicationCancelReason, ExchangeFee,
 )
 from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
@@ -678,7 +678,8 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "is_active": true
         "status": "created",
         "reason": "",
-        "round_digits": 2
+        "round_digits": 2,
+        "fee": 50.0
     }]
     """
     app_uuid = serializers.SerializerMethodField()
@@ -693,6 +694,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     rate = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     round_digits = serializers.SerializerMethodField()
+    fee = serializers.SerializerMethodField(help_text='Exchange fee (JNT)')
 
     class Meta:
         model = Application
@@ -700,6 +702,9 @@ class ApplicationsSerializer(serializers.ModelSerializer):
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
                   'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits')
+
+    def get_fee(self, obj):
+        return obj.fee
 
     def get_round_digits(self, obj):
         rec_currency = obj.currency_pair.base_currency if obj.is_reverse else \
@@ -1108,6 +1113,8 @@ class ApplicationSerializer(serializers.Serializer):
             if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
                 raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
 
+        fee_entry = ExchangeFee.objects.all().order_by("-from_block").first()
+        attrs['fee'] = fee_entry.value if fee_entry else 0.0
         attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs

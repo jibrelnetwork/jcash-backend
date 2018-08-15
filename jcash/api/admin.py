@@ -37,6 +37,7 @@ from jcash.api.models import (
     DocumentVerification,
     AccountType,
     LicenseAddress,
+    ExchangeFee,
 )
 
 from jcash.api import serializers
@@ -606,6 +607,12 @@ class LogEntryAdmin(admin.ModelAdmin):
             return 'DELETION'
         else:
             return str(obj.action_flag)
+
+
+@admin.register(ExchangeFee)
+class ExchangeFeeAdmin(admin.ModelAdmin):
+    list_display = ['id', 'from_block', 'value', 'created_at']
+    ordering = ('from_block',)
 
 
 admin.site.unregister(EmailAddress)
