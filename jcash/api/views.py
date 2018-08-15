@@ -48,6 +48,7 @@ from jcash.api.models import (
     Personal,
     Corporate,
     CustomerStatus,
+    ExchangeFee,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -215,6 +216,33 @@ class ResendEmailConfirmationView(GenericAPIView):
             return Response({'success': False, 'error': [_('Resend email confirmation failed')]}, status=400)
         logger.info('Resend email confirmation succeeded {}'.format(request.user.username))
         return Response({'success': True})
+
+
+class FeeJntView(APIView):
+    """
+    Get current exchange fee in JNT.
+
+    Response example:
+
+    ```
+    {"success":true, "value": 50.0} |
+    {"success":false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+
+    def get(self, request):
+        fee_entry = ExchangeFee.objects.all().order_by("-from_block").first()
+        if not fee_entry:
+            return Response({'success': False, 'error': 'Fee does not exist.'}, status=400)
+
+        data = {'success': True,
+                'value': fee_entry.value}
+
+        return Response(data)
 
 
 class CurrencyView(APIView):
@@ -597,7 +625,8 @@ class ApplicationView(GenericAPIView):
     "is_reverse": false,
     "status": "converting",
     "reason": "",
-    "round_digits": 2
+    "round_digits": 2,
+    "fee": 50.0
     }}]}}
     ```
 

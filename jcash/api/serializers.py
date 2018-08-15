@@ -30,7 +30,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
-    ApplicationCancelReason,
+    ApplicationCancelReason, ExchangeFee,
 )
 from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
@@ -678,7 +678,8 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "is_active": true
         "status": "created",
         "reason": "",
-        "round_digits": 2
+        "round_digits": 2,
+        "fee": 50.0
     }]
     """
     app_uuid = serializers.SerializerMethodField()
@@ -693,13 +694,18 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     rate = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     round_digits = serializers.SerializerMethodField()
+    fee = serializers.SerializerMethodField(help_text='Exchange fee (JNT)')
 
     class Meta:
         model = Application
         fields = ('app_uuid', 'created_at', 'expired_at', 'incoming_tx_id', 'outgoing_tx_id',
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
-                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits')
+                  'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits',
+                  'fee')
+
+    def get_fee(self, obj):
+        return obj.fee
 
     def get_round_digits(self, obj):
         rec_currency = obj.currency_pair.base_currency if obj.is_reverse else \
@@ -849,15 +855,18 @@ class AddressVerifySerializer(serializers.Serializer):
 class CurrencyRateSerializer(serializers.Serializer):
     base_currency = serializers.CharField(required=True, allow_blank=False)
     rec_currency = serializers.CharField(required=True, allow_blank=False)
-    base_amount = serializers.FloatField(required=False)
-    rec_amount = serializers.FloatField(required=False)
+    amount = serializers.FloatField(required=True)
+    type = serializers.CharField(required=True, help_text='base | rec')
 
     def validate(self, attrs):
-        base_amount = attrs.get('base_amount')
-        rec_amount = attrs.get('rec_amount')
-        if (base_amount is None and rec_amount is None) or \
-                (base_amount is not None and rec_amount is not None):
-            raise exceptions.ValidationError(_('base_amount or rec_amount required.'))
+        amount_attr = attrs.get('amount')
+
+        if attrs['type'] == ApplicationAmountType.base:
+            attrs['base_amount'] = amount_attr
+        elif attrs['type'] == ApplicationAmountType.rec:
+            attrs['rec_amount'] = amount_attr
+        else:
+            raise serializers.ValidationError(_('Wrong amount type.'))
 
         return attrs
 
@@ -1105,6 +1114,8 @@ class ApplicationSerializer(serializers.Serializer):
             if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
                 raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
 
+        fee_entry = ExchangeFee.objects.all().order_by("-from_block").first()
+        attrs['fee'] = fee_entry.value if fee_entry else 0.0
         attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs
@@ -1126,7 +1137,8 @@ class ApplicationSerializer(serializers.Serializer):
                                                      reciprocal_amount=self.validated_data['reciprocal_amount'],
                                                      reciprocal_amount_actual=self.validated_data['reciprocal_amount'],
                                                      exchanger_address=self.validated_data['exchanger_address'],
-                                                     expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC))
+                                                     expired_at=timezone.now() + timedelta(seconds=LOGIC__EXPIRATION_LIMIT_SEC),
+                                                     fee=self.validated_data['fee'])
             application.save()
             self.validated_data['application_id'] = application.pk
             notify.send_email_exchange_request(
