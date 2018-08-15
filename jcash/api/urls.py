@@ -29,4 +29,5 @@ urlpatterns = [
     url(r'^customer/corporate/documents/', views.CorporateDocumentsView.as_view()),
     url(r'^residential-countries/', views.ResidentialCountriesView.as_view()),
     url(r'^citizenship-countries/', views.CitizenshipCountriesView.as_view()),
+    url(r'^fee-jnt/', views.FeeJntView.as_view()),
 ]

@@ -880,6 +880,7 @@ class Application(models.Model):
     base_amount_actual = models.FloatField(default=0.0)
     reciprocal_amount = models.FloatField()
     reciprocal_amount_actual = models.FloatField(default=0.0)
+    fee = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField(blank=True, null=True)
@@ -984,6 +985,17 @@ class IncomingTransaction(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['is_linked']),
         )
+
+
+# Exchange Fee
+class ExchangeFee(models.Model):
+    value = models.FloatField(default=0)
+    type = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    from_block = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'exchange_fee'
 
 
 # Exchange
