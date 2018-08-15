@@ -849,15 +849,18 @@ class AddressVerifySerializer(serializers.Serializer):
 class CurrencyRateSerializer(serializers.Serializer):
     base_currency = serializers.CharField(required=True, allow_blank=False)
     rec_currency = serializers.CharField(required=True, allow_blank=False)
-    base_amount = serializers.FloatField(required=False)
-    rec_amount = serializers.FloatField(required=False)
+    amount = serializers.FloatField(required=True)
+    type = serializers.CharField(required=True, help_text='base | rec')
 
     def validate(self, attrs):
-        base_amount = attrs.get('base_amount')
-        rec_amount = attrs.get('rec_amount')
-        if (base_amount is None and rec_amount is None) or \
-                (base_amount is not None and rec_amount is not None):
-            raise exceptions.ValidationError(_('base_amount or rec_amount required.'))
+        amount_attr = attrs.get('amount')
+
+        if attrs['type'] == ApplicationAmountType.base:
+            attrs['base_amount'] = amount_attr
+        elif attrs['type'] == ApplicationAmountType.rec:
+            attrs['rec_amount'] = amount_attr
+        else:
+            raise serializers.ValidationError(_('Wrong amount type.'))
 
         return attrs
 
