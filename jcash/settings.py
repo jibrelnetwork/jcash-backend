@@ -303,7 +303,7 @@ MAILGUN__API_EVENTS_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/eve
 
 # SendGrid API
 SENDGRID__API_MESSAGES_URL = "https://api.sendgrid.com/api/mail.send.json"
-SENDGRID__API_KEY = ""
+SENDGRID__API_KEY = os.getenv('SENDGRID__API_KEY', '')
 
 # Logics settings
 LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)
