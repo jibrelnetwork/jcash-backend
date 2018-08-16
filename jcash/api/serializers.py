@@ -174,6 +174,10 @@ class AccountSerializer(serializers.Serializer):
         if not Account.is_user_email_confirmed(obj.user):
             return str(AccountStatus.email_confirmation)
 
+        if not is_personal_data_filled(obj) and \
+            obj.is_identity_declined:
+            return str(AccountStatus.declined)
+
         if is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
@@ -183,7 +187,6 @@ class AccountSerializer(serializers.Serializer):
             not obj.is_identity_declined:
             return str(AccountStatus.verified)
         elif is_personal_data_filled(obj) and \
-            not obj.is_identity_verified and \
             obj.is_identity_declined:
             return str(AccountStatus.declined)
 
