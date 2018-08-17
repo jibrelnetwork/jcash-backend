@@ -18,6 +18,7 @@ urlpatterns = [
     url(r'^application-refund/', views.ApplicationRefundView.as_view()),
     url(r'^application-cancel/', views.ApplicationCancelView.as_view()),
     url(r'^application-finish/', views.ApplicationFinishView.as_view()),
+    url(r'^customers/', views.CustomersView.as_view()),
     url(r'^customer/personal/contact-info/', views.PersonalContactInfoView.as_view()),
     url(r'^customer/personal/address/', views.PersonalAddressView.as_view()),
     url(r'^customer/personal/income-info/', views.PersonalIncomeInfoView.as_view()),

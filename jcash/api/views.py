@@ -111,8 +111,7 @@ def docstring_parameter(*sub):
     return dec
 
 
-@docstring_parameter(get_status_class_members(AccountStatus),
-                     get_status_class_members(CustomerStatus))
+@docstring_parameter(get_status_class_members(AccountStatus))
 class AccountView(GenericAPIView):
     """
     get:
@@ -129,19 +128,12 @@ class AccountView(GenericAPIView):
      "residency": "Zambia",
      "is_email_confirmed":true,
      "status": "verified",
-     "customers": [{{ "type": "personal",
-                     "uuid": "f9229b1b-f859-4cc9-b8ef-501238ca721b",
-                     "status": "submitted"}}]
     }}
     ```
 
     **Account Statuses**
 
     {0}
-
-    **Customers Statuses**
-
-    {1}
 
     * Requires token authentication.
     """
@@ -181,18 +173,7 @@ class AccountView(GenericAPIView):
         self.action = request.method.lower()
         account_serializer = AccountSerializer(account)
 
-        customers = []
-
-        if hasattr(account, account.rel_personal):
-            customers.append(account.personal)
-
-        if hasattr(account, account.rel_corporate):
-            customers.append(account.corporate)
-
-        customer_serializer = CustomersSerializer(customers, many=True)
-        response_data = account_serializer.data
-        response_data.update({"customers": customer_serializer.data})
-        return Response(response_data)
+        return Response(account_serializer.data)
 
 
 class ResendEmailConfirmationView(GenericAPIView):
@@ -1592,3 +1573,43 @@ class ValidatePasswordView(GenericAPIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             return Response({'success': True})
+
+
+@docstring_parameter(get_status_class_members(CustomerStatus))
+class CustomersView(GenericAPIView):
+    """
+    get:
+    Get customers list.
+
+    Response example:
+
+    ```
+    {{"success": true, "customers": [{{ "type": "personal",
+                     "uuid": "f9229b1b-f859-4cc9-b8ef-501238ca721b",
+                     "status": "submitted"}}]}}
+    ```
+
+    **Customers Statuses**
+
+    {0}
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CountriesSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        account = AccountView.ensure_account(request)
+        customers = []
+
+        if hasattr(account, account.rel_personal):
+            customers.append(account.personal)
+
+        if hasattr(account, account.rel_corporate):
+            customers.append(account.corporate)
+
+        customer_serializer = CustomersSerializer(customers, many=True)
+        response_data = {"success": True, "customers": customer_serializer.data}
+
+        return Response(response_data)
