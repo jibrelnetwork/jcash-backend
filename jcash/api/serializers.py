@@ -101,7 +101,9 @@ class CaptchaHelper():
 
 class AccountSerializer(serializers.Serializer):
     username = serializers.SerializerMethodField()
-    fullname = serializers.SerializerMethodField()
+    firstname = serializers.SerializerMethodField()
+    lastname = serializers.SerializerMethodField()
+    middlename = serializers.SerializerMethodField()
     birthday = serializers.SerializerMethodField()
     nationality = serializers.SerializerMethodField()
     residency = serializers.SerializerMethodField()
@@ -110,15 +112,33 @@ class AccountSerializer(serializers.Serializer):
     success = serializers.SerializerMethodField()
 
     class Meta:
-        fields = ('success', 'username', 'fullname', 'birthday', 'nationality', 'residency',
-                  'is_email_confirmed', 'status')
+        fields = ('success', 'username', 'firstname', 'lastname', 'middlename',
+                  'birthday', 'nationality', 'residency', 'is_email_confirmed', 'status')
 
-    def get_fullname(self, obj):
+    def get_firstname(self, obj):
         customer = obj.get_customer() if obj else None
         if isinstance(customer, Personal):
-            return obj.personal.fullname
+            return obj.personal.firstname
         elif isinstance(customer, Corporate):
-            return obj.corporate.contact_fullname
+            return obj.corporate.contact_firstname
+        else:
+            return ''
+
+    def get_lastname(self, obj):
+        customer = obj.get_customer() if obj else None
+        if isinstance(customer, Personal):
+            return obj.personal.lastname
+        elif isinstance(customer, Corporate):
+            return obj.corporate.contact_lastname
+        else:
+            return ''
+
+    def get_middlename(self, obj):
+        customer = obj.get_customer() if obj else None
+        if isinstance(customer, Personal):
+            return obj.personal.middlename
+        elif isinstance(customer, Corporate):
+            return obj.corporate.contact_middlename
         else:
             return ''
 
@@ -1268,8 +1288,12 @@ class PersonalContactInfoSerializer(serializers.Serializer):
     """
     Serializer for update personal contact information.
     """
-    fullname = serializers.CharField(required=True, max_length=PersonalFieldLength.fullname,
+    firstname = serializers.CharField(required=True, max_length=PersonalFieldLength.fullname,
+                                      min_length=1)
+    lastname = serializers.CharField(required=True, max_length=PersonalFieldLength.fullname,
                                      min_length=1)
+    middlename = serializers.CharField(required=False, max_length=PersonalFieldLength.fullname,
+                                       min_length=1, allow_blank=True)
     nationality = serializers.CharField(required=True, max_length=PersonalFieldLength.nationality,
                                         min_length=1)
     birthday = CustomDateField(
@@ -1282,7 +1306,7 @@ class PersonalContactInfoSerializer(serializers.Serializer):
 
     class Meta:
         model = Personal
-        fields = ('fullname', 'nationality', 'birthday', 'phone')
+        fields = ('firstname', 'lastname', 'middlename', 'nationality', 'birthday', 'phone')
 
     def save(self, personal):
         serializer_fields = self.get_fields()
@@ -1291,9 +1315,15 @@ class PersonalContactInfoSerializer(serializers.Serializer):
 
         with transaction.atomic():
             is_updated = False
-            if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
+            if serializer_fields.get('firstname') and self.validated_data.get('firstname'):
                 is_updated = True
-                personal.fullname = self.validated_data['fullname']
+                personal.firstname = self.validated_data['firstname']
+            if serializer_fields.get('lastname') and self.validated_data.get('lastname'):
+                is_updated = True
+                personal.lastname = self.validated_data['lastname']
+            if serializer_fields.get('middlename') and self.validated_data.get('middlename'):
+                is_updated = True
+                personal.middlename = self.validated_data['middlename']
             if serializer_fields.get('nationality') and self.validated_data.get('nationality'):
                 is_updated = True
                 personal.nationality = self.validated_data['nationality']
@@ -1470,7 +1500,9 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 passport=passport_document,
                 utilitybills=utilitybills_document,
                 selfie=selfie_document,
-                meta={'fullname': str(personal.fullname),
+                meta={'firstname': str(personal.firstname),
+                      'lastname': str(personal.lastname),
+                      'middlename': str(personal.middlename),
                       'nationality': str(personal.nationality),
                       'birthday': str(personal.birthday),
                       'phone': str(personal.phone),
@@ -1506,7 +1538,7 @@ class PersonalSerializer(serializers.ModelSerializer):
 
         status = self.context.get('status', '')
         if status == '':
-            fields = ('success', 'fullname', 'nationality', 'birthday', 'phone')
+            fields = ('success', 'firstname', 'lastname', 'middlename', 'nationality', 'birthday', 'phone')
         elif status == str(CustomerStatus.address):
             fields = ('success', 'country', 'street', 'apartment', 'city', 'postcode')
         elif status == str(CustomerStatus.income_info):
@@ -1524,7 +1556,7 @@ class PersonalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Personal
-        fields = ('success', 'fullname', 'nationality', 'birthday', 'phone',
+        fields = ('success', 'firstname', 'lastname', 'middlename', 'nationality', 'birthday', 'phone',
                   'country', 'street', 'apartment', 'city', 'postcode', 'profession',
                   'income_source', 'assets_origin', 'jcash_use', 'passport', 'utilitybills',
                   'selfie')
@@ -1690,8 +1722,12 @@ class CorporateContactInfoSerializer(serializers.Serializer):
     """
     Serializer for update primary contact info.
     """
-    fullname = serializers.CharField(required=True,max_length=CorporateFieldLength.fullname,
+    firstname = serializers.CharField(required=True, max_length=CorporateFieldLength.fullname,
+                                      min_length=1)
+    lastname = serializers.CharField(required=True, max_length=CorporateFieldLength.fullname,
                                      min_length=1)
+    middlename = serializers.CharField(required=False, max_length=CorporateFieldLength.fullname,
+                                       min_length=1, allow_blank=True)
     birthday = CustomDateField(
         required=True,
         validators=[
@@ -1716,7 +1752,7 @@ class CorporateContactInfoSerializer(serializers.Serializer):
 
     class Meta:
         model = Corporate
-        fields = ('fullname', 'birthday', 'email', 'nationality', 'residency',
+        fields = ('firstname', 'lastname', 'middlename', 'birthday', 'email', 'nationality', 'residency',
                   'street', 'apartment', 'city', 'postcode')
 
     def save(self, corporate):
@@ -1726,9 +1762,15 @@ class CorporateContactInfoSerializer(serializers.Serializer):
 
         with transaction.atomic():
             is_updated = False
-            if serializer_fields.get('fullname') and self.validated_data.get('fullname'):
+            if serializer_fields.get('firstname') and self.validated_data.get('firstname'):
                 is_updated = True
-                corporate.contact_fullname = self.validated_data['fullname']
+                corporate.contact_firstname = self.validated_data['firstname']
+            if serializer_fields.get('lastname') and self.validated_data.get('lastname'):
+                is_updated = True
+                corporate.contact_lastname = self.validated_data['lastname']
+            if serializer_fields.get('middlename') and self.validated_data.get('middlename'):
+                is_updated = True
+                corporate.contact_middlename = self.validated_data['middlename']
             if serializer_fields.get('birthday') and self.validated_data.get('birthday'):
                 is_updated = True
                 corporate.contact_birthday = self.validated_data['birthday']
@@ -1839,7 +1881,9 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                       'currency_nature': str(corporate.currency_nature),
                       'assets_origin_description': str(corporate.assets_origin_description),
                       'jcash_use': str(corporate.jcash_use),
-                      'contact_fullname': str(corporate.contact_fullname),
+                      'contact_firstname': str(corporate.contact_firstname),
+                      'contact_lastname': str(corporate.contact_lastname),
+                      'contact_middlename': str(corporate.contact_middlename),
                       'contact_birthday': str(corporate.contact_birthday),
                       'contact_nationality': str(corporate.contact_nationality),
                       'contact_residency': str(corporate.contact_residency),
@@ -1879,7 +1923,8 @@ class CorporateSerializer(serializers.ModelSerializer):
             fields = ('success', 'industry', 'assets_origin', 'currency_nature',
                       'assets_origin_description', 'jcash_use')
         elif status == str(CustomerStatus.primary_contact):
-            fields = ('success', 'contact_fullname', 'contact_birthday', 'contact_nationality',
+            fields = ('success', 'contact_firstname', 'contact_lastname', 'contact_middlename',
+                      'contact_birthday', 'contact_nationality',
                       'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
                       'contact_apartment', 'contact_city', 'contact_postcode')
         elif status == str(CustomerStatus.documents):
@@ -1898,7 +1943,8 @@ class CorporateSerializer(serializers.ModelSerializer):
         fields = ('success', 'name', 'domicile_country', 'business_phone',
                   'country', 'street', 'apartment', 'city', 'postcode',  'industry',
                   'assets_origin', 'currency_nature', 'assets_origin_description',
-                  'jcash_use', 'contact_fullname', 'contact_birthday', 'contact_nationality',
+                  'jcash_use', 'contact_firstname', 'contact_lastname', 'contact_middlename',
+                  'contact_birthday', 'contact_nationality',
                   'contact_residency', 'contact_phone', 'contact_email', 'contact_street',
                   'contact_apartment', 'contact_city', 'contact_postcode', 'passport',
                   'utilitybills', 'selfie')
