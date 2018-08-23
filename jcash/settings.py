@@ -230,7 +230,7 @@ CORS_ORIGIN_ALLOW_ALL = True
 ONFIDO_API_KEY = os.getenv('ONFIDO_API_KEY')
 
 
-RECAPTCHA_ENABLED = False  # bool(os.getenv("RECAPTCHA_ENABLED", 1))
+RECAPTCHA_ENABLED = bool(os.getenv("RECAPTCHA_ENABLED", 1))
 RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 
 ACCOUNT_EMAIL_REQUIRED = True
@@ -303,7 +303,7 @@ MAILGUN__API_EVENTS_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/eve
 
 # SendGrid API
 SENDGRID__API_MESSAGES_URL = "https://api.sendgrid.com/api/mail.send.json"
-SENDGRID__API_KEY = ""
+SENDGRID__API_KEY = os.getenv('SENDGRID__API_KEY', '')
 
 # Logics settings
 LOGIC__EXPIRATION_LIMIT_SEC = os.getenv('LOGIC_EXPIRATION_LIMIT_SEC', 30*60)

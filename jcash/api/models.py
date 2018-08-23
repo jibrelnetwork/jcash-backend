@@ -286,7 +286,9 @@ class Personal(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     version = IntegerVersionField()
     # Contact information
-    fullname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    firstname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    lastname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    middlename = models.CharField(max_length=PersonalFieldLength.fullname, null=True, blank=True)
     nationality = models.CharField(max_length=PersonalFieldLength.nationality, null=False, blank=True)
     birthday = models.DateField(null=True, blank=True)
     phone = models.CharField(max_length=PersonalFieldLength.phone, null=False, blank=True)
@@ -384,7 +386,10 @@ class Corporate(models.Model):
     jcash_use = models.CharField(max_length=CorporateFieldLength.jcash_use, null=False, blank=True)
 
     # Primary contact
-    contact_fullname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_firstname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_lastname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_middlename = models.CharField(max_length=CorporateFieldLength.fullname, null=True, blank=True)
+
     contact_birthday = models.DateField(null=True, blank=True)
     contact_nationality = models.CharField(max_length=CorporateFieldLength.country, null=False, blank=True)
     contact_residency = models.CharField(max_length=CorporateFieldLength.country, null=False, blank=True)
@@ -880,6 +885,7 @@ class Application(models.Model):
     base_amount_actual = models.FloatField(default=0.0)
     reciprocal_amount = models.FloatField()
     reciprocal_amount_actual = models.FloatField(default=0.0)
+    fee = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField(blank=True, null=True)
@@ -984,6 +990,17 @@ class IncomingTransaction(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['is_linked']),
         )
+
+
+# Exchange Fee
+class ExchangeFee(models.Model):
+    value = models.FloatField(default=0)
+    type = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    from_block = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'exchange_fee'
 
 
 # Exchange
