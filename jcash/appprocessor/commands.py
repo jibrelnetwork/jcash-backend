@@ -207,14 +207,14 @@ def verify_document(document_verification_id):
         with transaction.atomic():
             if not customer.onfido_applicant_id:
                 if isinstance(customer, Personal):
-                    full_name = document_verification.personal.fullname
-                    first_name = full_name.split(" ")[0]
-                    last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
+                    first_name = document_verification.personal.firstname
+                    last_name = document_verification.personal.lastname
+                    middle_name = document_verification.personal.middlename
                     birtday = document_verification.personal.birthday
                 elif isinstance(customer, Corporate):
-                    full_name = document_verification.corporate.contact_fullname
-                    first_name = full_name.split(" ")[0]
-                    last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
+                    first_name = document_verification.corporate.contact_firstname
+                    last_name = document_verification.corporate.contact_lastname
+                    middle_name = document_verification.corporate.contact_middlename
                     birtday = document_verification.corporate.contact_birthday
                 else:
                     logger.error('Document verification id=%s has no customer', document_verification.pk)
@@ -223,11 +223,11 @@ def verify_document(document_verification_id):
                 email = document_verification.user.email
                 if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
                     try:
-                        applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
+                        applicant_id = person_verify.create_applicant(first_name, middle_name, last_name, email, birtday)
                     except:
                         exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-                        logging.getLogger(__name__).info("Failed to create onfido applicant {}{}{}{} due to error:\n{}"
-                                                          .format(first_name, last_name, email, birtday, exception_str))
+                        logging.getLogger(__name__).error("Failed to create onfido applicant {} {} {} {} due to error:\n{}"
+                                                          .format(email, first_name, last_name, birtday, exception_str))
                         return
                     else:
                         customer.onfido_applicant_id = applicant_id

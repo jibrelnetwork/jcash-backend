@@ -122,7 +122,9 @@ class AccountView(GenericAPIView):
     ```
     {{"success": true,
      "username": "ivan_ivanov@example.com",
-     "fullname": "Ivan Ivanov",
+     "firstname": "Ivan",
+     "lastname": "Ivanov",
+     "middlename": null,
      "birthday": "2017-01-01",
      "nationality": "Zambia",
      "residency": "Zambia",
@@ -1033,7 +1035,8 @@ class PersonalContactInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "fullname": "", "nationality": "", "birthday": "", "phone": ""} |
+    {"success": true, "firstname": "", "lastname": "", "middlename": "", "nationality": "",
+    "birthday": "", "phone": ""} |
     {"success": false, "error": "error_description"}
     ```
 
@@ -1399,7 +1402,8 @@ class CorporateContactInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "contact_fullname": "", "contact_birthday": "", "contact_nationality": "",
+    {"success": true, "contact_firstname": "", "contact_lastname": "", "contact_middlename": "",
+    "contact_birthday": "", "contact_nationality": "",
     "contact_residency": "", "contact_phon": "", "contact_email": "", "contact_street": "",
     "contact_apartment": "", "contact_city": "", "contact_postcode": ""} |
     {"success": false, "error": "error_description"}
