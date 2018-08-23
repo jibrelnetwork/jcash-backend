@@ -31,4 +31,5 @@ urlpatterns = [
     url(r'^residential-countries/', views.ResidentialCountriesView.as_view()),
     url(r'^citizenship-countries/', views.CitizenshipCountriesView.as_view()),
     url(r'^fee-jnt/', views.FeeJntView.as_view()),
+    url(r'^proof-of-solvency/', views.ProofOfSolvencyView.as_view()),
 ]
