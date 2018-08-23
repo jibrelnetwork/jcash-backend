@@ -87,6 +87,7 @@ from jcash.api.serializers import (
 from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
+from jcash.appprocessor.commands import proof_of_solvency
 
 
 logger = logging.getLogger(__name__)
@@ -1615,5 +1616,69 @@ class CustomersView(GenericAPIView):
 
         customer_serializer = CustomersSerializer(customers, many=True)
         response_data = {"success": True, "customers": customer_serializer.data}
+
+        return Response(response_data)
+
+
+class ProofOfSolvencyView(GenericAPIView):
+    """
+    get:
+    Proof of solvency.
+
+    Response example:
+
+    ```
+    {
+      "success": true,
+      "data": {
+        "summary": {
+          "jnt_price": 0.1,
+          "solvency_requirement": 202159,
+          "proof_of_solvency": 1250000,
+          "liquidity": 6.1832
+        },
+        "crydrs": {
+          "jUSD": {
+            "minted": 1000000,
+            "circulating": 11257.12,
+            "jnt_requirement": 114285.48
+          },
+          "jEUR": {
+            "minted": 400000,
+            "circulating": 12.11,
+            "jnt_requirement": 122.96
+          },
+          "jKRW": {
+            "minted": 350000000,
+            "circulating": 4512.24,
+            "jnt_requirement": 45809.54
+          },
+          "jGBP": {
+            "minted": 200000,
+            "circulating": 4131.20,
+            "jnt_requirement": 41941.12
+          }
+        },
+        "liquidity_providers": [{
+          "entity": "JNT Commercial Brokers",
+          "jnt_pledge": 1000000,
+          "current_fee_share": 0.8,
+          "fees_collected": 100
+        }, {
+          "entity": "JNT Commercial Brokers #2",
+          "jnt_pledge": 250000,
+          "current_fee_share": 0.2,
+          "fees_collected": 230
+        }]
+      }
+    }
+    ```
+
+    """
+    permission_classes = (permissions.AllowAny,)
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        response_data = proof_of_solvency()
 
         return Response(response_data)
