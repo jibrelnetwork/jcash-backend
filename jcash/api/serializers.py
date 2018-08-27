@@ -1483,7 +1483,7 @@ class PersonalDocumentsSerializer(serializers.Serializer):
             if personal.account is not None:
                 if personal.account.is_identity_declined:
                     personal.account.is_identity_declined = False
-                if personal.account.corporate is not None:
+                if hasattr(personal.account, 'corporate') and personal.account.corporate is not None:
                     if personal.account.corporate.status == str(CustomerStatus.declined):
                         personal.account.corporate.status = str(CustomerStatus.documents)
                         personal.account.corporate.save()
@@ -1851,7 +1851,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
             if corporate.account is not None:
                 if corporate.account.is_identity_declined:
                     corporate.account.is_identity_declined = False
-                if corporate.account.personal is not None:
+                if hasattr(corporate.account, 'personal') and corporate.account.personal is not None:
                     if corporate.account.personal.status == str(CustomerStatus.declined):
                         corporate.account.personal.status = str(CustomerStatus.documents)
                         corporate.account.personal.save()
