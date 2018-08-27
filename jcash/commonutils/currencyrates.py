@@ -7,7 +7,8 @@ from dateutil.tz import tzutc
 
 from .bitfinex import Bitfinex
 from .alphavantage import Alphavantage
-from jcash.api.models import Currency, CurrencyPair, CurrencyPairRate
+from .bibox import BiBox
+from jcash.api.models import Currency, CurrencyPair, CurrencyPairRate, JntRate
 
 
 def get_currency_pair_rate(currency_pair_rate: CurrencyPairRate, is_reverse_operation: bool):
@@ -129,3 +130,41 @@ def fetch_exchangeable_currency_price(currency_pair: CurrencyPair):
                                           .format(currency_pair.base_currency.display_name,
                                                   currency_pair.reciprocal_currency.display_name,
                                                   exception_str))
+
+
+def fetch_jnt_price():
+    """
+    Fetch JNT price (USD).
+    """
+    # noinspection PyBroadException
+    try:
+        base_cur = 'JNT'
+        rec_cur = 'ETH'
+        logging.getLogger(__name__).info("Start to fetch {}/{} price"
+                                         .format(base_cur, rec_cur))
+
+        ticker_data = None
+        try:
+            bibox = BiBox()
+            ticker_data = bibox.get_price(base_cur, rec_cur)
+        except:
+            logging.getLogger(__name__).info("Fetch currency rate failed from BiBox API for symbol '{}/{}'."
+                                             .format(base_cur, rec_cur))
+
+        if not ticker_data or len(ticker_data) != 2:
+            logging.getLogger(__name__).info("Invalid response from BiBox API for symbol '{}/{}'."
+                                              .format(base_cur, rec_cur))
+            return
+
+        with transaction.atomic():
+            jnt_rate = JntRate.objects.create(created_at=ticker_data[0],
+                                              price=ticker_data[1],
+                                              source='bibox')
+            jnt_rate.save()
+
+        logging.getLogger(__name__).info("Finished to fetch {}/{} price"
+                                         .format(base_cur, rec_cur))
+    except Exception:
+        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+        logging.getLogger(__name__).error("Finished to fetch {}/{} price due to error:\n{}"
+                                          .format(base_cur, rec_cur, exception_str))

@@ -740,7 +740,8 @@ class Currency(models.Model):
     controller_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     license_registry_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     is_erc20_token = models.BooleanField(default=False)
-    balance = models.FloatField()
+    balance = models.FloatField(default=0.0)
+    total_supply = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     abi = JSONField(default=dict)
     round_digits = models.IntegerField(null=False, default=8)
@@ -750,7 +751,7 @@ class Currency(models.Model):
 
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
-    rel_currencies = 'incoming_transactions'
+    rel_incomingtxs = 'incoming_transactions'
     rel_exchanges = 'exchanges'
     rel_refunds = 'refunds'
     rel_licenseusers = 'licenseusers'
@@ -811,6 +812,46 @@ class CurrencyPairRate(models.Model):
 
     class Meta:
         db_table = 'currency_pair_rate'
+        indexes = (
+            models.Index(fields=['created_at']),
+        )
+
+
+# JntRate
+class JntRate(models.Model):
+    source = models.CharField(max_length=30)  # source of price information (e.g. BiBox, Gate.io)
+    price = models.FloatField()
+    created_at = models.DateTimeField()
+    meta = JSONField(default={})
+
+    class Meta:
+        db_table = 'jnt_rate'
+        indexes = (
+            models.Index(fields=['created_at']),
+            models.Index(fields=['source']),
+        )
+
+
+# LiquidityProvider
+class LiquidityProvider(models.Model):
+    entity = models.CharField(max_length=255)
+    address = models.CharField(max_length=255, blank=True, null=True)
+    jnt_pledge = models.FloatField(default=0.0)
+
+    class Meta:
+        db_table = 'liquidity_provider'
+        indexes = (
+            models.Index(fields=['entity']),
+        )
+
+
+# ProofOfSolvency
+class ProofOfSolvency(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    meta = JSONField(default={})
+
+    class Meta:
+        db_table = 'proof_of_solvency'
         indexes = (
             models.Index(fields=['created_at']),
         )
@@ -963,7 +1004,7 @@ class IncomingTransaction(models.Model):
     application = models.ForeignKey(Application, models.DO_NOTHING,
                                     related_name=Application.rel_incoming_txs, null=True)
     currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING,
-                                 related_name=Currency.rel_currencies, null=True)
+                                 related_name=Currency.rel_incomingtxs, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
