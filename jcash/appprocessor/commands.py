@@ -912,7 +912,7 @@ def build_proof_of_solvency():
                 exchanged = exchanged_cur[i]['val_sum'] if exchanged_cur[i]['val_sum'] else 0.0
                 incoming = incoming_cur[i]['val_sum'] if incoming_cur[i]['val_sum'] else 0.0
                 refunded = refunded_cur[i]['val_sum'] if refunded_cur[i]['val_sum'] else 0.0
-                calculating = exchanged - incoming - refunded \
+                calculating = exchanged - incoming + refunded \
                     if (exchanged - incoming + refunded) > 0.0 \
                     else 0.0
 
