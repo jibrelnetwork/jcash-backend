@@ -210,7 +210,7 @@ def verify_document(document_verification_id):
     customer = get_customer_by_document_verification(document_verification)
     if document_verification and customer:
         with transaction.atomic():
-            if not customer.onfido_applicant_id:
+            if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
                 if isinstance(customer, Personal):
                     first_name = document_verification.personal.firstname
                     last_name = document_verification.personal.lastname
@@ -226,19 +226,18 @@ def verify_document(document_verification_id):
                     return
 
                 email = document_verification.user.email
-                if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
-                    try:
-                        applicant_id = person_verify.create_applicant(first_name, middle_name, last_name, email, birtday)
-                    except:
-                        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-                        logging.getLogger(__name__).error("Failed to create onfido applicant {} {} {} {} due to error:\n{}"
-                                                          .format(email, first_name, last_name, birtday, exception_str))
-                        return
-                    else:
-                        customer.onfido_applicant_id = applicant_id
-                        customer.save()
-                        document_verification.meta['onfido_applicant_id'] = applicant_id
-                        document_verification.save()
+                try:
+                    applicant_id = person_verify.create_applicant(first_name, middle_name, last_name, email, birtday)
+                except:
+                    exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+                    logging.getLogger(__name__).error("Failed to create onfido applicant {} {} {} {} due to error:\n{}"
+                                                      .format(email, first_name, last_name, birtday, exception_str))
+                    return
+                else:
+                    customer.onfido_applicant_id = applicant_id
+                    customer.save()
+                    document_verification.meta['onfido_applicant_id'] = applicant_id
+                    document_verification.save()
 
                 logger.info('Applicant %s created for %s',
                             customer.onfido_applicant_id,
