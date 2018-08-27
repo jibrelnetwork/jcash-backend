@@ -840,3 +840,51 @@ def check_address_licenses():
         exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
         logging.getLogger(__name__).error("Failed to check address licenses due to exception:\n{}"
                                           .format(exception_str))
+
+
+def proof_of_solvency():
+    return {
+        "success": True,
+        "data": {
+            "summary": {
+                "jnt_price": 0.1,
+                "solvency_requirement": 202159,
+                "proof_of_solvency": 1250000,
+                "liquidity": 6.1832
+            },
+            "crydrs": {
+                "jUSD": {
+                    "minted": 1000000,
+                    "circulating": 11257.12,
+                    "jnt_requirement": 114285.48
+                },
+                "jEUR": {
+                    "minted": 400000,
+                    "circulating": 12.11,
+                    "jnt_requirement": 122.96
+                },
+                "jKRW": {
+                    "minted": 350000000,
+                    "circulating": 4512.24,
+                    "jnt_requirement": 45809.54
+                },
+                "jGBP": {
+                    "minted": 200000,
+                    "circulating": 4131.20,
+                    "jnt_requirement": 41941.12
+                }
+            },
+            "liquidity_providers": [{
+                "entity": "JNT Commercial Brokers",
+                "jnt_pledge": 1000000,
+                "current_fee_share": 0.8,
+                "fees_collected": 100
+            },
+            {
+                "entity": "JNT Commercial Brokers #2",
+                "jnt_pledge": 250000,
+                "current_fee_share": 0.2,
+                "fees_collected": 230
+            }]
+        }
+    }
