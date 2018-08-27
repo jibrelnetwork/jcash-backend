@@ -1496,7 +1496,7 @@ class PersonalDocumentsSerializer(serializers.Serializer):
 
             try:
                 last_document_verification = DocumentVerification.objects\
-                    .filter(personal_id=personal.id)\
+                    .filter(personal_id=personal.uuid)\
                     .latest('created_at')
                 if personal.firstname != last_document_verification.meta['firstname'] or \
                         personal.lastname != last_document_verification.meta['lastname']:
@@ -1877,7 +1877,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
 
             try:
                 last_document_verification = DocumentVerification.objects\
-                    .filter(corporate_id=corporate.id)\
+                    .filter(coporate_id=corporate.uuid)\
                     .latest('created_at')
                 if corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or \
                         corporate.contact_lastname != last_document_verification.meta['contact_lastname']:
