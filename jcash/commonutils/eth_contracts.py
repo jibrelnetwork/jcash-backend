@@ -85,6 +85,15 @@ def __sendRawTxAndWait(_abi, _to, _from, _functionName, _args, _from_priv_key, b
     return _tx_id
 
 
+def totalSupply(abi, contract_address) -> float:
+    web3 = create_web3()
+
+    contract = web3.eth.contract(address=web3.toChecksumAddress(contract_address), abi=abi)
+    res = contract.functions.totalSupply().call()
+
+    return web3.fromWei(res, 'ether')
+
+
 def balanceEth(holder_address) -> float:
     web3 = create_web3()
 

@@ -1680,5 +1680,6 @@ class ProofOfSolvencyView(GenericAPIView):
 
     def get(self, request):
         response_data = proof_of_solvency()
+        response_data.update({'success': True})
 
         return Response(response_data)

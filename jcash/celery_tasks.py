@@ -6,7 +6,7 @@ django.setup()
 
 from jcash.commonutils.celery_lock import locked_task
 from jcash.celeryapp import celery_app
-from jcash.commonutils.currencyrates import fetch_currency_price
+from jcash.commonutils.currencyrates import fetch_currency_price, fetch_jnt_price
 from jcash.appprocessor import commands
 
 
@@ -108,6 +108,20 @@ def celery_fetch_currencies_state():
     return commands.fetch_currencies_state()
 
 
+@celery_app.task()
+@locked_task()
+@initialize_app
+def celery_fetch_jnt_price():
+    return fetch_jnt_price()
+
+
+@celery_app.task()
+@locked_task()
+@initialize_app
+def celery_build_proof_of_solvency():
+    return commands.build_proof_of_solvency()
+
+
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(minute='*/1'),
@@ -166,3 +180,11 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_fetch_currencies_state,
                              expires=15,
                              name='fetch_currencies_state')
+    sender.add_periodic_task(crontab(minute='*/15'),
+                             celery_fetch_jnt_price,
+                             expires=15,
+                             name='fetch_jnt_price')
+    sender.add_periodic_task(crontab(minute='*/15'),
+                             celery_build_proof_of_solvency,
+                             expires=15,
+                             name='build_proof_of_solvency')

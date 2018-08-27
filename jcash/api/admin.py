@@ -38,6 +38,9 @@ from jcash.api.models import (
     AccountType,
     LicenseAddress,
     ExchangeFee,
+    LiquidityProvider,
+    JntRate,
+    ProofOfSolvency,
 )
 
 from jcash.api import serializers
@@ -614,6 +617,21 @@ class LogEntryAdmin(admin.ModelAdmin):
 class ExchangeFeeAdmin(admin.ModelAdmin):
     list_display = ['id', 'from_block', 'value', 'created_at']
     ordering = ('from_block',)
+
+
+@admin.register(LiquidityProvider)
+class LiquidityProviderAdmin(admin.ModelAdmin):
+    list_display = ['id', 'entity', 'address', 'jnt_pledge']
+
+
+@admin.register(JntRate)
+class JntRateAdmin(admin.ModelAdmin):
+    list_display = ['id', 'source', 'price', 'created_at']
+
+
+@admin.register(ProofOfSolvency)
+class ProofOfSolvencyAdmin(admin.ModelAdmin):
+    list_display = ['id', 'meta']
 
 
 admin.site.unregister(EmailAddress)

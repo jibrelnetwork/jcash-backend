@@ -30,7 +30,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
-    ApplicationCancelReason, ExchangeFee,
+    ApplicationCancelReason, ExchangeFee, LiquidityProvider,
 )
 from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
@@ -1494,6 +1494,18 @@ class PersonalDocumentsSerializer(serializers.Serializer):
             personal.status = str(CustomerStatus.submitted)
             personal.save()
 
+            try:
+                last_document_verification = DocumentVerification.objects\
+                    .filter(personal_id=personal.id)\
+                    .latest('created_at')
+                if personal.firstname != last_document_verification.meta['firstname'] or \
+                        personal.lastname != last_document_verification.meta['lastname']:
+                    is_applicant_changed = True
+                else:
+                    is_applicant_changed = False
+            except DocumentVerification.DoesNotExist:
+                is_applicant_changed = False
+
             doc_verification = DocumentVerification.objects.create(
                 user=personal.account.user,
                 personal=personal,
@@ -1514,7 +1526,8 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                       'profession': str(personal.profession),
                       'income_source': str(personal.income_source),
                       'assets_origin': str(personal.assets_origin),
-                      'jcash_use': str(personal.jcash_use)})
+                      'jcash_use': str(personal.jcash_use)},
+                is_applicant_changed=is_applicant_changed)
 
             doc_verification.save()
             ga_integration.on_status_registration_complete(personal.account)
@@ -1862,6 +1875,18 @@ class CorporateDocumentsSerializer(serializers.Serializer):
             corporate.status = str(CustomerStatus.submitted)
             corporate.save()
 
+            try:
+                last_document_verification = DocumentVerification.objects\
+                    .filter(corporate_id=corporate.id)\
+                    .latest('created_at')
+                if corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or \
+                        corporate.contact_lastname != last_document_verification.meta['contact_lastname']:
+                    is_applicant_changed = True
+                else:
+                    is_applicant_changed = False
+            except DocumentVerification.DoesNotExist:
+                is_applicant_changed = False
+
             doc_verification = DocumentVerification.objects.create(
                 user=corporate.account.user,
                 corporate=corporate,
@@ -1892,7 +1917,8 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                       'contact_street': str(corporate.contact_street),
                       'contact_apartment': str(corporate.contact_apartment),
                       'contact_city': str(corporate.contact_city),
-                      'contact_postcode': str(corporate.contact_postcode)})
+                      'contact_postcode': str(corporate.contact_postcode)},
+                is_applicant_changed=is_applicant_changed)
 
             doc_verification.save()
             ga_integration.on_status_registration_complete(corporate.account)
