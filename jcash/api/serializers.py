@@ -1877,7 +1877,7 @@ class CorporateDocumentsSerializer(serializers.Serializer):
 
             try:
                 last_document_verification = DocumentVerification.objects\
-                    .filter(coporate_id=corporate.uuid)\
+                    .filter(corporate_id=corporate.uuid)\
                     .latest('created_at')
                 if corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or \
                         corporate.contact_lastname != last_document_verification.meta['contact_lastname']:
