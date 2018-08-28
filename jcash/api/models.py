@@ -192,6 +192,7 @@ class Account(models.Model):
                 doc_verification.save()
 
             notify.send_email_jcash_application_unsuccessful(self.user.email if self.user else None,
+                                                             reason,
                                                              self.user.id if self.user else None)
 
     @classmethod

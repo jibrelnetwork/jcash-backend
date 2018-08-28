@@ -393,8 +393,11 @@ def send_email_jcash_application_underway(email, user_id = None):
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_underway, data=ctx)
 
 
-def send_email_jcash_application_unsuccessful(email, user_id = None):
+def send_email_jcash_application_unsuccessful(email, reason, user_id = None):
     ctx = company_links()
+    ctx.update({
+        'reason': reason,
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_unsuccessful, data=ctx)
 
 
