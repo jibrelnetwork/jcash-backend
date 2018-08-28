@@ -1498,7 +1498,9 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 last_document_verification = DocumentVerification.objects\
                     .filter(personal_id=personal.uuid)\
                     .latest('created_at')
-                if personal.firstname != last_document_verification.meta['firstname'] or \
+                if 'firstname' not in last_document_verification.meta or\
+                        'lastname' not in last_document_verification.meta or\
+                        personal.firstname != last_document_verification.meta['firstname'] or\
                         personal.lastname != last_document_verification.meta['lastname']:
                     is_applicant_changed = True
                 else:
@@ -1879,7 +1881,9 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 last_document_verification = DocumentVerification.objects\
                     .filter(corporate_id=corporate.uuid)\
                     .latest('created_at')
-                if corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or \
+                if 'contact_firstname' not in last_document_verification.meta or \
+                        'contact_lastname' not in last_document_verification.meta or\
+                        corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or\
                         corporate.contact_lastname != last_document_verification.meta['contact_lastname']:
                     is_applicant_changed = True
                 else:
