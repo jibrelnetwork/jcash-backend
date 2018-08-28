@@ -1774,6 +1774,8 @@ class EmailTemplatesView(GenericAPIView):
 
     {"success": false, "error": "error_description"}
     ```
+
+    * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     permission_classes = (permissions.IsAdminUser,)
@@ -1796,6 +1798,8 @@ class SendEmailView(GenericAPIView):
     {"success": true} |
     {"success": false, "error": "error_description"}
     ```
+
+    * Requires token authentication.
     """
     authentication_classes = (authentication.TokenAuthentication,)
     permission_classes = (permissions.IsAdminUser,)
