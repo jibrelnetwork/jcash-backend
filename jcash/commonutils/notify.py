@@ -331,6 +331,7 @@ def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_r
         'rec_curr': rec_curr,
         'eth_address': eth_address,
         'fx_rate': fx_rate,
+        'dashboard_url': '{}/dashboard/'.format(config.FRONTEND_URL),
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_successful, data=ctx)
 
