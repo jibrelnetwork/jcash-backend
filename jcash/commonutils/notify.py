@@ -34,7 +34,7 @@ def _format_fiat_value(value: float, currency: str) -> str:
 
 
 def _format_float_value(value: float, currency: str) -> str:
-    return "{0:} {1:}".format(value, currency)
+    return "{0:,} {1:}".format(value, currency)
 
 
 def _format_coin_value(value: float) -> str:
@@ -42,7 +42,7 @@ def _format_coin_value(value: float) -> str:
 
 
 def _format_conversion_rate(value: float, base_cur: str, rec_cur: str) -> str:
-    return "1 {0:} ≈ {1:} {2:}".format(base_cur, value, rec_cur)
+    return "1 {0:} ≈ {1:,} {2:}".format(base_cur, value, rec_cur)
 
 
 def _format_date_period(start_date: datetime, end_date: datetime) -> str:
@@ -331,6 +331,7 @@ def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_r
         'rec_curr': rec_curr,
         'eth_address': eth_address,
         'fx_rate': fx_rate,
+        'dashboard_url': '{}/dashboard/'.format(config.FRONTEND_URL),
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_successful, data=ctx)
 
@@ -393,8 +394,11 @@ def send_email_jcash_application_underway(email, user_id = None):
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_underway, data=ctx)
 
 
-def send_email_jcash_application_unsuccessful(email, user_id = None):
+def send_email_jcash_application_unsuccessful(email, reason, user_id = None):
     ctx = company_links()
+    ctx.update({
+        'reason': reason,
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_unsuccessful, data=ctx)
 
 

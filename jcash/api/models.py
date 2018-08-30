@@ -192,6 +192,7 @@ class Account(models.Model):
                 doc_verification.save()
 
             notify.send_email_jcash_application_unsuccessful(self.user.email if self.user else None,
+                                                             reason,
                                                              self.user.id if self.user else None)
 
     @classmethod
@@ -286,7 +287,9 @@ class Personal(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     version = IntegerVersionField()
     # Contact information
-    fullname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    firstname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    lastname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
+    middlename = models.CharField(max_length=PersonalFieldLength.fullname, null=True, blank=True)
     nationality = models.CharField(max_length=PersonalFieldLength.nationality, null=False, blank=True)
     birthday = models.DateField(null=True, blank=True)
     phone = models.CharField(max_length=PersonalFieldLength.phone, null=False, blank=True)
@@ -384,7 +387,10 @@ class Corporate(models.Model):
     jcash_use = models.CharField(max_length=CorporateFieldLength.jcash_use, null=False, blank=True)
 
     # Primary contact
-    contact_fullname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_firstname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_lastname = models.CharField(max_length=CorporateFieldLength.fullname, null=False, blank=True)
+    contact_middlename = models.CharField(max_length=CorporateFieldLength.fullname, null=True, blank=True)
+
     contact_birthday = models.DateField(null=True, blank=True)
     contact_nationality = models.CharField(max_length=CorporateFieldLength.country, null=False, blank=True)
     contact_residency = models.CharField(max_length=CorporateFieldLength.country, null=False, blank=True)
@@ -735,7 +741,8 @@ class Currency(models.Model):
     controller_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     license_registry_address = models.CharField(unique=True, max_length=255, blank=True, null=True)
     is_erc20_token = models.BooleanField(default=False)
-    balance = models.FloatField()
+    balance = models.FloatField(default=0.0)
+    total_supply = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)
     abi = JSONField(default=dict)
     round_digits = models.IntegerField(null=False, default=8)
@@ -745,7 +752,7 @@ class Currency(models.Model):
 
     rel_base_currencies = 'base_currencies'
     rel_reciprocal_currencies = 'reciprocal_currencies'
-    rel_currencies = 'incoming_transactions'
+    rel_incomingtxs = 'incoming_transactions'
     rel_exchanges = 'exchanges'
     rel_refunds = 'refunds'
     rel_licenseusers = 'licenseusers'
@@ -806,6 +813,46 @@ class CurrencyPairRate(models.Model):
 
     class Meta:
         db_table = 'currency_pair_rate'
+        indexes = (
+            models.Index(fields=['created_at']),
+        )
+
+
+# JntRate
+class JntRate(models.Model):
+    source = models.CharField(max_length=30)  # source of price information (e.g. BiBox, Gate.io)
+    price = models.FloatField()
+    created_at = models.DateTimeField()
+    meta = JSONField(default={})
+
+    class Meta:
+        db_table = 'jnt_rate'
+        indexes = (
+            models.Index(fields=['created_at']),
+            models.Index(fields=['source']),
+        )
+
+
+# LiquidityProvider
+class LiquidityProvider(models.Model):
+    entity = models.CharField(max_length=255)
+    address = models.CharField(max_length=255, blank=True, null=True)
+    jnt_pledge = models.FloatField(default=0.0)
+
+    class Meta:
+        db_table = 'liquidity_provider'
+        indexes = (
+            models.Index(fields=['entity']),
+        )
+
+
+# ProofOfSolvency
+class ProofOfSolvency(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    meta = JSONField(default={})
+
+    class Meta:
+        db_table = 'proof_of_solvency'
         indexes = (
             models.Index(fields=['created_at']),
         )
@@ -880,6 +927,7 @@ class Application(models.Model):
     base_amount_actual = models.FloatField(default=0.0)
     reciprocal_amount = models.FloatField()
     reciprocal_amount_actual = models.FloatField(default=0.0)
+    fee = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     expired_at = models.DateTimeField(blank=True, null=True)
@@ -957,7 +1005,7 @@ class IncomingTransaction(models.Model):
     application = models.ForeignKey(Application, models.DO_NOTHING,
                                     related_name=Application.rel_incoming_txs, null=True)
     currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING,
-                                 related_name=Currency.rel_currencies, null=True)
+                                 related_name=Currency.rel_incomingtxs, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     mined_at = models.DateTimeField(null=True, blank=True)
     block_height = models.IntegerField(blank=True, null=True)
@@ -984,6 +1032,17 @@ class IncomingTransaction(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['is_linked']),
         )
+
+
+# Exchange Fee
+class ExchangeFee(models.Model):
+    value = models.FloatField(default=0)
+    type = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    from_block = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'exchange_fee'
 
 
 # Exchange

@@ -6,7 +6,7 @@ from dateutil.tz import tzlocal
 import time
 
 from django.db import transaction
-from django.db.models import Q, F, Count, Max
+from django.db.models import Q, F, Count, Sum, When, Case, FloatField
 from django.utils import timezone
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
@@ -33,6 +33,10 @@ from jcash.api.models import (
     Personal,
     Corporate,
     ApplicationCancelReason,
+    JntRate,
+    LiquidityProvider,
+    ProofOfSolvency,
+    ExchangeFee
 )
 from jcash.commonutils import (
     notify,
@@ -44,6 +48,7 @@ from jcash.commonutils import (
     exchange_utils as utils,
     ga_integration,
     sql_utils,
+    bibox,
 )
 from jcash.api.tasks import celery_refund_eth, celery_transfer_eth, celery_refund_token, celery_transfer_token
 from jcash.settings import (
@@ -205,33 +210,34 @@ def verify_document(document_verification_id):
     customer = get_customer_by_document_verification(document_verification)
     if document_verification and customer:
         with transaction.atomic():
-            if not customer.onfido_applicant_id:
+            if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
                 if isinstance(customer, Personal):
-                    full_name = document_verification.personal.fullname
-                    first_name = full_name.split(" ")[0]
-                    last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
+                    first_name = document_verification.personal.firstname
+                    last_name = document_verification.personal.lastname
+                    middle_name = document_verification.personal.middlename
                     birtday = document_verification.personal.birthday
                 elif isinstance(customer, Corporate):
-                    full_name = document_verification.corporate.contact_fullname
-                    first_name = full_name.split(" ")[0]
-                    last_name = full_name.split(" ")[1] if len(full_name.split(" "))>1 else ""
+                    first_name = document_verification.corporate.contact_firstname
+                    last_name = document_verification.corporate.contact_lastname
+                    middle_name = document_verification.corporate.contact_middlename
                     birtday = document_verification.corporate.contact_birthday
                 else:
                     logger.error('Document verification id=%s has no customer', document_verification.pk)
                     return
 
                 email = document_verification.user.email
-                if not customer.onfido_applicant_id or document_verification.is_applicant_changed:
-                    try:
-                        applicant_id = person_verify.create_applicant(first_name, last_name, email, birtday)
-                    except:
-                        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-                        logging.getLogger(__name__).info("Failed to create onfido applicant {}{}{}{} due to error:\n{}"
-                                                          .format(first_name, last_name, email, birtday, exception_str))
-                        return
-                    else:
-                        customer.onfido_applicant_id = applicant_id
-                        customer.save()
+                try:
+                    applicant_id = person_verify.create_applicant(first_name, middle_name, last_name, email, birtday)
+                except:
+                    exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+                    logging.getLogger(__name__).error("Failed to create onfido applicant {} {} {} {} due to error:\n{}"
+                                                      .format(email, first_name, last_name, birtday, exception_str))
+                    return
+                else:
+                    customer.onfido_applicant_id = applicant_id
+                    customer.save()
+                    document_verification.meta['onfido_applicant_id'] = applicant_id
+                    document_verification.save()
 
                 logger.info('Applicant %s created for %s',
                             customer.onfido_applicant_id,
@@ -540,6 +546,8 @@ def fetch_currencies_state():
                     currency.balance = eth_contracts.balanceToken(currency.abi,
                                                                   currency.view_address,
                                                                   currency.exchanger_address)
+                    currency.total_supply = eth_contracts.totalSupply(currency.abi,
+                                                                      currency.view_address)
                 else:
                     currency.balance = eth_contracts.balanceEth(currency.exchanger_address)
                 currency.save()
@@ -840,3 +848,117 @@ def check_address_licenses():
         exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
         logging.getLogger(__name__).error("Failed to check address licenses due to exception:\n{}"
                                           .format(exception_str))
+
+
+def build_proof_of_solvency():
+    solvency = {
+        "data": {
+            "summary": {
+                "jnt_price": 0.0,
+                "solvency_requirement": 0.0,
+                "proof_of_solvency": 0.0,
+                "liquidity": 0.0
+            },
+            "crydrs": {},
+            "liquidity_providers": [],
+        }
+    }
+
+    # noinspection PyBroadException
+    try:
+        logging.getLogger(__name__).info("Start to build proof of solvency")
+
+        with transaction.atomic():
+            try:
+                jnt_price_record = JntRate.objects.all().latest('created_at')
+                jnt_price = jnt_price_record.price
+            except JntRate.DoesNotExist:
+                price_provider = bibox.BiBox()
+                jnt_price = price_provider.get_price("JNT", "ETH")[1]
+
+            fees = Application.objects.filter(status=str(ApplicationStatus.converted)).aggregate(Sum('fee'))
+            fees_sum = fees['fee__sum'] if fees['fee__sum'] else 0.0
+
+            liquidity_providers_jnts = LiquidityProvider.objects.aggregate(Sum('jnt_pledge'))
+            liquidity_providers_jnts_sum = liquidity_providers_jnts['jnt_pledge__sum'] \
+                if liquidity_providers_jnts['jnt_pledge__sum'] else 0.0
+
+            liquidity_providers = LiquidityProvider.objects.all()
+
+            incoming_cur = Currency.objects.filter(is_erc20_token=True)\
+                .values('display_name')\
+                .annotate(val_sum=Sum(Case(When(incoming_transactions__status__in=[TransactionStatus.confirmed,
+                                                                                   TransactionStatus.rejected],
+                                           then=F('incoming_transactions__value')),
+                                           output_field=FloatField())))
+
+            exchanged_cur = Currency.objects.filter(is_erc20_token=True)\
+                .values('display_name')\
+                .annotate(val_sum=Sum(Case(When(exchanges__status__in=[TransactionStatus.success],
+                                           then=F('exchanges__value')),
+                                           output_field=FloatField())),
+                          total_supply=Sum('total_supply'))
+
+            refunded_cur = Currency.objects.filter(is_erc20_token=True)\
+                .values('display_name')\
+                .annotate(val_sum=Sum(Case(When(refunds__status__in=[TransactionStatus.success],
+                                           then=F('refunds__value')),
+                                           output_field=FloatField())))
+
+            jnt_requirement = 0.0
+
+            for i in range(0,exchanged_cur.count()):
+                exchanged = exchanged_cur[i]['val_sum'] if exchanged_cur[i]['val_sum'] else 0.0
+                incoming = incoming_cur[i]['val_sum'] if incoming_cur[i]['val_sum'] else 0.0
+                refunded = refunded_cur[i]['val_sum'] if refunded_cur[i]['val_sum'] else 0.0
+                calculating = exchanged - incoming + refunded \
+                    if (exchanged - incoming + refunded) > 0.0 \
+                    else 0.0
+
+                jnt_requirement += calculating / jnt_price
+
+                solvency['data']['crydrs'][exchanged_cur[i]['display_name']] = {
+                    "minted": exchanged_cur[i]['total_supply'],
+                    "circulating": calculating,
+                    "jnt_requirement": calculating / jnt_price
+                }
+
+            for provider in liquidity_providers:
+                solvency['data']['liquidity_providers'].append(
+                    {
+                        "entity": provider.entity,
+                        "jnt_pledge": provider.jnt_pledge,
+                        "current_fee_share": provider.jnt_pledge / liquidity_providers_jnts_sum \
+                            if liquidity_providers_jnts_sum > 0.0 else 0.0,
+                        "fees_collected": provider.jnt_pledge / liquidity_providers_jnts_sum * fees_sum \
+                            if liquidity_providers_jnts_sum > 0.0 else 0.0
+                    })
+
+            solvency['data']['summary']['jnt_price'] = jnt_price
+            solvency['data']['summary']['solvency_requirement'] = jnt_requirement
+            solvency['data']['summary']['proof_of_solvency'] = liquidity_providers_jnts_sum
+            solvency['data']['summary']['liquidity'] = liquidity_providers_jnts_sum / jnt_requirement \
+                if jnt_requirement > 0.0 else 0.0
+
+            pos = ProofOfSolvency.objects.create(meta=solvency)
+            pos.save()
+
+        logging.getLogger(__name__).info("Finished building proof of solvency")
+    except Exception:
+        exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+        logging.getLogger(__name__).error("Failed to build proof of solvency due to exception:\n{}"
+                                          .format(exception_str))
+
+    return solvency
+
+
+def proof_of_solvency():
+    """
+    Get latest report of proof of solvency
+    :return: Proof of solvency
+    """
+    try:
+        solvency = ProofOfSolvency.objects.all().latest('created_at')
+        return solvency.meta
+    except ProofOfSolvency.DoesNotExist:
+        return build_proof_of_solvency()

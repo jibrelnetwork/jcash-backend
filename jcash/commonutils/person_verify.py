@@ -25,10 +25,11 @@ def get_client(api_key=None):
     return api
 
 
-def create_applicant(first_name, last_name, email, birthday):
+def create_applicant(first_name, middle_name, last_name, email, birthday):
     details = {
         'first_name': first_name,
         'last_name': last_name,
+        'middle_name': middle_name,
         'email': email,
         'dob': birthday,
     }

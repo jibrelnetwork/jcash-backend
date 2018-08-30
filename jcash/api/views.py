@@ -48,6 +48,7 @@ from jcash.api.models import (
     Personal,
     Corporate,
     CustomerStatus,
+    ExchangeFee,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -86,6 +87,7 @@ from jcash.api.serializers import (
 from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
+from jcash.appprocessor.commands import proof_of_solvency
 
 
 logger = logging.getLogger(__name__)
@@ -110,8 +112,7 @@ def docstring_parameter(*sub):
     return dec
 
 
-@docstring_parameter(get_status_class_members(AccountStatus),
-                     get_status_class_members(CustomerStatus))
+@docstring_parameter(get_status_class_members(AccountStatus))
 class AccountView(GenericAPIView):
     """
     get:
@@ -122,25 +123,20 @@ class AccountView(GenericAPIView):
     ```
     {{"success": true,
      "username": "ivan_ivanov@example.com",
-     "fullname": "Ivan Ivanov",
+     "firstname": "Ivan",
+     "lastname": "Ivanov",
+     "middlename": null,
      "birthday": "2017-01-01",
      "nationality": "Zambia",
      "residency": "Zambia",
      "is_email_confirmed":true,
      "status": "verified",
-     "customers": [{{ "type": "personal",
-                     "uuid": "f9229b1b-f859-4cc9-b8ef-501238ca721b",
-                     "status": "submitted"}}]
     }}
     ```
 
     **Account Statuses**
 
     {0}
-
-    **Customers Statuses**
-
-    {1}
 
     * Requires token authentication.
     """
@@ -180,18 +176,7 @@ class AccountView(GenericAPIView):
         self.action = request.method.lower()
         account_serializer = AccountSerializer(account)
 
-        customers = []
-
-        if hasattr(account, account.rel_personal):
-            customers.append(account.personal)
-
-        if hasattr(account, account.rel_corporate):
-            customers.append(account.corporate)
-
-        customer_serializer = CustomersSerializer(customers, many=True)
-        response_data = account_serializer.data
-        response_data.update({"customers": customer_serializer.data})
-        return Response(response_data)
+        return Response(account_serializer.data)
 
 
 class ResendEmailConfirmationView(GenericAPIView):
@@ -215,6 +200,33 @@ class ResendEmailConfirmationView(GenericAPIView):
             return Response({'success': False, 'error': [_('Resend email confirmation failed')]}, status=400)
         logger.info('Resend email confirmation succeeded {}'.format(request.user.username))
         return Response({'success': True})
+
+
+class FeeJntView(APIView):
+    """
+    Get current exchange fee in JNT.
+
+    Response example:
+
+    ```
+    {"success":true, "value": 50.0} |
+    {"success":false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+
+    def get(self, request):
+        fee_entry = ExchangeFee.objects.all().order_by("-from_block").first()
+        if not fee_entry:
+            return Response({'success': False, 'error': 'Fee does not exist.'}, status=400)
+
+        data = {'success': True,
+                'value': fee_entry.value}
+
+        return Response(data)
 
 
 class CurrencyView(APIView):
@@ -597,7 +609,8 @@ class ApplicationView(GenericAPIView):
     "is_reverse": false,
     "status": "converting",
     "reason": "",
-    "round_digits": 2
+    "round_digits": 2,
+    "fee": 50.0
     }}]}}
     ```
 
@@ -1023,7 +1036,8 @@ class PersonalContactInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "fullname": "", "nationality": "", "birthday": "", "phone": ""} |
+    {"success": true, "firstname": "", "lastname": "", "middlename": "", "nationality": "",
+    "birthday": "", "phone": ""} |
     {"success": false, "error": "error_description"}
     ```
 
@@ -1389,7 +1403,8 @@ class CorporateContactInfoView(GenericAPIView):
     Response example:
 
     ```
-    {"success": true, "contact_fullname": "", "contact_birthday": "", "contact_nationality": "",
+    {"success": true, "contact_firstname": "", "contact_lastname": "", "contact_middlename": "",
+    "contact_birthday": "", "contact_nationality": "",
     "contact_residency": "", "contact_phon": "", "contact_email": "", "contact_street": "",
     "contact_apartment": "", "contact_city": "", "contact_postcode": ""} |
     {"success": false, "error": "error_description"}
@@ -1563,3 +1578,108 @@ class ValidatePasswordView(GenericAPIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             return Response({'success': True})
+
+
+@docstring_parameter(get_status_class_members(CustomerStatus))
+class CustomersView(GenericAPIView):
+    """
+    get:
+    Get customers list.
+
+    Response example:
+
+    ```
+    {{"success": true, "customers": [{{ "type": "personal",
+                     "uuid": "f9229b1b-f859-4cc9-b8ef-501238ca721b",
+                     "status": "submitted"}}]}}
+    ```
+
+    **Customers Statuses**
+
+    {0}
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = CountriesSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        account = AccountView.ensure_account(request)
+        customers = []
+
+        if hasattr(account, account.rel_personal):
+            customers.append(account.personal)
+
+        if hasattr(account, account.rel_corporate):
+            customers.append(account.corporate)
+
+        customer_serializer = CustomersSerializer(customers, many=True)
+        response_data = {"success": True, "customers": customer_serializer.data}
+
+        return Response(response_data)
+
+
+class ProofOfSolvencyView(GenericAPIView):
+    """
+    get:
+    Proof of solvency.
+
+    Response example:
+
+    ```
+    {
+      "success": true,
+      "data": {
+        "summary": {
+          "jnt_price": 0.1,
+          "solvency_requirement": 202159,
+          "proof_of_solvency": 1250000,
+          "liquidity": 6.1832
+        },
+        "crydrs": {
+          "jUSD": {
+            "minted": 1000000,
+            "circulating": 11257.12,
+            "jnt_requirement": 114285.48
+          },
+          "jEUR": {
+            "minted": 400000,
+            "circulating": 12.11,
+            "jnt_requirement": 122.96
+          },
+          "jKRW": {
+            "minted": 350000000,
+            "circulating": 4512.24,
+            "jnt_requirement": 45809.54
+          },
+          "jGBP": {
+            "minted": 200000,
+            "circulating": 4131.20,
+            "jnt_requirement": 41941.12
+          }
+        },
+        "liquidity_providers": [{
+          "entity": "JNT Commercial Brokers",
+          "jnt_pledge": 1000000,
+          "current_fee_share": 0.8,
+          "fees_collected": 100
+        }, {
+          "entity": "JNT Commercial Brokers #2",
+          "jnt_pledge": 250000,
+          "current_fee_share": 0.2,
+          "fees_collected": 230
+        }]
+      }
+    }
+    ```
+
+    """
+    permission_classes = (permissions.AllowAny,)
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        response_data = proof_of_solvency()
+        response_data.update({'success': True})
+
+        return Response(response_data)

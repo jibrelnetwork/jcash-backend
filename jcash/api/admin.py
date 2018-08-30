@@ -37,6 +37,10 @@ from jcash.api.models import (
     DocumentVerification,
     AccountType,
     LicenseAddress,
+    ExchangeFee,
+    LiquidityProvider,
+    JntRate,
+    ProofOfSolvency,
 )
 
 from jcash.api import serializers
@@ -493,7 +497,7 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(Personal)
 class PersonalAdmin(admin.ModelAdmin):
-    list_display = ['user_name', 'fullname', 'nationality', 'birthday', 'phone',
+    list_display = ['user_name', 'firstname', 'middlename', 'lastname', 'nationality', 'birthday', 'phone',
                     'country', 'street', 'apartment', 'city', 'postcode',
                     'profession', 'income_source', 'assets_origin', 'jcash_use', 'created_at', 'last_updated_at']
     search_fields = ['account__user__username']
@@ -511,7 +515,8 @@ class CorporateAdmin(admin.ModelAdmin):
     list_display = ['user_name', 'name', 'domicile_country', 'business_phone', 'country',
                     'street', 'apartment', 'city', 'postcode', 'industry', 'assets_origin',
                     'currency_nature', 'assets_origin_description', 'jcash_use',
-                    'contact_fullname', 'contact_birthday', 'contact_nationality', 'contact_residency',
+                    'contact_firstname', 'contact_middlename', 'contact_lastname',
+                    'contact_birthday', 'contact_nationality', 'contact_residency',
                     'contact_phone', 'contact_email', 'contact_street', 'contact_apartment',
                     'contact_city', 'contact_postcode', 'created_at', 'last_updated_at']
     search_fields = ['account__user__username']
@@ -606,6 +611,27 @@ class LogEntryAdmin(admin.ModelAdmin):
             return 'DELETION'
         else:
             return str(obj.action_flag)
+
+
+@admin.register(ExchangeFee)
+class ExchangeFeeAdmin(admin.ModelAdmin):
+    list_display = ['id', 'from_block', 'value', 'created_at']
+    ordering = ('from_block',)
+
+
+@admin.register(LiquidityProvider)
+class LiquidityProviderAdmin(admin.ModelAdmin):
+    list_display = ['id', 'entity', 'address', 'jnt_pledge']
+
+
+@admin.register(JntRate)
+class JntRateAdmin(admin.ModelAdmin):
+    list_display = ['id', 'source', 'price', 'created_at']
+
+
+@admin.register(ProofOfSolvency)
+class ProofOfSolvencyAdmin(admin.ModelAdmin):
+    list_display = ['id', 'meta']
 
 
 admin.site.unregister(EmailAddress)
