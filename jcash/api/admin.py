@@ -371,7 +371,13 @@ class ApplicationAdmin(admin.ModelAdmin):
 
     @staticmethod
     def username(obj):
-        return obj.address.user.username
+        if hasattr(obj, 'address') and \
+                obj.address and \
+                hasattr(obj.address, 'user') and \
+                obj.address.user:
+            return obj.address.user.username
+        else:
+            return '-'
 
     @staticmethod
     def currency_name(obj):
