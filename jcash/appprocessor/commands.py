@@ -19,6 +19,7 @@ from jcash.api.models import (
     Notification,
     IncomingTransaction,
     Currency,
+    CurrencyPairRate,
     TransactionStatus,
     Address,
     Application,
@@ -885,25 +886,34 @@ def build_proof_of_solvency():
 
             liquidity_providers = LiquidityProvider.objects.all()
 
+            latest_rates = CurrencyPairRate.objects \
+                .order_by('currency_pair__reciprocal_currency__id', '-created_at') \
+                .distinct('currency_pair__reciprocal_currency__id')
+
+            currency_rates = {rate.currency_pair.display_name: rate.buy_price for rate in latest_rates}
+
             incoming_cur = Currency.objects.filter(is_erc20_token=True)\
                 .values('display_name')\
                 .annotate(val_sum=Sum(Case(When(incoming_transactions__status__in=[TransactionStatus.confirmed,
                                                                                    TransactionStatus.rejected],
                                            then=F('incoming_transactions__value')),
-                                           output_field=FloatField())))
+                                           output_field=FloatField()))) \
+                .order_by('currency__id')
 
             exchanged_cur = Currency.objects.filter(is_erc20_token=True)\
                 .values('display_name')\
                 .annotate(val_sum=Sum(Case(When(exchanges__status__in=[TransactionStatus.success],
                                            then=F('exchanges__value')),
                                            output_field=FloatField())),
-                          total_supply=Sum('total_supply'))
+                          total_supply=Sum('total_supply')) \
+                .order_by('currency__id')
 
             refunded_cur = Currency.objects.filter(is_erc20_token=True)\
                 .values('display_name')\
                 .annotate(val_sum=Sum(Case(When(refunds__status__in=[TransactionStatus.success],
                                            then=F('refunds__value')),
-                                           output_field=FloatField())))
+                                           output_field=FloatField()))) \
+                .order_by('currency__id')
 
             jnt_requirement = 0.0
 
@@ -915,12 +925,16 @@ def build_proof_of_solvency():
                     if (exchanged - incoming + refunded) > 0.0 \
                     else 0.0
 
-                jnt_requirement += calculating / jnt_price
+                eth_usd = currency_rates['ETH/JUSD']
+                eth_cur = currency_rates['ETH/{}'.format(exchanged_cur[i]['display_name'])]
+                usd_cur = eth_cur / eth_usd
+
+                jnt_requirement += calculating / jnt_price / usd_cur
 
                 solvency['data']['crydrs'][exchanged_cur[i]['display_name']] = {
                     "minted": exchanged_cur[i]['total_supply'],
                     "circulating": calculating,
-                    "jnt_requirement": calculating / jnt_price
+                    "jnt_requirement": calculating / jnt_price / usd_cur
                 }
 
             for provider in liquidity_providers:
