@@ -942,7 +942,7 @@ def build_proof_of_solvency():
                     {
                         "entity": provider.entity,
                         "jnt_pledge": provider.jnt_pledge,
-                        "current_fee_share": provider.jnt_pledge / liquidity_providers_jnts_sum \
+                        "current_fee_share": provider.jnt_pledge / liquidity_providers_jnts_sum * 100.0 \
                             if liquidity_providers_jnts_sum > 0.0 else 0.0,
                         "fees_collected": provider.jnt_pledge / liquidity_providers_jnts_sum * fees_sum \
                             if liquidity_providers_jnts_sum > 0.0 else 0.0
@@ -951,7 +951,7 @@ def build_proof_of_solvency():
             solvency['data']['summary']['jnt_price'] = jnt_price
             solvency['data']['summary']['solvency_requirement'] = jnt_requirement
             solvency['data']['summary']['proof_of_solvency'] = liquidity_providers_jnts_sum
-            solvency['data']['summary']['liquidity'] = liquidity_providers_jnts_sum / jnt_requirement \
+            solvency['data']['summary']['liquidity'] = liquidity_providers_jnts_sum / jnt_requirement * 100.0 \
                 if jnt_requirement > 0.0 else 0.0
 
             pos = ProofOfSolvency.objects.create(meta=solvency)
