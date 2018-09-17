@@ -11,6 +11,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
+from rest_framework.pagination import (
+    LimitOffsetPagination,
+    PageNumberPagination,
+)
 from rest_framework import authentication, permissions
 from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model, logout as django_logout
@@ -88,6 +92,7 @@ from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
 from jcash.appprocessor.commands import proof_of_solvency
+from jcash.api.pagination import ApplicationPageNumberPagination
 
 
 logger = logging.getLogger(__name__)
@@ -588,7 +593,11 @@ class ApplicationView(GenericAPIView):
     Response example:
 
     ```
-    {{"success":true, "applications":
+    {{"success":true,
+      "count": 1,
+      "next": "http://localhost:8000/api/application/?page=2",
+      "previous": null,
+      "applications":
     [{{
     "app_uuid": "6242cd54-0616-48d8-b1d4-d1ed99116b1b",
     "created_at": "2018-05-22T16:08:21.132030Z",
@@ -644,11 +653,20 @@ class ApplicationView(GenericAPIView):
     parser_classes = (JSONParser,)
     serializer_class = ApplicationSerializer
     permission_classes = (IsAuthenticated,)
+    pagination_class = ApplicationPageNumberPagination
 
     def get(self, request):
-        applications_qs = Application.objects.filter(user=request.user).order_by('-created_at')
-        applications = ApplicationsSerializer(applications_qs, many=True).data
-        return Response({"success": True, "application": applications})
+        applications_qs = Application.objects.filter(user=self.request.user).order_by('-created_at')
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(applications_qs, request)
+
+        serializer = ApplicationsSerializer(page, many=True)
+        pagination_data = dict(paginator.get_paginated_response(serializer.data).data)
+        pagination_data['success'] = True
+        pagination_data['applications'] = pagination_data.pop('results')
+
+        return Response(pagination_data)
 
     @transaction.atomic
     @require_lock(Application, 'ROW SHARE')
