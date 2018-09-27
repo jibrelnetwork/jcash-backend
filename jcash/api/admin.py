@@ -574,12 +574,15 @@ class DocumentVerificationAdmin(admin.ModelAdmin):
             return None
 
     def document_thumb(self, obj):
-        if not obj.image:
+        if not obj or not obj.image:
             return ''
         if obj.ext.lower() in ('jpg', 'jpeg', 'png'):
             return format_html('<a href="{src}"><img src="{src}" height="30"/></a>', src=obj.image.url)
         else:
-            return obj.image.url
+            return format_html('<a href="{url}">{type}.{ext}</a>',
+                               url=obj.image.url,
+                               type=obj.type.lower(),
+                               ext=obj.ext.lower())
 
     def passport_thumb(self, obj):
         return self.document_thumb(obj.passport)
