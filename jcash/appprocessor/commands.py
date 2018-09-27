@@ -898,6 +898,7 @@ def build_proof_of_solvency():
                                                                                    TransactionStatus.rejected],
                                            then=F('incoming_transactions__value')),
                                            output_field=FloatField()))) \
+                .filter(is_disabled=False) \
                 .order_by('id')
 
             exchanged_cur = Currency.objects.filter(is_erc20_token=True)\
@@ -906,6 +907,7 @@ def build_proof_of_solvency():
                                            then=F('exchanges__value')),
                                            output_field=FloatField())),
                           total_supply=Sum('total_supply')) \
+                .filter(is_disabled=False) \
                 .order_by('id')
 
             refunded_cur = Currency.objects.filter(is_erc20_token=True)\
@@ -913,6 +915,7 @@ def build_proof_of_solvency():
                 .annotate(val_sum=Sum(Case(When(refunds__status__in=[TransactionStatus.success],
                                            then=F('refunds__value')),
                                            output_field=FloatField()))) \
+                .filter(is_disabled=False) \
                 .order_by('id')
 
             jnt_requirement = 0.0
