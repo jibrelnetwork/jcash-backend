@@ -30,7 +30,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, AccountStatus, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
-    ApplicationCancelReason, ExchangeFee, LiquidityProvider,
+    ApplicationCancelReason, ExchangeFee, LiquidityProvider, VideoVerification,
 )
 from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
@@ -2067,3 +2067,31 @@ class ValidatePasswordSerializer(serializers.Serializer):
 
     def validate_password(self, password):
         return get_adapter().clean_password(password)
+
+
+class VideoVerificationSerializer(serializers.Serializer):
+    """
+    Serializer that set Ziggeo video id.
+    """
+    vid = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        video_verification_id = self.context.get('uuid')
+
+        if not video_verification_id:
+            raise serializers.ValidationError(_('no such verification'))
+
+        try:
+            self.video_verification = VideoVerification.objects.get(id=video_verification_id)
+        except VideoVerification.DoesNotExist:
+            raise serializers.ValidationError(_('no such verification'))
+
+        if self.video_verification.video_id:
+            raise serializers.ValidationError(_('verification completed'))
+
+        return attrs
+
+    def save(self):
+        with transaction.atomic():
+            self.video_verification.video_id = self.validated_data.get('vid')
+            self.video_verification.save()
