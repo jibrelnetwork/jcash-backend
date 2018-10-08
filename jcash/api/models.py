@@ -9,12 +9,13 @@ from django.conf import settings
 from django.contrib.postgres.fields import JSONField
 from django.template.loader import render_to_string
 from django.utils.timezone import now
+from django.utils import timezone
 from django.contrib.auth.tokens import default_token_generator as token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from concurrency.fields import IntegerVersionField
 
 from jcash.commonutils import notify
-from jcash.settings import FRONTEND_URL
+from jcash.settings import FRONTEND_URL, LOGIC__VIDEO_VERIFY_TEXT
 
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,7 @@ class Account(models.Model):
     rel_corporate = 'corporate'
     rel_documentverification = 'documentverification'
     rel_licenseaddress = 'licenseaddress'
+    rel_videoverification = 'videoverification'
 
     # Relationships
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -129,6 +131,26 @@ class Account(models.Model):
         self.is_blocked = False
         self.save()
 
+    def get_customer(self):
+        personal = None
+        corporate = None
+        if hasattr(self, 'personal'):
+            personal = self.personal
+        if hasattr(self, 'corporate'):
+            corporate = self.corporate
+
+        if corporate and personal:
+            if personal.last_updated_at >= corporate.last_updated_at:
+                return personal
+            else:
+                return corporate
+        elif corporate:
+            return corporate
+        elif personal:
+            return personal
+        else:
+            return None
+
     def approve_verification(self):
         with transaction.atomic():
             self.is_identity_verified = True
@@ -150,26 +172,6 @@ class Account(models.Model):
             notify.send_email_jcash_application_approved(self.user.email if self.user else None,
                                                          FRONTEND_URL,
                                                          self.user.id if self.user else None)
-
-    def get_customer(self):
-        personal = None
-        corporate = None
-        if hasattr(self, 'personal'):
-            personal = self.personal
-        if hasattr(self, 'corporate'):
-            corporate = self.corporate
-
-        if corporate and personal:
-            if personal.last_updated_at >= corporate.last_updated_at:
-                return personal
-            else:
-                return corporate
-        elif corporate:
-            return corporate
-        elif personal:
-            return personal
-        else:
-            return None
 
     def decline_verification(self, reason):
         with transaction.atomic():
@@ -194,6 +196,32 @@ class Account(models.Model):
             notify.send_email_jcash_application_unsuccessful(self.user.email if self.user else None,
                                                              reason,
                                                              self.user.id if self.user else None)
+
+    def video_verification(self):
+        with transaction.atomic():
+            doc_verification = None
+            customer = self.get_customer()
+            if customer:
+                customer.status = str(CustomerStatus.submitted)
+                customer.save()
+                if hasattr(customer, 'document_verifications') and \
+                        customer.document_verifications.count() > 0:
+                    doc_verification = customer.document_verifications.latest('created_at')
+            if doc_verification:
+                video_message = LOGIC__VIDEO_VERIFY_TEXT.format(
+                    customer.firstname if isinstance(customer, Personal) else customer.contact_firstname,
+                    customer.lastname if isinstance(customer, Personal) else customer.contact_lastname,
+                    timezone.now().strftime('%Y %B %d %I:%M %p'))
+
+                video_verification = VideoVerification.objects.create(message=video_message)
+                video_verification.save()
+
+                doc_verification.video_verification = video_verification
+                doc_verification.save()
+
+                notify.send_email_video_verification(self.user.email if self.user else None,
+                                                     FRONTEND_URL,
+                                                     self.user.id if self.user else None)
 
     @classmethod
     def is_user_email_confirmed(cls, user):
@@ -453,6 +481,7 @@ class DocumentType:
     utilitybills = 'utilitybills'
     selfie = 'selfie'
     report = 'report'
+    video = 'video'
 
 
 # Document model
@@ -478,6 +507,7 @@ class Document(models.Model):
     rel_utilitybills_verification = 'utilitybills_verification'
     rel_selfie_verification = 'selfie_verification'
     rel_report_verification = 'report_verification'
+    rel_video_verification = 'video_verification'
 
     class Meta:
         db_table = 'document'
@@ -486,6 +516,31 @@ class Document(models.Model):
             models.Index(fields=['type']),
             models.Index(fields=['group']),
             models.Index(fields=['created_at']),
+        )
+
+
+# VideoVerification
+class VideoVerification(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    version = IntegerVersionField()
+    message = models.CharField(unique=False, max_length=1024)
+    video_id = models.CharField(unique=False, null=True, blank=True, max_length=1024)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+
+    # Relationships
+    file = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                blank=True, null=True, related_name=Document.rel_video_verification)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
+                             blank=False, null=False, related_name=Account.rel_videoverification)
+
+    rel_video_verification = 'video_document_verification'
+
+    class Meta:
+        db_table = 'video_verification'
+        indexes = (
+            models.Index(fields=['created_at']),
+            models.Index(fields=['is_verified']),
         )
 
 
@@ -519,6 +574,9 @@ class DocumentVerification(models.Model):
 
     report = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
                                   blank=True, null=True, related_name=Document.rel_report_verification)
+
+    video_verification = models.OneToOneField(VideoVerification, on_delete=models.DO_NOTHING,
+                                  blank=True, null=True, related_name=VideoVerification.rel_video_verification)
 
     comment = models.TextField(null=True, blank=True)
 
@@ -626,6 +684,7 @@ class NotificationType:
     password_reset                 = 'password_reset'
     refund_successful              = 'refund_successful'
     verify_email                   = 'verify_email'
+    video_verification             = 'video_verification'
 
 
 class Notification(models.Model):
@@ -667,6 +726,7 @@ class Notification(models.Model):
         NotificationType.password_reset: 'password_reset',
         NotificationType.refund_successful: 'refund_successful',
         NotificationType.verify_email: 'verify_email',
+        NotificationType.video_verification: 'video_verification',
     }
 
     notification_subjects = {
@@ -684,6 +744,7 @@ class Notification(models.Model):
         'password_reset': 'Uh oh..forgot your password?',
         'refund_successful': 'Refund successful!',
         'verify_email': 'One Step away!',
+        'video_verification': 'Needs video verification!',
     }
 
     def __str__(self):

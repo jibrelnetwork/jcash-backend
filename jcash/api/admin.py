@@ -217,7 +217,8 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def account_actions(self, obj):
         return format_html(
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=block" data-action="block">Block</a>&nbsp;'
-            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=unblock" data-action="block">Unblock</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=unblock" data-action="unblock">Unblock</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=video" data-action="video">Video</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=approve" data-action="approve">Approve</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=decline" data-action="decline">Decline</a>&nbsp;',
             url = reverse('admin:account-action', args=[obj.pk]))
@@ -264,6 +265,15 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                          extra_tags='safe')
         return HttpResponse('OK')
 
+    def video_verification(self, request, account_id, *args, **kwargs):
+        account = get_object_or_404(Account, pk=account_id)
+        logger.info('Start video verification for %s', account.user.username)
+        account.video_verification()
+        messages.success(request,
+                         mark_safe('Video verification <b>started</b> for {}'.format(account.user.username)),
+                         extra_tags='safe')
+        return HttpResponse('OK')
+
     def account_action(self, request, account_id, *args, **kwargs):
         if request.method == 'POST' and request.POST.get('confirm'):
             action = request.POST.get('action')
@@ -275,6 +285,8 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                 return self.approve_identity_verification(request, account_id)
             elif action == 'decline':
                 return self.decline_identity_verification(request, account_id)
+            elif action == 'video':
+                return  self.video_verification(request, account_id)
         else:
             account = get_object_or_404(Account, pk=account_id)
             action = request.GET.get('action')

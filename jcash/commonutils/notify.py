@@ -432,3 +432,11 @@ def send_email_verify_email(email, activate_url, user_id = None):
         'user_name': email,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.verify_email, data=ctx)
+
+
+def send_email_video_verification(email, activate_url, user_id = None):
+    ctx = company_links()
+    ctx.update({
+        'activate_url': activate_url,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.video_verification, data=ctx)

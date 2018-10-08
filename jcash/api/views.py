@@ -53,6 +53,7 @@ from jcash.api.models import (
     Corporate,
     CustomerStatus,
     ExchangeFee,
+    VideoVerification,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -87,6 +88,7 @@ from jcash.api.serializers import (
     CustomersSerializer,
     CheckTokenSerializer,
     ValidatePasswordSerializer,
+    VideoVerificationSerializer,
 )
 from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
@@ -741,6 +743,52 @@ class ApplicationDetailView(GenericAPIView):
             return Response({"success": False, "error": "no such application"}, status=400)
         application = ApplicationsSerializer(app, many=False).data
         return Response({"success": True, "application": application})
+
+
+class VideoVerificationView(GenericAPIView):
+    """
+    get:
+    Returns video verification details.
+
+    Response example:
+
+    ```{{"success":true, "message":"I, John Smith, ..."}}```
+
+    or
+
+    ```{{"success":false, "error": "error_description"}}```
+
+    post:
+    Set Ziggeo video ID.
+
+    Response example:
+
+    ```{{"success":true}}```
+
+    or
+
+    ```{{"success":false, "error": "error_description"}}```
+    """
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = VideoVerificationSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request, uuid=None):
+        try:
+            verification = VideoVerification.objects.filter(id=uuid).first()
+        except:
+            return Response({"success": False, "error": "no such verification"}, status=400)
+
+        if verification.video_id:
+            return Response({"success": False, "error": "no such verification"}, status=400)
+
+        return Response({"success": True, "message": verification.message})
+
+    def post(self, request, uuid=None):
+        serializer = self.serializer_class(data=request.data, context={'uuid': uuid})
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({"success": True})
 
 
 class ApplicationConfirmView(GenericAPIView):

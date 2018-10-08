@@ -315,6 +315,8 @@ LOGIC__REFUND_FEE_PERCENT = os.getenv('LOGIC_REFUND_FEE_PERCENT', 0.0)
 LOGIC__OUT_OF_DATE_PRICE_SEC = os.getenv('LOGIC_OUT_OF_DATE_PRICE_SEC', 10*60)
 LOGIC__ADDRESS_VERIFY_TEXT = os.getenv('LOGIC_ADDRESS_VERIFY_TEXT',
     "I, {} {}, hereby confirm that I and only I own and have access to the private key of the address {}. Date: {} UTC")
+LOGIC__VIDEO_VERIFY_TEXT = os.getenv('LOGIC_VIDEO_VERIFY_TEXT',
+    "I, {} {}, hereby confirm that I and only I own and have access to the Jcash account. Date: {} UTC")
 
 # Alphavantage.co API
 ALPHAVANTAGE__API_KEY = os.getenv('ALPHAVANTAGE_API_KEY', '')
