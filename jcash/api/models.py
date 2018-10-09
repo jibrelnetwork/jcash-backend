@@ -213,7 +213,8 @@ class Account(models.Model):
                     customer.lastname if isinstance(customer, Personal) else customer.contact_lastname,
                     timezone.now().strftime('%Y %B %d %I:%M %p'))
 
-                video_verification = VideoVerification.objects.create(message=video_message)
+                video_verification = VideoVerification.objects.create(user=self.user,
+                                                                      message=video_message)
                 video_verification.save()
 
                 doc_verification.video_verification = video_verification

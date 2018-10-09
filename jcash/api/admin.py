@@ -41,6 +41,7 @@ from jcash.api.models import (
     LiquidityProvider,
     JntRate,
     ProofOfSolvency,
+    VideoVerification,
 )
 
 from jcash.api import serializers
@@ -653,6 +654,25 @@ class JntRateAdmin(admin.ModelAdmin):
 @admin.register(ProofOfSolvency)
 class ProofOfSolvencyAdmin(admin.ModelAdmin):
     list_display = ['id', 'meta']
+
+
+@admin.register(VideoVerification)
+class VideoVerificationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'username', 'created_at', 'message', 'video_link', 'is_verified']
+    search_fields = ['id', 'user__username']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        return obj.user.username
+
+    def video_link(self, obj):
+        if obj.file:
+            return format_html('<a href="{url}">video</a>',
+                               url=obj.file.url)
+        else:
+            return '-'
+    video_link.allow_tags = True
 
 
 admin.site.unregister(EmailAddress)
