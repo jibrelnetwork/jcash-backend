@@ -769,23 +769,25 @@ class VideoVerificationView(GenericAPIView):
 
     ```{{"success":false, "error": "error_description"}}```
     """
-    permission_classes = (permissions.AllowAny,)
+    authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = VideoVerificationSerializer
     parser_classes = (JSONParser,)
 
-    def get(self, request, uuid=None):
+    def get(self, request):
         try:
-            verification = VideoVerification.objects.filter(id=uuid).first()
-        except:
-            return Response({"success": False, "error": "no such verification"}, status=400)
+            verification = VideoVerification.objects\
+                .filter(user=request.user)\
+                .latest('created_at')
+        except VideoVerification.DoesNotExist:
+            return Response({"success": False, "error": "verification has not started yet"}, status=400)
 
         if verification.video_id:
-            return Response({"success": False, "error": "no such verification"}, status=400)
+            return Response({"success": False, "error": "verification completed"}, status=400)
 
         return Response({"success": True, "message": verification.message})
 
-    def post(self, request, uuid=None):
-        serializer = self.serializer_class(data=request.data, context={'uuid': uuid})
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data, context={'user': request.user})
         if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response({"success": True})

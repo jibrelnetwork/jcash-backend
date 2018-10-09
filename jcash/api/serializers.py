@@ -198,6 +198,15 @@ class AccountSerializer(serializers.Serializer):
             obj.is_identity_declined:
             return str(AccountStatus.declined)
 
+        try:
+            verification = VideoVerification.objects.filter(user=obj.user).latest('created_at')
+            if not obj.is_identity_declined and not verification.is_verified and not verification.video_id:
+                return str(AccountStatus.needs_video_verification)
+            elif not obj.is_identity_declined and not verification.is_verified and verification.video_id:
+                return str(AccountStatus.pending_approve_video_verification)
+        except VideoVerification.DoesNotExist:
+            pass
+
         if is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \
             not obj.is_identity_declined:
@@ -2076,15 +2085,12 @@ class VideoVerificationSerializer(serializers.Serializer):
     vid = serializers.CharField(required=True)
 
     def validate(self, attrs):
-        video_verification_id = self.context.get('uuid')
-
-        if not video_verification_id:
-            raise serializers.ValidationError(_('no such verification'))
-
         try:
-            self.video_verification = VideoVerification.objects.get(id=video_verification_id)
+            self.video_verification = VideoVerification.objects\
+                .filter(user=self.context.get('user'))\
+                .latest('created_at')
         except VideoVerification.DoesNotExist:
-            raise serializers.ValidationError(_('no such verification'))
+            raise serializers.ValidationError(_("verification has not started yet"))
 
         if self.video_verification.video_id:
             raise serializers.ValidationError(_('verification completed'))
