@@ -43,6 +43,9 @@ class AccountStatus:
     declined = ObjStatus('declined', 'declined account')
     email_confirmation = ObjStatus('email_confirmation', 'email confirmation required')
     created = ObjStatus('created', 'new account')
+    needs_video_verification = ObjStatus('needs-video-verification', 'needs video verification')
+    pending_approve_video_verification = ObjStatus('pending-approve-video-verification',
+                                                   'user''s video verification in pending mode')
 
 
 # Account types
@@ -169,6 +172,10 @@ class Account(models.Model):
                 doc_verification.is_identity_declined = False
                 doc_verification.save()
 
+                if doc_verification.video_verification:
+                    doc_verification.video_verification.is_verified = True
+                    doc_verification.video_verification.save()
+
             notify.send_email_jcash_application_approved(self.user.email if self.user else None,
                                                          FRONTEND_URL,
                                                          self.user.id if self.user else None)
@@ -192,6 +199,10 @@ class Account(models.Model):
                 doc_verification.is_identity_declined = True
                 doc_verification.comment = reason
                 doc_verification.save()
+
+                if doc_verification.video_verification:
+                    doc_verification.video_verification.is_verified = False
+                    doc_verification.video_verification.save()
 
             notify.send_email_jcash_application_unsuccessful(self.user.email if self.user else None,
                                                              reason,
