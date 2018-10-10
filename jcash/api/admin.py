@@ -667,9 +667,9 @@ class VideoVerificationAdmin(admin.ModelAdmin):
         return obj.user.username
 
     def video_link(self, obj):
-        if obj.file:
+        if obj.document and obj.document.image:
             return format_html('<a href="{url}">video</a>',
-                               url=obj.file.url)
+                               url=obj.document.image.url)
         else:
             return '-'
     video_link.allow_tags = True
