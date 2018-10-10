@@ -210,6 +210,9 @@ class Account(models.Model):
 
     def video_verification(self):
         with transaction.atomic():
+            self.is_identity_verified = False
+            self.is_identity_declined = False
+            self.save()
             doc_verification = None
             customer = self.get_customer()
             if customer:
@@ -510,9 +513,9 @@ class Document(models.Model):
                              blank=False, null=False, related_name=Account.rel_documents)
 
     personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
-                                 related_name=Personal.rel_documents, null=True)
+                                 related_name=Personal.rel_documents, null=True, blank=True)
     corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
-                                  related_name=Corporate.rel_documents, null=True)
+                                  related_name=Corporate.rel_documents, null=True, blank=True)
     onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
 
     rel_passport_verification = 'passport_verification'
@@ -541,8 +544,8 @@ class VideoVerification(models.Model):
     is_verified = models.BooleanField(default=False)
 
     # Relationships
-    file = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
-                                blank=True, null=True, related_name=Document.rel_video_verification)
+    document = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=True, null=True, related_name=Document.rel_video_verification)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
                              blank=False, null=False, related_name=Account.rel_videoverification)
 

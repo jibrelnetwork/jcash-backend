@@ -200,9 +200,9 @@ class AccountSerializer(serializers.Serializer):
 
         try:
             verification = VideoVerification.objects.filter(user=obj.user).latest('created_at')
-            if not obj.is_identity_declined and not verification.is_verified and not verification.video_id:
+            if not obj.is_identity_declined and not obj.is_identity_verified and not verification.video_id:
                 return str(AccountStatus.needs_video_verification)
-            elif not obj.is_identity_declined and not verification.is_verified and verification.video_id:
+            elif not obj.is_identity_declined and not obj.is_identity_verified and verification.video_id:
                 return str(AccountStatus.pending_approve_video_verification)
         except VideoVerification.DoesNotExist:
             pass
@@ -2085,15 +2085,21 @@ class VideoVerificationSerializer(serializers.Serializer):
     vid = serializers.CharField(required=True)
 
     def validate(self, attrs):
+        user = self.context.get('user')
         try:
             self.video_verification = VideoVerification.objects\
-                .filter(user=self.context.get('user'))\
+                .filter(user=user)\
                 .latest('created_at')
         except VideoVerification.DoesNotExist:
             raise serializers.ValidationError(_("verification has not started yet"))
 
         if self.video_verification.video_id:
             raise serializers.ValidationError(_('verification completed'))
+
+        if hasattr(user, 'account') and user.account:
+            if user.account.is_identity_verified or \
+                    user.account.is_identity_declined:
+                raise serializers.ValidationError(_('verification completed'))
 
         return attrs
 

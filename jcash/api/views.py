@@ -784,6 +784,11 @@ class VideoVerificationView(GenericAPIView):
         if verification.video_id:
             return Response({"success": False, "error": "verification completed"}, status=400)
 
+        if hasattr(request.user, 'account') and request.user.account:
+            if request.user.account.is_identity_verified or \
+                    request.user.account.is_identity_declined:
+                return Response({"success": False, "error": "verification completed"}, status=400)
+
         return Response({"success": True, "message": verification.message})
 
     def post(self, request):

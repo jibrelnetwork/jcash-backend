@@ -327,6 +327,10 @@ LOGGING__SQLALCHEMY_ECHO = False
 
 LOGIN_REDIRECT_URL = '/'
 
+# Ziggeo config
+ZIGGEO__TOKEN = os.getenv('ZIGGEO_TOKEN', '')
+ZIGGEO__PRIVATE_KEY = os.getenv('ZIGGEO_PRIVATE_KEY', '')
+
 # Bitfinex config
 BITFINEX__TIMEOUT = 1
 
