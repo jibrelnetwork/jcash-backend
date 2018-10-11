@@ -248,6 +248,53 @@ class Account(models.Model):
             return False
 
     @classmethod
+    def get_status(cls, obj):
+        def is_personal_data_filled(obj):
+            customer = obj.get_customer() if obj else None
+            return True if customer and \
+                           (customer.status == str(CustomerStatus.submitted) or
+                            customer.status == str(CustomerStatus.declined)) else False
+
+        if not obj:
+            return ''
+
+        if obj.is_blocked:
+            return str(AccountStatus.blocked)
+
+        if not Account.is_user_email_confirmed(obj.user):
+            return str(AccountStatus.email_confirmation)
+
+        if not is_personal_data_filled(obj) and \
+            obj.is_identity_declined:
+            return str(AccountStatus.declined)
+
+        try:
+            verification = VideoVerification.objects.filter(user=obj.user).latest('created_at')
+            if not obj.is_identity_declined and not obj.is_identity_verified and not verification.video_id:
+                return str(AccountStatus.needs_video_verification)
+            elif not obj.is_identity_declined and not obj.is_identity_verified and verification.video_id:
+                return str(AccountStatus.pending_approve_video_verification)
+        except VideoVerification.DoesNotExist:
+            pass
+
+        if is_personal_data_filled(obj) and \
+            not obj.is_identity_verified and \
+            not obj.is_identity_declined:
+            return str(AccountStatus.pending)
+        elif is_personal_data_filled(obj) and \
+            obj.is_identity_verified and \
+            not obj.is_identity_declined:
+            return str(AccountStatus.verified)
+        elif is_personal_data_filled(obj) and \
+            obj.is_identity_declined:
+            return str(AccountStatus.declined)
+
+        if obj.is_identity_verified:
+            return str(AccountStatus.verified)
+
+        return str(AccountStatus.created)
+
+    @classmethod
     def check_exchange_rights(cls, user):
         if Account.is_user_email_confirmed(user) is False:
             return False, "Please confirm the e-mail"

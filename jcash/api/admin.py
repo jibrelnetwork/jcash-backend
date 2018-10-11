@@ -116,7 +116,7 @@ class ReadonlyMixin:
 @admin.register(Account)
 class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
-                    'verification_result', 'verification_report_link', 'is_identity_verified',
+                    'verification_result', 'verification_report_link', 'status', 'is_identity_verified',
                     'is_identity_declined', 'is_blocked', 'account_actions']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
     exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
@@ -145,6 +145,9 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     @staticmethod
     def username(obj):
         return obj.user.username
+
+    def status(self, obj):
+        return Account.get_status(obj)
 
     def customer_link(self, obj):
         if hasattr(obj.user, 'account'):
@@ -559,7 +562,7 @@ class ReplenisherAdmin(admin.ModelAdmin):
 @admin.register(DocumentVerification)
 class DocumentVerificationAdmin(admin.ModelAdmin):
     list_display = ['id', 'username', 'created_at', 'passport_thumb', 'utilitybills_thumb',
-                    'selfie_thumb', 'onfido_check_status', 'onfido_check_result',
+                    'selfie_thumb', 'video_link', 'onfido_check_status', 'onfido_check_result',
                     'is_identity_verified', 'is_identity_declined']
     search_fields = ['id', 'user__username']
     ordering = ('-id',)
@@ -605,6 +608,16 @@ class DocumentVerificationAdmin(admin.ModelAdmin):
 
     def selfie_thumb(self, obj):
         return self.document_thumb(obj.selfie)
+
+    def video_link(self, obj):
+        if obj.video_verification and \
+                obj.video_verification.document and \
+                obj.video_verification.document.image:
+            return format_html('<a href="{url}">video</a>',
+                               url=obj.video_verification.document.image.url)
+        else:
+            return '-'
+    video_link.allow_tags = True
 
     passport_thumb.short_description = 'Passport'
     passport_thumb.allow_tags = True
