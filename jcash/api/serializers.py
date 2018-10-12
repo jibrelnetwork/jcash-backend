@@ -31,6 +31,7 @@ from jcash.api.models import (
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
     ApplicationCancelReason, ExchangeFee, LiquidityProvider, VideoVerification,
+    NotificationType,
 )
 from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
@@ -2064,3 +2065,100 @@ class VideoVerificationSerializer(serializers.Serializer):
         with transaction.atomic():
             self.video_verification.video_id = self.validated_data.get('vid')
             self.video_verification.save()
+
+
+class SendEmailSerializer(serializers.Serializer):
+    """
+    Serializer for send email.
+    """
+
+    template = serializers.CharField(required=True)
+    to_address = serializers.EmailField(required=True)
+
+    # template parameters
+    base_curr = serializers.CharField(required=False)
+    rec_curr = serializers.CharField(required=False)
+    eth_address = serializers.CharField(required=False)
+    fx_rate  = serializers.CharField(required=False)
+    reason = serializers.CharField(required=False)
+    activate_url = serializers.CharField(required=False)
+    user_name = serializers.CharField(required=False)
+    device = serializers.CharField(required=False)
+    location = serializers.CharField(required=False)
+
+    def validate_template(self, template):
+        email_types = [attr for attr in dir(NotificationType) if not callable(getattr(NotificationType, attr)) and \
+                       not attr.startswith("__")]
+        if template not in email_types:
+            raise exceptions.ValidationError('Wrong template name')
+        return template
+
+    def save(self):
+        template = self.validated_data.get('template')
+        to_address = self.validated_data.get('to_address')
+        with transaction.atomic():
+            if template == NotificationType.verify_email:
+                notify.send_email_verify_email(to_address,
+                                               self.validated_data.get('activate_url', ''),
+                                               None, True)
+            elif template == NotificationType.password_reset:
+                notify.send_email_password_reset(to_address,
+                                                 self.validated_data.get('activate_url', ''),
+                                                 None, True)
+            elif template == NotificationType.refund_successful:
+                notify.send_email_refund_successful(to_address,
+                                                    self.validated_data.get('base_curr', ''),
+                                                    self.validated_data.get('eth_address', ''),
+                                                    self.validated_data.get('reason', ''),
+                                                    None, True)
+            elif template == NotificationType.password_reset_confirmation:
+                notify.send_email_password_reset_confirmation(to_address, None, True)
+            elif template == NotificationType.new_login_detected:
+                notify.send_email_new_login_detected(to_address,
+                                                     self.validated_data.get('device', ''),
+                                                     self.validated_data.get('location', ''),
+                                                     None, True)
+            elif template ==  NotificationType.jcash_application_unsuccessful:
+                notify.send_email_jcash_application_unsuccessful(to_address,
+                                                                 self.validated_data.get('reason', ''),
+                                                                 None, True)
+            elif template == NotificationType.exchange_unsuccessful:
+                notify.send_email_exchange_unsuccessful(to_address,
+                                                        self.validated_data.get('base_curr', ''),
+                                                        self.validated_data.get('reason', ''),
+                                                        None, True)
+            elif template == NotificationType.jcash_application_underway:
+                notify.send_email_jcash_application_underway(to_address, None, True)
+            elif template == NotificationType.jcash_application_approved:
+                notify.send_email_jcash_application_approved(to_address,
+                                                             self.validated_data.get('jcash_url', ''),
+                                                             None, True)
+            elif template == NotificationType.few_steps_away:
+                notify.send_email_few_steps_away(to_address,
+                                                 self.validated_data.get('jcash_url', ''),
+                                                 None, True)
+            elif template == NotificationType.exchange_successful:
+                notify.send_email_exchange_successful(to_address,
+                                                      self.validated_data.get('base_curr', ''),
+                                                      self.validated_data.get('rec_curr', ''),
+                                                      self.validated_data.get('eth_address', ''),
+                                                      self.validated_data.get('fx_rate', ''),
+                                                      None, True)
+            elif template == NotificationType.exchange_request:
+                notify.send_email_exchange_request(to_address,
+                                                   self.validated_data.get('base_curr', ''),
+                                                   self.validated_data.get('rec_curr', ''),
+                                                   self.validated_data.get('eth_address', ''),
+                                                   self.validated_data.get('fx_rate', ''),
+                                                   None, True)
+            elif template == NotificationType.eth_address_removed:
+                notify.send_email_eth_address_removed(to_address,
+                                                      self.validated_data.get('eth_address', ''),
+                                                      None, True)
+            elif template == NotificationType.eth_address_added:
+                notify.send_email_eth_address_added(to_address,
+                                                    self.validated_data.get('eth_address', ''),
+                                                    None, True)
+            elif template == NotificationType.video_verification:
+                notify.send_email_video_verification(to_address, self.validated_data.get('activate_url', ''),
+                                                     None, True)

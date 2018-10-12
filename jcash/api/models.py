@@ -749,6 +749,16 @@ class NotificationType:
     video_verification             = 'video_verification'
 
 
+def get_email_templates():
+    """
+    Get email templates of the service
+    """
+    return [getattr(NotificationType, attr) for attr in dir(NotificationType) \
+            if not callable(getattr(NotificationType, attr)) and not attr.startswith("__") and \
+            (not hasattr(getattr(NotificationType, attr), 'hide') or \
+             not getattr(NotificationType, attr).hide)]
+
+
 class Notification(models.Model):
     version = IntegerVersionField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,

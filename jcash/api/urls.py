@@ -33,4 +33,6 @@ urlpatterns = [
     url(r'^fee-jnt/', views.FeeJntView.as_view()),
     url(r'^proof-of-solvency/', views.ProofOfSolvencyView.as_view()),
     url(r'^video-verification/$', views.VideoVerificationView.as_view()),
+    url(r'^email-templates/', views.EmailTemplatesView.as_view()),
+    url(r'^send-email/', views.SendEmailView.as_view()),
 ]
