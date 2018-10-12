@@ -229,8 +229,12 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 ONFIDO_API_KEY = os.getenv('ONFIDO_API_KEY')
 
-
-RECAPTCHA_ENABLED = bool(os.getenv("RECAPTCHA_ENABLED", 1))
+RECAPTCHA_ENABLED = True
+if os.getenv("RECAPTCHA_ENABLED"):
+    try:
+        RECAPTCHA_ENABLED = bool(int(os.getenv("RECAPTCHA_ENABLED")))
+    except:
+        pass
 RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 
 ACCOUNT_EMAIL_REQUIRED = True
