@@ -1019,7 +1019,7 @@ def download_ziggeo_video_file(video_verification_id: str):
         video_verification.document = video_document
         video_verification.save()
 
-        #ziggeo.videos().delete(video_verification.video_id)
+        ziggeo.videos().delete(video_verification.video_id)
 
         logging.getLogger(__name__).info("Finished downloading Ziggeo video file: video_verification_id: {}"
                                          .format(video_verification_id))
@@ -1031,6 +1031,11 @@ def process_all_undownloaded_video():
     verifications = VideoVerification.objects.filter(~Q(video_id=None) &
                                                      Q(document=None))
     for verification in verifications:
-        download_ziggeo_video_file(verification.id)
+        try:
+            download_ziggeo_video_file(verification.id)
+        except:
+            exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
+            logging.getLogger(__name__).error("Failed to download Ziggeo video file {} due to exception:\n{}"
+                                              .format(verification.video_id, exception_str))
 
-    logger.info('Finished downloading Ziggeo vide files')
+    logger.info('Finished downloading Ziggeo video files')
