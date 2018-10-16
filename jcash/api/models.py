@@ -224,7 +224,8 @@ class Account(models.Model):
             if doc_verification:
                 video_message = LOGIC__VIDEO_VERIFY_TEXT.format(
                     customer.firstname if isinstance(customer, Personal) else customer.contact_firstname,
-                    customer.lastname if isinstance(customer, Personal) else customer.contact_lastname)
+                    customer.lastname if isinstance(customer, Personal) else customer.contact_lastname,
+                    customer.country if isinstance(customer, Personal) else customer.contact_residency)
 
                 video_verification = VideoVerification.objects.create(user=self.user,
                                                                       message=video_message)
