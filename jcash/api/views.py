@@ -1,9 +1,4 @@
-from datetime import datetime
-from itertools import chain
-from operator import itemgetter
 import logging
-import coreapi
-import coreschema
 import inspect
 import sys
 from allauth.account import app_settings as allauth_settings
@@ -38,7 +33,6 @@ from jcash.api.models import (
     Application,
     ApplicationStatus,
     ApplicationCancelReason,
-    ObjStatus,
     Country,
     CountryType,
     Personal,
