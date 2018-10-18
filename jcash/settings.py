@@ -191,16 +191,6 @@ MEDIA_ROOT = Path(APP_DIR) / 'uploads'
 FILE_UPLOAD_PERMISSIONS = 0o644
 
 
-EMAIL_HOST = 'smtp.mailgun.org'
-EMAIL_PORT = 587
-EMAIL_HOST_USER = ''
-EMAIL_HOST_PASSWORD = ''
-EMAIL_USE_TLS = True
-
-
-ACCOUNT_CONFIRM_EMAIL_ON_GET = True
-
-
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -256,20 +246,8 @@ COUNTRIES_NOT_ALLOWED = ['USA']
 #
 # ######################################################################
 
-# DB settings
-DATABASE_HOST = 'localhost'
-DATABASE_NAME = 'jcashdb'
-DATABASE_USER = 'jcashuser'
-DATABASE_PASS = 'password'
-
 # Frontend settings
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://localhost')
-
-# Sqlalchemy settings
-SQLALCHEMY_ECHO = True
-
-# Flask SQLAlchemy
-SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Celery configuration
 CELERY_NAME = "jibreljcashcelery"
@@ -277,14 +255,8 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", 'redis://:supersecretpass@loc
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", 'redis://:supersecretpass@localhost:6379/1')
 
 # Email notifications
-EMAIL_NOTIFICATIONS__ENABLED = True
 EMAIL_NOTIFICATIONS__MAILGUN_SENDER = 'Jibrel Network <donotreply@mailgun.jibrel.network>'
 EMAIL_NOTIFICATIONS__SENDGRID_SENDER = 'Jibrel Network <donotreply@sendgrid.jibrel.network>'
-EMAIL_NOTIFICATIONS__BACKUP_ENABLED = False
-EMAIL_NOTIFICATIONS__BACKUP_SENDER = 'Jibrel Backup <backup@mailgun.jibrel.network>'
-EMAIL_NOTIFICATIONS__BACKUP_ADDRESS = 'salebackup@jibrel.network'
-EMAIL_NOTIFICATIONS__SUPPORT_ADDRESS = 'support@jibrel'
-EMAIL_NOTIFICATIONS__MAX_ATTEMPTS = 3
 EMAIL_NOTIFICATIONS__SENDGRID_DOMAINS = ["yahoo", "sina.cn", "increw.com.au", "moeboard.net", "hanmail.net", "daum.net"]
 
 # Email templates
@@ -296,14 +268,9 @@ EMAIL_TEMPLATES__MEDIUM_LINK = os.getenv('EMAIL_TEMPLATES_MEDIUM_LINK', 'https:/
 EMAIL_TEMPLATES__CONTACT_SUPPORT_LINK = os.getenv('EMAIL_TEMPLATES_CONTACT_SUPPORT_LINK', 'https://jibrelnetwork.freshdesk.com/support/tickets/new')
 EMAIL_TEMPLATES__EMAIL_SUPPORT = os.getenv('EMAIL_TEMPLATES_EMAIL_SUPPORT', 'support@jibrel.network')
 
-# Force scanning address
-FORCE_SCANNING_ADDRESS__ENABLED = True
-FORCE_SCANNING_ADDRESS__EMAIL_RECIPIENT = 'Jibrel Presale <presale@jibrel.network>'
-
 # Mailgun API
 MAILGUN__API_KEY = os.getenv('MAILGUN_API_KEY', '')
 MAILGUN__API_MESSAGES_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/messages"
-MAILGUN__API_EVENTS_URL = "https://api.mailgun.net/v3/mailgun.jibrel.network/events"
 
 # SendGrid API
 SENDGRID__API_MESSAGES_URL = "https://api.sendgrid.com/api/mail.send.json"
@@ -469,23 +436,9 @@ CRAWLER_PROXY__URLS = [
     "199.115.116.233:1099",
     "199.115.116.233:1100"]
 
-# Check mail delivery
-CHECK_MAIL_DELIVERY__ENABLED = True
-CHECK_MAIL_DELIVERY__DAYS_DEPTH = 4
-
 appLogLevel = logging.DEBUG if DEBUG else logging.INFO
-sqlAlchemyLogLevel = logging.WARNING if DEBUG else logging.ERROR
 appHandlers = ['handler_console', 'sentry']
 
-mailFormat = '''
-Message type:\t\t%(levelname)s
-Location:\t\t%(pathname)s:%(lineno)d
-Module:\t\t%(module)s
-Function:\t\t%(funcName)s
-Time:\t\t%(asctime)s
-Message:
-%(message)s
-'''
 
 LOGGING = {
         'version': 1,
@@ -496,9 +449,6 @@ LOGGING = {
             },
             'formatter_brief': {
                 'format': '%(asctime)s > %(levelname)s > %(message)s'
-            },
-            'formatter_mail': {
-                'format': mailFormat
             },
         },
         'handlers': {
@@ -515,7 +465,6 @@ LOGGING = {
         },
         'loggers': {
             '': {'handlers': appHandlers, 'level': appLogLevel, 'propagate': False},
-            'sqlalchemy': {'handlers': appHandlers, 'level': sqlAlchemyLogLevel, 'propagate': False},
             'django.db.backends': {'handlers': appHandlers, 'level': 'DEBUG', 'propagate': False},
         },
     }

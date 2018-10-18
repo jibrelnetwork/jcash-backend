@@ -135,22 +135,6 @@ def _send_email_mailgun(sender: str,
                                                   .format(proposal_id, recipient, exception_str))
                 success = False
 
-    if config.EMAIL_NOTIFICATIONS__BACKUP_ENABLED:
-        # noinspection PyBroadException
-        try:
-            data = {
-                "from": config.EMAIL_NOTIFICATIONS__BACKUP_SENDER,
-                "to": config.EMAIL_NOTIFICATIONS__BACKUP_ADDRESS,
-                "subject": email_subject + ' >>> ' + recipient,
-                "html": email_body
-            }
-
-            requests.post(config.MAILGUN__API_MESSAGES_URL, auth=("api", config.MAILGUN__API_KEY), data=data, files=files)
-        except Exception:
-            exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-            logging.getLogger(__name__).error("Failed to send backup email '{}' due to error:\n{}"
-                                              .format(proposal_id, exception_str))
-
     return success, message_id
 
 
