@@ -38,7 +38,6 @@ from jcash.api.models import (
     JntRate,
     LiquidityProvider,
     ProofOfSolvency,
-    ExchangeFee,
     VideoVerification,
 )
 from jcash.commonutils import (

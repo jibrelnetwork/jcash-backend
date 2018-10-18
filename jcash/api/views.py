@@ -1,9 +1,4 @@
-from datetime import datetime
-from itertools import chain
-from operator import itemgetter
 import logging
-import coreapi
-import coreschema
 import inspect
 import sys
 from allauth.account import app_settings as allauth_settings
@@ -11,32 +6,24 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
-from rest_framework.pagination import (
-    LimitOffsetPagination,
-    PageNumberPagination,
-)
 from rest_framework import authentication, permissions
-from django.contrib.auth.models import User
-from django.contrib.auth import get_user_model, logout as django_logout
+from django.contrib.auth import logout as django_logout
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
 from rest_framework_extensions.cache.decorators import cache_response
-from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework import status
 from rest_auth.registration.views import RegisterView as RestAuthRegisterView, VerifyEmailView
 from django.db import transaction
 from rest_auth.app_settings import (
-    PasswordChangeSerializer,
     TokenSerializer,
     JWTSerializer
 )
 from rest_auth.views import (
     PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView, LoginView
 )
-from allauth.account.models import EmailAddress
 from allauth.account.utils import send_email_confirmation
 from jcash.api.models import (
     Address,
@@ -46,7 +33,6 @@ from jcash.api.models import (
     Application,
     ApplicationStatus,
     ApplicationCancelReason,
-    ObjStatus,
     Country,
     CountryType,
     Personal,
@@ -63,7 +49,6 @@ from jcash.api.serializers import (
     RemoveAddressSerializer,
     AddressVerifySerializer,
     AccountInitSerializer,
-    AccountUpdateSerializer,
     CurrencyRateSerializer,
     OpenCurrencyRateSerializer,
     CurrencySerializer,

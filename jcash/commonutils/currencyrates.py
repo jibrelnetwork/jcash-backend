@@ -8,7 +8,7 @@ from dateutil.tz import tzutc
 from .bitfinex import Bitfinex
 from .alphavantage import Alphavantage
 from .bibox import BiBox
-from jcash.api.models import Currency, CurrencyPair, CurrencyPairRate, JntRate
+from jcash.api.models import CurrencyPair, CurrencyPairRate, JntRate
 
 
 def get_currency_pair_rate(currency_pair_rate: CurrencyPairRate, is_reverse_operation: bool):
