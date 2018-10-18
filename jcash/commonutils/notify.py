@@ -7,11 +7,9 @@ import time
 import sys
 import traceback
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
-from email.utils import formatdate
-from jinja2 import FileSystemLoader, Environment
+from typing import List, Tuple, Optional
 
 from jcash.api import models as api_models
 from jcash import settings as config
