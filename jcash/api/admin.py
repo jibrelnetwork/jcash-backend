@@ -1,19 +1,15 @@
 import logging
-from wsgiref.util import FileWrapper
 from urllib.parse import urlencode
 
 from django.contrib import admin
 from django.utils.html import format_html
-from django.shortcuts import redirect, get_object_or_404, render
-from django.utils.crypto import get_random_string
+from django.shortcuts import get_object_or_404, render
 from django.conf.urls import url
 from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.http import HttpResponse
 from django.contrib.admin import SimpleListFilter
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
-from django.utils import timezone
-from rest_framework.authtoken.models import Token
 from allauth.account.models import EmailAddress
 from django.urls import reverse
 
@@ -44,8 +40,6 @@ from jcash.api.models import (
     VideoVerification,
 )
 
-from jcash.api import serializers
-from jcash.api import utils
 from jcash.commonutils import ga_integration
 
 
