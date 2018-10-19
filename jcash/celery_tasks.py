@@ -122,6 +122,13 @@ def celery_build_proof_of_solvency():
     return commands.build_proof_of_solvency()
 
 
+@celery_app.task()
+@locked_task()
+@initialize_app
+def celery_process_all_undownloaded_video():
+    return commands.process_all_undownloaded_video()
+
+
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(crontab(minute='*/1'),
@@ -188,3 +195,7 @@ def setup_periodic_tasks(sender, **kwargs):
                              celery_build_proof_of_solvency,
                              expires=15,
                              name='build_proof_of_solvency')
+    sender.add_periodic_task(crontab(minute='*/5'),
+                             celery_process_all_undownloaded_video,
+                             expires=25,
+                             name='process_all_undownloaded_video')

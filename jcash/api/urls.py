@@ -1,7 +1,4 @@
-
-from django.conf import settings
-from django.conf.urls import url, include
-from django.contrib import admin
+from django.conf.urls import url
 
 from jcash.api import views
 
@@ -32,4 +29,7 @@ urlpatterns = [
     url(r'^citizenship-countries/', views.CitizenshipCountriesView.as_view()),
     url(r'^fee-jnt/', views.FeeJntView.as_view()),
     url(r'^proof-of-solvency/', views.ProofOfSolvencyView.as_view()),
+    url(r'^video-verification/$', views.VideoVerificationView.as_view()),
+    url(r'^email-templates/', views.EmailTemplatesView.as_view()),
+    url(r'^send-email/', views.SendEmailView.as_view()),
 ]

@@ -7,11 +7,9 @@ import time
 import sys
 import traceback
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
-from email.utils import formatdate
-from jinja2 import FileSystemLoader, Environment
+from typing import List, Tuple, Optional
 
 from jcash.api import models as api_models
 from jcash import settings as config
@@ -134,22 +132,6 @@ def _send_email_mailgun(sender: str,
                 logging.getLogger(__name__).error("Failed to send email '{}' to '{}' due to error. Abort.\n{}"
                                                   .format(proposal_id, recipient, exception_str))
                 success = False
-
-    if config.EMAIL_NOTIFICATIONS__BACKUP_ENABLED:
-        # noinspection PyBroadException
-        try:
-            data = {
-                "from": config.EMAIL_NOTIFICATIONS__BACKUP_SENDER,
-                "to": config.EMAIL_NOTIFICATIONS__BACKUP_ADDRESS,
-                "subject": email_subject + ' >>> ' + recipient,
-                "html": email_body
-            }
-
-            requests.post(config.MAILGUN__API_MESSAGES_URL, auth=("api", config.MAILGUN__API_KEY), data=data, files=files)
-        except Exception:
-            exception_str = ''.join(traceback.format_exception(*sys.exc_info()))
-            logging.getLogger(__name__).error("Failed to send backup email '{}' due to error:\n{}"
-                                              .format(proposal_id, exception_str))
 
     return success, message_id
 
@@ -313,18 +295,19 @@ def company_links():
     }
 
 
-def send_email_exchange_request(email, base_curr, rec_curr, eth_address, fx_rate, user_id = None):
+def send_email_exchange_request(email, base_curr, rec_curr, eth_address, fx_rate, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'base_curr': base_curr,
         'rec_curr': rec_curr,
         'eth_address': eth_address,
         'fx_rate': fx_rate,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_request, data=ctx)
 
 
-def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_rate, user_id = None):
+def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_rate, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'base_curr': base_curr,
@@ -332,103 +315,129 @@ def send_email_exchange_successful(email, base_curr, rec_curr, eth_address, fx_r
         'eth_address': eth_address,
         'fx_rate': fx_rate,
         'dashboard_url': '{}/dashboard/'.format(config.FRONTEND_URL),
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_successful, data=ctx)
 
 
-def send_email_exchange_unsuccessful(email, base_curr, reason, user_id = None):
+def send_email_exchange_unsuccessful(email, base_curr, reason, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'base_curr': base_curr,
         'reason': reason,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.exchange_unsuccessful, data=ctx)
     pass
 
 
-def send_email_refund_successful(email, base_curr, eth_address, reason, user_id = None):
+def send_email_refund_successful(email, base_curr, eth_address, reason, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'base_curr': base_curr,
         'eth_address': eth_address,
         'reason': reason,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.refund_successful, data=ctx)
 
 
-def send_email_eth_address_added(email, eth_address, user_id = None):
+def send_email_eth_address_added(email, eth_address, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'eth_address': eth_address,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.eth_address_added, data=ctx)
 
 
-def send_email_eth_address_removed(email, eth_address, user_id = None):
+def send_email_eth_address_removed(email, eth_address, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'eth_address': eth_address,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.eth_address_removed, data=ctx)
 
 
-def send_email_few_steps_away(email, jcash_url, user_id = None):
+def send_email_few_steps_away(email, jcash_url, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'activate_url': jcash_url,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.few_steps_away, data=ctx)
 
 
-def send_email_jcash_application_approved(email, jcash_url, user_id = None):
+def send_email_jcash_application_approved(email, jcash_url, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'activate_url': jcash_url,
         'user_name': email,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_approved, data=ctx)
 
 
-def send_email_jcash_application_underway(email, user_id = None):
+def send_email_jcash_application_underway(email, user_id=None, is_api_call=False):
     ctx = company_links()
+    ctx.update({
+        'is_api_call': is_api_call,
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_underway, data=ctx)
 
 
-def send_email_jcash_application_unsuccessful(email, reason, user_id = None):
+def send_email_jcash_application_unsuccessful(email, reason, user_id = None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'reason': reason,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.jcash_application_unsuccessful, data=ctx)
 
 
 # ToDo: device?, location?
-def send_email_new_login_detected(email, device, location, user_id = None):
+def send_email_new_login_detected(email, device, location, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'device': device,
         'location': location,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.new_login_detected, data=ctx)
 
 
-def send_email_password_reset_confirmation(email, user_id = None):
+def send_email_password_reset_confirmation(email, user_id=None, is_api_call=False):
     ctx = company_links()
+    ctx.update({
+        'is_api_call': is_api_call,
+    })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset_confirmation, data=ctx)
 
 
-def send_email_password_reset(email, activate_url, user_id = None):
+def send_email_password_reset(email, activate_url, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'activate_url': activate_url,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.password_reset, data=ctx)
 
 
-def send_email_verify_email(email, activate_url, user_id = None):
+def send_email_verify_email(email, activate_url, user_id=None, is_api_call=False):
     ctx = company_links()
     ctx.update({
         'activate_url': activate_url,
         'user_name': email,
+        'is_api_call': is_api_call,
     })
     add_notification(email, user_id=user_id, type=api_models.NotificationType.verify_email, data=ctx)
+
+
+def send_email_video_verification(email, activate_url, user_id = None, is_api_call=False):
+    ctx = company_links()
+    ctx.update({
+        'activate_url': activate_url,
+        'is_api_call': is_api_call,
+    })
+    add_notification(email, user_id=user_id, type=api_models.NotificationType.video_verification, data=ctx)

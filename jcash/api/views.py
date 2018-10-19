@@ -1,9 +1,4 @@
-from datetime import datetime
-from itertools import chain
-from operator import itemgetter
 import logging
-import coreapi
-import coreschema
 import inspect
 import sys
 from allauth.account import app_settings as allauth_settings
@@ -11,32 +6,24 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
-from rest_framework.pagination import (
-    LimitOffsetPagination,
-    PageNumberPagination,
-)
 from rest_framework import authentication, permissions
-from django.contrib.auth.models import User
-from django.contrib.auth import get_user_model, logout as django_logout
+from django.contrib.auth import logout as django_logout
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
 from rest_framework_extensions.cache.decorators import cache_response
-from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework import status
 from rest_auth.registration.views import RegisterView as RestAuthRegisterView, VerifyEmailView
 from django.db import transaction
 from rest_auth.app_settings import (
-    PasswordChangeSerializer,
     TokenSerializer,
     JWTSerializer
 )
 from rest_auth.views import (
     PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView, LoginView
 )
-from allauth.account.models import EmailAddress
 from allauth.account.utils import send_email_confirmation
 from jcash.api.models import (
     Address,
@@ -46,13 +33,14 @@ from jcash.api.models import (
     Application,
     ApplicationStatus,
     ApplicationCancelReason,
-    ObjStatus,
     Country,
     CountryType,
     Personal,
     Corporate,
     CustomerStatus,
     ExchangeFee,
+    VideoVerification,
+    get_email_templates,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -61,7 +49,6 @@ from jcash.api.serializers import (
     RemoveAddressSerializer,
     AddressVerifySerializer,
     AccountInitSerializer,
-    AccountUpdateSerializer,
     CurrencyRateSerializer,
     OpenCurrencyRateSerializer,
     CurrencySerializer,
@@ -87,6 +74,8 @@ from jcash.api.serializers import (
     CustomersSerializer,
     CheckTokenSerializer,
     ValidatePasswordSerializer,
+    VideoVerificationSerializer,
+    SendEmailSerializer,
 )
 from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
@@ -741,6 +730,59 @@ class ApplicationDetailView(GenericAPIView):
             return Response({"success": False, "error": "no such application"}, status=400)
         application = ApplicationsSerializer(app, many=False).data
         return Response({"success": True, "application": application})
+
+
+class VideoVerificationView(GenericAPIView):
+    """
+    get:
+    Returns video verification details.
+
+    Response example:
+
+    ```{{"success":true, "message":"I, John Smith, ..."}}```
+
+    or
+
+    ```{{"success":false, "error": "error_description"}}```
+
+    post:
+    Set Ziggeo video ID.
+
+    Response example:
+
+    ```{{"success":true}}```
+
+    or
+
+    ```{{"success":false, "error": "error_description"}}```
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = VideoVerificationSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        try:
+            verification = VideoVerification.objects\
+                .filter(user=request.user)\
+                .latest('created_at')
+        except VideoVerification.DoesNotExist:
+            return Response({"success": False, "error": "verification has not started yet"}, status=400)
+
+        if verification.video_id:
+            return Response({"success": False, "error": "verification completed"}, status=400)
+
+        if hasattr(request.user, 'account') and request.user.account:
+            if request.user.account.is_identity_verified or \
+                    request.user.account.is_identity_declined:
+                return Response({"success": False, "error": "verification completed"}, status=400)
+
+        return Response({"success": True, "message": verification.message})
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data, context={'user': request.user})
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({"success": True})
 
 
 class ApplicationConfirmView(GenericAPIView):
@@ -1701,3 +1743,56 @@ class ProofOfSolvencyView(GenericAPIView):
         response_data.update({'success': True})
 
         return Response(response_data)
+
+
+class EmailTemplatesView(GenericAPIView):
+    """
+    get:
+    Get email templates
+
+    Response example:
+
+    ```
+    {"success": true, templates: [{'name':'password_reset','parameters':['activate_url','reason']}]}
+
+    or
+
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    permission_classes = (permissions.IsAdminUser,)
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        templates = get_email_templates()
+        response_data = {'success': True, 'templates': templates}
+        return Response(response_data)
+
+
+class SendEmailView(GenericAPIView):
+    """
+    post:
+    Send email
+
+    Response example:
+
+    ```
+    {"success": true} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+    """
+    authentication_classes = (authentication.TokenAuthentication,)
+    permission_classes = (permissions.IsAdminUser,)
+    serializer_class = SendEmailSerializer
+    parser_classes = (JSONParser,)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({'success': True})

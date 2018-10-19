@@ -1,19 +1,15 @@
 import logging
-from wsgiref.util import FileWrapper
 from urllib.parse import urlencode
 
 from django.contrib import admin
 from django.utils.html import format_html
-from django.shortcuts import redirect, get_object_or_404, render
-from django.utils.crypto import get_random_string
+from django.shortcuts import get_object_or_404, render
 from django.conf.urls import url
 from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.http import HttpResponse
 from django.contrib.admin import SimpleListFilter
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
-from django.utils import timezone
-from rest_framework.authtoken.models import Token
 from allauth.account.models import EmailAddress
 from django.urls import reverse
 
@@ -41,10 +37,9 @@ from jcash.api.models import (
     LiquidityProvider,
     JntRate,
     ProofOfSolvency,
+    VideoVerification,
 )
 
-from jcash.api import serializers
-from jcash.api import utils
 from jcash.commonutils import ga_integration
 
 
@@ -115,7 +110,7 @@ class ReadonlyMixin:
 @admin.register(Account)
 class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
-                    'verification_result', 'verification_report_link', 'is_identity_verified',
+                    'verification_result', 'verification_report_link', 'status', 'is_identity_verified',
                     'is_identity_declined', 'is_blocked', 'account_actions']
     list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
     exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
@@ -144,6 +139,9 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     @staticmethod
     def username(obj):
         return obj.user.username
+
+    def status(self, obj):
+        return Account.get_status(obj)
 
     def customer_link(self, obj):
         if hasattr(obj.user, 'account'):
@@ -217,7 +215,8 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     def account_actions(self, obj):
         return format_html(
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=block" data-action="block">Block</a>&nbsp;'
-            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=unblock" data-action="block">Unblock</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=unblock" data-action="unblock">Unblock</a>&nbsp;'
+            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=video" data-action="video">Video</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=approve" data-action="approve">Approve</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=decline" data-action="decline">Decline</a>&nbsp;',
             url = reverse('admin:account-action', args=[obj.pk]))
@@ -264,6 +263,15 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                          extra_tags='safe')
         return HttpResponse('OK')
 
+    def video_verification(self, request, account_id, *args, **kwargs):
+        account = get_object_or_404(Account, pk=account_id)
+        logger.info('Start video verification for %s', account.user.username)
+        account.video_verification()
+        messages.success(request,
+                         mark_safe('Video verification <b>started</b> for {}'.format(account.user.username)),
+                         extra_tags='safe')
+        return HttpResponse('OK')
+
     def account_action(self, request, account_id, *args, **kwargs):
         if request.method == 'POST' and request.POST.get('confirm'):
             action = request.POST.get('action')
@@ -275,6 +283,8 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                 return self.approve_identity_verification(request, account_id)
             elif action == 'decline':
                 return self.decline_identity_verification(request, account_id)
+            elif action == 'video':
+                return  self.video_verification(request, account_id)
         else:
             account = get_object_or_404(Account, pk=account_id)
             action = request.GET.get('action')
@@ -546,7 +556,7 @@ class ReplenisherAdmin(admin.ModelAdmin):
 @admin.register(DocumentVerification)
 class DocumentVerificationAdmin(admin.ModelAdmin):
     list_display = ['id', 'username', 'created_at', 'passport_thumb', 'utilitybills_thumb',
-                    'selfie_thumb', 'onfido_check_status', 'onfido_check_result',
+                    'selfie_thumb', 'video_link', 'onfido_check_status', 'onfido_check_result',
                     'is_identity_verified', 'is_identity_declined']
     search_fields = ['id', 'user__username']
     ordering = ('-id',)
@@ -592,6 +602,16 @@ class DocumentVerificationAdmin(admin.ModelAdmin):
 
     def selfie_thumb(self, obj):
         return self.document_thumb(obj.selfie)
+
+    def video_link(self, obj):
+        if obj.video_verification and \
+                obj.video_verification.document and \
+                obj.video_verification.document.image:
+            return format_html('<a href="{url}">video</a>',
+                               url=obj.video_verification.document.image.url)
+        else:
+            return '-'
+    video_link.allow_tags = True
 
     passport_thumb.short_description = 'Passport'
     passport_thumb.allow_tags = True
@@ -641,6 +661,25 @@ class JntRateAdmin(admin.ModelAdmin):
 @admin.register(ProofOfSolvency)
 class ProofOfSolvencyAdmin(admin.ModelAdmin):
     list_display = ['id', 'meta']
+
+
+@admin.register(VideoVerification)
+class VideoVerificationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'username', 'created_at', 'message', 'video_link', 'is_verified']
+    search_fields = ['id', 'user__username']
+    ordering = ('-created_at',)
+
+    @staticmethod
+    def username(obj):
+        return obj.user.username
+
+    def video_link(self, obj):
+        if obj.document and obj.document.image:
+            return format_html('<a href="{url}">video</a>',
+                               url=obj.document.image.url)
+        else:
+            return '-'
+    video_link.allow_tags = True
 
 
 admin.site.unregister(EmailAddress)

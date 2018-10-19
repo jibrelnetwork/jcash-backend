@@ -1,17 +1,8 @@
-import csv
-import io
-import zipfile
-
-from allauth.account.adapter import DefaultAccountAdapter, build_absolute_uri
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.contrib.sites.shortcuts import get_current_site
-from django.contrib.auth import get_user_model
+from allauth.account.adapter import DefaultAccountAdapter
 from rest_framework.views import exception_handler
 from rest_framework import exceptions
 from django.utils.encoding import force_text
 
-from jcash.api.models import Address, Account
 from jcash.api.views import AccountView
 from jcash.commonutils.notify import send_email_verify_email
 from jcash.settings import FRONTEND_URL
