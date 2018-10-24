@@ -109,12 +109,15 @@ def download_onfido_report(document_verification, url):
 
         try:
             if not document_verification.report:
-                document_verification.report = Document.objects.create(user=document_verification.user,
-                                                                       type=DocumentType.report,
-                                                                       ext='html')
-
-                document_verification.report.image.save(DocumentHelper.unique_document_filename(None, 'report.html'),
-                                                        File(tmp_file))
+                with transaction.atomic():
+                    document_verification.report = Document.objects.create(user=document_verification.user,
+                                                                           type=DocumentType.report,
+                                                                           ext='html')
+                    document_verification.report.image.save(
+                        DocumentHelper.unique_document_filename(None, 'report.html'),
+                        File(tmp_file))
+                    document_verification.user.account.is_verification_report_available = True
+                    document_verification.user.account.save()
         except:
             logger.error('download_onfido_report: failed saving report into DB (verification:{})'
                          .format(document_verification.pk))

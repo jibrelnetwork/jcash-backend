@@ -111,7 +111,7 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
     list_display = ['id', 'username', 'customer_link', 'verification_link', 'verification_status',
                     'verification_result', 'verification_report_link', 'status', 'is_identity_verified',
                     'is_identity_declined', 'is_blocked', 'account_actions']
-    list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked']
+    list_filter = ['is_identity_verified', 'is_identity_declined', 'is_blocked', 'is_verification_report_available']
     exclude = ['first_name', 'last_name', 'fullname', 'citizenship', 'birthday', 'residency',
                'country', 'street', 'town', 'postcode', 'terms_confirmed']
     search_fields = ['user__username']
