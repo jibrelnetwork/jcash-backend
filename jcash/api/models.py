@@ -6,6 +6,7 @@ from django.db import models, transaction
 from django.conf import settings
 from django.contrib.postgres.fields import JSONField
 from django.template.loader import render_to_string
+from django.utils.translation import ugettext_lazy as _
 from concurrency.fields import IntegerVersionField
 
 from jcash.commonutils import notify
@@ -26,6 +27,13 @@ class ObjStatus:
         return self.name
 
     def __str__(self):
+        if not isinstance(self.name, str):
+            raise Exception(_('Value is not str.'))
+        return self.name
+
+    def __int__(self):
+        if not isinstance(self.name, int):
+            raise Exception(_('Value is not int.'))
         return self.name
 
 
@@ -47,6 +55,16 @@ class AccountType:
     personal = 'personal'
     corporate = 'corporate'
     beneficiary = 'beneficiary'
+
+
+def get_account_types():
+    """
+    Get account types of the service
+    """
+    return [getattr(AccountType, attr) for attr in dir(AccountType) \
+            if not callable(getattr(AccountType, attr)) and not attr.startswith("__") and \
+            (not hasattr(getattr(AccountType, attr), 'hide') or \
+             not getattr(AccountType, attr).hide)]
 
 
 # Account model
@@ -89,7 +107,6 @@ class Account(models.Model):
     rel_corporate = 'corporate'
     rel_documentverification = 'documentverification'
     rel_licenseaddress = 'licenseaddress'
-    rel_videoverification = 'videoverification'
 
     # Relationships
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -166,10 +183,6 @@ class Account(models.Model):
                 doc_verification.is_identity_declined = False
                 doc_verification.save()
 
-                if doc_verification.video_verification:
-                    doc_verification.video_verification.is_verified = True
-                    doc_verification.video_verification.save()
-
             notify.send_email_jcash_application_approved(self.user.email if self.user else None,
                                                          FRONTEND_URL,
                                                          self.user.id if self.user else None)
@@ -194,43 +207,9 @@ class Account(models.Model):
                 doc_verification.comment = reason
                 doc_verification.save()
 
-                if doc_verification.video_verification:
-                    doc_verification.video_verification.is_verified = False
-                    doc_verification.video_verification.save()
-
             notify.send_email_jcash_application_unsuccessful(self.user.email if self.user else None,
                                                              reason,
                                                              self.user.id if self.user else None)
-
-    def video_verification(self):
-        with transaction.atomic():
-            self.is_identity_verified = False
-            self.is_identity_declined = False
-            self.save()
-            doc_verification = None
-            customer = self.get_customer()
-            if customer:
-                customer.status = str(CustomerStatus.submitted)
-                customer.save()
-                if hasattr(customer, 'document_verifications') and \
-                        customer.document_verifications.count() > 0:
-                    doc_verification = customer.document_verifications.latest('created_at')
-            if doc_verification:
-                video_message = LOGIC__VIDEO_VERIFY_TEXT.format(
-                    customer.firstname if isinstance(customer, Personal) else customer.contact_firstname,
-                    customer.lastname if isinstance(customer, Personal) else customer.contact_lastname,
-                    customer.country if isinstance(customer, Personal) else customer.contact_residency)
-
-                video_verification = VideoVerification.objects.create(user=self.user,
-                                                                      message=video_message)
-                video_verification.save()
-
-                doc_verification.video_verification = video_verification
-                doc_verification.save()
-
-                notify.send_email_video_verification(self.user.email if self.user else None,
-                                                     FRONTEND_URL,
-                                                     self.user.id if self.user else None)
 
     @classmethod
     def is_user_email_confirmed(cls, user):
@@ -263,12 +242,12 @@ class Account(models.Model):
             return str(AccountStatus.declined)
 
         try:
-            verification = VideoVerification.objects.filter(user=obj.user).latest('created_at')
-            if not obj.is_identity_declined and not obj.is_identity_verified and not verification.video_id:
+            verification = DocumentVerification.objects.filter(user=obj.user).latest('created_at')
+            if not obj.is_identity_declined and not obj.is_identity_verified and not verification.video_reg_id:
                 return str(AccountStatus.needs_video_verification)
-            elif not obj.is_identity_declined and not obj.is_identity_verified and verification.video_id:
+            elif not obj.is_identity_declined and not obj.is_identity_verified and verification.video_reg_id:
                 return str(AccountStatus.pending_approve_video_verification)
-        except VideoVerification.DoesNotExist:
+        except DocumentVerification.DoesNotExist:
             pass
 
         if is_personal_data_filled(obj) and \
@@ -358,18 +337,109 @@ class PersonalFieldLength:
 
 # Customer statuses
 class CustomerStatus:
+    confirmations = ObjStatus('confirmations', 'confirmations required (personal, corporate)')
+    contact_info = ObjStatus('contact_info', 'contact info required (personal')
+    company_info = ObjStatus('company_info', 'company info required (corporate')
     address = ObjStatus('address', 'address info required (personal)')
     business_address = ObjStatus('business_address', 'business address info required (corporate)')
     income_info = ObjStatus('income_info', 'income info required (personal, corporate)')
     primary_contact = ObjStatus('primary_contact', 'primary contact info required (corporate)')
     documents = ObjStatus('documents', 'documents required (personal, corporate)')
+    video_verification = ObjStatus('video_verification', 'video verification required (personal, corporate)')
     submitted = ObjStatus('submitted', 'all fields submitted (personal, corporate)')
     declined = ObjStatus('declined', 'customer declined (personal, corporate)')
+
+
+# KYC steps
+class KycSteps:
+    declined = ObjStatus(-1, 'customer declined (personal, corporate)')
+    submitted = ObjStatus(0, 'all fields submitted (personal, corporate)')
+    confirmations = ObjStatus(1, 'confirmations required (personal, corporate)')
+    contact_info = ObjStatus(2, 'contact info required (personal')
+    company_info = ObjStatus(2, 'company info required (corporate')
+    address = ObjStatus(3, 'personal address/business address required (personal, corporate)')
+    income_info = ObjStatus(4, 'income info required (personal, corporate)')
+    primary_contact = ObjStatus(5, 'primary contact info required (corporate)')
+    documents = ObjStatus(6, 'documents required (personal, corporate)')
+    video_verification = ObjStatus(7, 'video verification required (personal, corporate)')
+
+
+class DocumentGroup:
+    personal = 'personal'
+    corporate = 'corporate'
+
+
+class DocumentType:
+    passport = 'passport'
+    utilitybills = 'utilitybills'
+    selfie = 'selfie'
+    report = 'report'
+    video = 'video'
+
+
+class DocumentHelper:
+    @classmethod
+    def get_document_filename_extension(cls, filename):
+        if len(filename.split(".")) > 1:
+            return filename.split(".")[-1]
+        else:
+            return "unknown"
+
+    @classmethod
+    def unique_document_filename(cls,  document, filename):
+        extension = cls.get_document_filename_extension(filename)
+        return "{}.{}".format(uuid.uuid4(), extension)
+
+
+# Document model
+class Document(models.Model):
+    version = IntegerVersionField()
+    image = models.FileField('uploaded document', upload_to=DocumentHelper.unique_document_filename)  # stores the uploaded documents
+    ext = models.CharField(max_length=20, null=False, blank=True)
+    type = models.CharField(max_length=20, null=False, blank=True)
+    group = models.CharField(max_length=20, null=False, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Relationships
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
+                             blank=False, null=False, related_name=Account.rel_documents)
+
+    onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
+
+    rel_passport_verification = 'passport_verification'
+    rel_utilitybills_verification = 'utilitybills_verification'
+    rel_selfie_verification = 'selfie_verification'
+    rel_report_verification = 'report_verification'
+    rel_video_verification = 'video_verification'
+    rel_personal_passport = 'personal_passport'
+    rel_personal_utilitybills = 'personal_utilitybills'
+    rel_personal_selfie = 'personal_selfie'
+    rel_personal_video = 'personal_video'
+    rel_corporate_passport = 'corporate_passport'
+    rel_corporate_utilitybills = 'corporate_utilitybills'
+    rel_corporate_selfie = 'corporate_selfie'
+    rel_corporate_video = 'corporate_video'
+
+    class Meta:
+        db_table = 'document'
+        indexes = (
+            models.Index(fields=['ext']),
+            models.Index(fields=['type']),
+            models.Index(fields=['group']),
+            models.Index(fields=['created_at']),
+        )
 
 
 class Personal(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     version = IntegerVersionField()
+
+    # Confirmations
+    is_terms_agreed = models.BooleanField(default=False)
+    is_not_political = models.BooleanField(default=False)
+    is_ultimate_owner = models.BooleanField(default=False)
+    is_information_confirmed = models.BooleanField(default=False)
+
     # Contact information
     firstname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
     lastname = models.CharField(max_length=PersonalFieldLength.fullname, null=False, blank=True)
@@ -391,11 +461,22 @@ class Personal(models.Model):
     assets_origin = models.CharField(max_length=PersonalFieldLength.assets_origin, null=False, blank=True)
     jcash_use = models.CharField(max_length=PersonalFieldLength.jcash_use, null=False, blank=True)
 
+    # Documents
+    passport = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=True, null=True, related_name=Document.rel_personal_passport)
+    utilitybills = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                        blank=True, null=True, related_name=Document.rel_personal_utilitybills)
+    selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                  blank=True, null=True, related_name=Document.rel_personal_selfie)
+    video = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=True, null=True, related_name=Document.rel_personal_video)
+
     # Modifications time
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated_at = models.DateTimeField(auto_now_add=True)
 
     status = models.CharField(max_length=20, default='')
+    kyc_step = models.IntegerField(default=-2)
     onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     # Relationships
@@ -441,6 +522,13 @@ class CorporateFieldLength:
 class Corporate(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     version = IntegerVersionField()
+
+    # Confirmations
+    is_terms_agreed = models.BooleanField(default=False)
+    is_not_political = models.BooleanField(default=False)
+    is_ultimate_owner = models.BooleanField(default=False)
+    is_information_confirmed = models.BooleanField(default=False)
+
     # Company information
     name = models.CharField(max_length=CorporateFieldLength.name,
                             null=False, blank=True)
@@ -485,11 +573,22 @@ class Corporate(models.Model):
     contact_city = models.CharField(max_length=CorporateFieldLength.city, null=False, blank=True)
     contact_postcode = models.CharField(max_length=CorporateFieldLength.postcode, null=False, blank=True)
 
+    # Documents
+    passport = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=True, null=True, related_name=Document.rel_corporate_passport,)
+    utilitybills = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                        blank=True, null=True, related_name=Document.rel_corporate_utilitybills)
+    selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                  blank=True, null=True, related_name=Document.rel_corporate_selfie)
+    video = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=True, null=True, related_name=Document.rel_corporate_video)
+
     # Modifications time
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated_at = models.DateTimeField(auto_now_add=True)
 
     status = models.CharField(max_length=20, default='')
+    kyc_step = models.IntegerField(default=-2)
     onfido_applicant_id = models.CharField(max_length=200, null=True, blank=True)
 
     # Relationships
@@ -510,93 +609,6 @@ class Corporate(models.Model):
             models.Index(fields=['last_updated_at']),
             models.Index(fields=['status']),
             models.Index(fields=['onfido_applicant_id']),
-        )
-
-
-class DocumentHelper:
-    @classmethod
-    def get_document_filename_extension(cls, filename):
-        if len(filename.split(".")) > 1:
-            return filename.split(".")[-1]
-        else:
-            return "unknown"
-
-    @classmethod
-    def unique_document_filename(cls,  document, filename):
-        extension = cls.get_document_filename_extension(filename)
-        return "{}.{}".format(uuid.uuid4(), extension)
-
-
-class DocumentGroup:
-    personal = 'personal'
-    corporate = 'corporate'
-
-
-class DocumentType:
-    passport = 'passport'
-    utilitybills = 'utilitybills'
-    selfie = 'selfie'
-    report = 'report'
-    video = 'video'
-
-
-# Document model
-class Document(models.Model):
-    version = IntegerVersionField()
-    image = models.FileField('uploaded document', upload_to=DocumentHelper.unique_document_filename)  # stores the uploaded documents
-    ext = models.CharField(max_length=20, null=False, blank=True)
-    type = models.CharField(max_length=20, null=False, blank=True)
-    group = models.CharField(max_length=20, null=False, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    # Relationships
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
-                             blank=False, null=False, related_name=Account.rel_documents)
-
-    personal = models.ForeignKey(Personal, on_delete=models.DO_NOTHING,
-                                 related_name=Personal.rel_documents, null=True, blank=True)
-    corporate = models.ForeignKey(Corporate, on_delete=models.DO_NOTHING,
-                                  related_name=Corporate.rel_documents, null=True, blank=True)
-    onfido_document_id = models.CharField(max_length=200, null=True, blank=True)
-
-    rel_passport_verification = 'passport_verification'
-    rel_utilitybills_verification = 'utilitybills_verification'
-    rel_selfie_verification = 'selfie_verification'
-    rel_report_verification = 'report_verification'
-    rel_video_verification = 'video_verification'
-
-    class Meta:
-        db_table = 'document'
-        indexes = (
-            models.Index(fields=['ext']),
-            models.Index(fields=['type']),
-            models.Index(fields=['group']),
-            models.Index(fields=['created_at']),
-        )
-
-
-# VideoVerification
-class VideoVerification(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    version = IntegerVersionField()
-    message = models.CharField(unique=False, max_length=1024)
-    video_id = models.CharField(unique=False, null=True, blank=True, max_length=1024)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_verified = models.BooleanField(default=False)
-
-    # Relationships
-    document = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
-                                    blank=True, null=True, related_name=Document.rel_video_verification)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
-                             blank=False, null=False, related_name=Account.rel_videoverification)
-
-    rel_video_verification = 'video_document_verification'
-
-    class Meta:
-        db_table = 'video_verification'
-        indexes = (
-            models.Index(fields=['created_at']),
-            models.Index(fields=['is_verified']),
         )
 
 
@@ -628,11 +640,11 @@ class DocumentVerification(models.Model):
     selfie = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
                                   blank=False, null=False, related_name=Document.rel_selfie_verification)
 
+    video = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
+                                    blank=True, null=True, related_name=Document.rel_video_verification)
+
     report = models.OneToOneField(Document, on_delete=models.DO_NOTHING,
                                   blank=True, null=True, related_name=Document.rel_report_verification)
-
-    video_verification = models.OneToOneField(VideoVerification, on_delete=models.DO_NOTHING,
-                                  blank=True, null=True, related_name=VideoVerification.rel_video_verification)
 
     comment = models.TextField(null=True, blank=True)
 
@@ -647,6 +659,9 @@ class DocumentVerification(models.Model):
     onfido_check_created = models.DateTimeField(null=True, blank=True)
     verification_started_at = models.DateTimeField(null=True, blank=True)
     verification_attempts = models.IntegerField(default=0)
+
+    video_message = models.CharField(unique=False, max_length=1024, default='')
+    video_reg_id = models.CharField(unique=False, null=True, blank=True, max_length=1024)
 
     # Relationships
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
