@@ -37,7 +37,6 @@ from jcash.api.models import (
     LiquidityProvider,
     JntRate,
     ProofOfSolvency,
-    VideoVerification,
 )
 
 from jcash.commonutils import ga_integration
@@ -216,7 +215,6 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
         return format_html(
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=block" data-action="block">Block</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=unblock" data-action="unblock">Unblock</a>&nbsp;'
-            '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=video" data-action="video">Video</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=approve" data-action="approve">Approve</a>&nbsp;'
             '<a class="button account-action" href="javascript:void(0)" data-url="{url}?action=decline" data-action="decline">Decline</a>&nbsp;',
             url = reverse('admin:account-action', args=[obj.pk]))
@@ -263,15 +261,6 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                          extra_tags='safe')
         return HttpResponse('OK')
 
-    def video_verification(self, request, account_id, *args, **kwargs):
-        account = get_object_or_404(Account, pk=account_id)
-        logger.info('Start video verification for %s', account.user.username)
-        account.video_verification()
-        messages.success(request,
-                         mark_safe('Video verification <b>started</b> for {}'.format(account.user.username)),
-                         extra_tags='safe')
-        return HttpResponse('OK')
-
     def account_action(self, request, account_id, *args, **kwargs):
         if request.method == 'POST' and request.POST.get('confirm'):
             action = request.POST.get('action')
@@ -283,8 +272,6 @@ class AccountAdmin(ReadonlyMixin, admin.ModelAdmin):
                 return self.approve_identity_verification(request, account_id)
             elif action == 'decline':
                 return self.decline_identity_verification(request, account_id)
-            elif action == 'video':
-                return  self.video_verification(request, account_id)
         else:
             account = get_object_or_404(Account, pk=account_id)
             action = request.GET.get('action')
@@ -604,11 +591,9 @@ class DocumentVerificationAdmin(admin.ModelAdmin):
         return self.document_thumb(obj.selfie)
 
     def video_link(self, obj):
-        if obj.video_verification and \
-                obj.video_verification.document and \
-                obj.video_verification.document.image:
+        if obj.video and obj.video.image:
             return format_html('<a href="{url}">video</a>',
-                               url=obj.video_verification.document.image.url)
+                               url=obj.video.image.url)
         else:
             return '-'
     video_link.allow_tags = True
@@ -661,25 +646,6 @@ class JntRateAdmin(admin.ModelAdmin):
 @admin.register(ProofOfSolvency)
 class ProofOfSolvencyAdmin(admin.ModelAdmin):
     list_display = ['id', 'meta']
-
-
-@admin.register(VideoVerification)
-class VideoVerificationAdmin(admin.ModelAdmin):
-    list_display = ['id', 'username', 'created_at', 'message', 'video_link', 'is_verified']
-    search_fields = ['id', 'user__username']
-    ordering = ('-created_at',)
-
-    @staticmethod
-    def username(obj):
-        return obj.user.username
-
-    def video_link(self, obj):
-        if obj.document and obj.document.image:
-            return format_html('<a href="{url}">video</a>',
-                               url=obj.document.image.url)
-        else:
-            return '-'
-    video_link.allow_tags = True
 
 
 admin.site.unregister(EmailAddress)

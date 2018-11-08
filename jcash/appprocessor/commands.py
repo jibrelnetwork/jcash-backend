@@ -38,7 +38,6 @@ from jcash.api.models import (
     JntRate,
     LiquidityProvider,
     ProofOfSolvency,
-    VideoVerification,
 )
 from jcash.commonutils import (
     notify,
@@ -984,30 +983,30 @@ def proof_of_solvency():
         return build_proof_of_solvency()
 
 
-def download_ziggeo_video_file(video_verification_id: str):
+def download_ziggeo_video_file(document_verification_id: str):
     """
     Download video from Ziggeo by id
     :param vid: ziggeo video token
     :return: path_to_vide_file
     """
     logging.getLogger(__name__).info("Started downloading Ziggeo video file: video_verification_id: {}"
-                                     .format(video_verification_id))
+                                     .format(document_verification_id))
 
     ziggeo = Ziggeo(ZIGGEO__TOKEN, ZIGGEO__PRIVATE_KEY)
 
     with transaction.atomic():
 
-        video_verification = VideoVerification.objects.get(id=video_verification_id)
-        video_type = ziggeo.videos().get(video_verification.video_id)['default_stream']['video_type']
+        document_verification = DocumentVerification.objects.get(id=document_verification_id)
+        video_type = ziggeo.videos().get(document_verification.video_reg_id)['default_stream']['video_type']
 
-        file_name = "{file_name}.{ext}".format(file_name=video_verification.video_id,
+        file_name = "{file_name}.{ext}".format(file_name=document_verification.video_reg_id,
                                                ext=video_type)
 
         tmp_file = NamedTemporaryFile(delete=True)
-        tmp_file.write(ziggeo.videos().download_video(video_verification.video_id))
+        tmp_file.write(ziggeo.videos().download_video(document_verification.video_id))
         tmp_file.flush()
 
-        video_document = Document.objects.create(user_id=video_verification.user.pk)
+        video_document = Document.objects.create(user_id=document_verification.user.pk)
         video_document.image.save(DocumentHelper.unique_document_filename(None, file_name),
                                   File(tmp_file))
         video_document.group = ''
@@ -1015,20 +1014,20 @@ def download_ziggeo_video_file(video_verification_id: str):
         video_document.ext = video_type
         video_document.save()
 
-        video_verification.document = video_document
-        video_verification.save()
+        document_verification.video = video_document
+        document_verification.save()
 
-        ziggeo.videos().delete(video_verification.video_id)
+        ziggeo.videos().delete(document_verification.video_reg_id)
 
         logging.getLogger(__name__).info("Finished downloading Ziggeo video file: video_verification_id: {}"
-                                         .format(video_verification_id))
+                                         .format(document_verification_id))
 
 
 def process_all_undownloaded_video():
     logger.info('Start downloading Ziggeo vide files')
 
-    verifications = VideoVerification.objects.filter(~Q(video_id=None) &
-                                                     Q(document=None))
+    verifications = DocumentVerification.objects.filter(~Q(video_reg_id=None) &
+                                                        Q(video=None))
     for verification in verifications:
         try:
             download_ziggeo_video_file(verification.id)
