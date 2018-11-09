@@ -1003,7 +1003,7 @@ def download_ziggeo_video_file(document_verification_id: str):
                                                ext=video_type)
 
         tmp_file = NamedTemporaryFile(delete=True)
-        tmp_file.write(ziggeo.videos().download_video(document_verification.video_id))
+        tmp_file.write(ziggeo.videos().download_video(document_verification.video_reg_id))
         tmp_file.flush()
 
         video_document = Document.objects.create(user_id=document_verification.user.pk)
