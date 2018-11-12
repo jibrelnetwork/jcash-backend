@@ -196,6 +196,7 @@ class Account(models.Model):
             customer = self.get_customer()
             if customer:
                 customer.status = str(CustomerStatus.declined)
+                customer.kyc_step = int(KycSteps.declined)
                 customer.save()
                 if hasattr(customer, 'document_verifications') and \
                         customer.document_verifications.count() > 0:
@@ -240,15 +241,6 @@ class Account(models.Model):
         if not is_personal_data_filled(obj) and \
             obj.is_identity_declined:
             return str(AccountStatus.declined)
-
-        try:
-            verification = DocumentVerification.objects.filter(user=obj.user).latest('created_at')
-            if not obj.is_identity_declined and not obj.is_identity_verified and not verification.video_reg_id:
-                return str(AccountStatus.needs_video_verification)
-            elif not obj.is_identity_declined and not obj.is_identity_verified and verification.video_reg_id:
-                return str(AccountStatus.pending_approve_video_verification)
-        except DocumentVerification.DoesNotExist:
-            pass
 
         if is_personal_data_filled(obj) and \
             not obj.is_identity_verified and \

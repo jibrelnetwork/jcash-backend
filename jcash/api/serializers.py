@@ -1407,8 +1407,8 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
                     personal.account.type = AccountType.personal
                     personal.account.save()
                 personal.status = str(CustomerStatus.documents)
-                if personal.kyc_step < int(KycSteps.income_info):
-                    personal.kyc_step = int(KycSteps.income_info)
+                if personal.kyc_step < int(KycSteps.documents):
+                    personal.kyc_step = int(KycSteps.documents)
                 personal.save()
 
 
