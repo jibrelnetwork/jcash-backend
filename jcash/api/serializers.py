@@ -658,6 +658,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "outgoing_tx_id": "0x60cb8ecad",
         "outgoing_tx_value": 1810.0,
         "base_currency": "eth",
+        "token_address": "0x6666666",
         "reciprocal_currency": "jAED",
         "base_amount": 1.0,
         "reciprocal_amount": 1810.0,
@@ -683,6 +684,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     round_digits = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField(help_text='Exchange fee (JNT)')
+    token_address = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -690,7 +692,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
                   'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits',
-                  'fee')
+                  'fee', 'token_address')
 
     def get_fee(self, obj):
         return obj.fee
@@ -802,6 +804,9 @@ class ApplicationsSerializer(serializers.ModelSerializer):
             return tx.value
 
         return 0
+
+    def get_token_address(self, obj):
+        return obj.currency_pair.reciprocal_currency.view_address
 
 
 class AddressVerifySerializer(serializers.Serializer):
