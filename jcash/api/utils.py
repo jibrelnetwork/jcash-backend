@@ -2,6 +2,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from rest_framework.views import exception_handler
 from rest_framework import exceptions
 from django.utils.encoding import force_text
+from django.utils.translation import ugettext_lazy as _
 
 from jcash.api.views import AccountView
 from jcash.commonutils.notify import send_email_verify_email
@@ -28,7 +29,10 @@ def custom_exception_handler(exc, context):
                 and len(response.data.keys())==1:
             error = " ".join("{}".format(force_text("".join(value))) for field, value in response.data.items())
         else:
-            errors = response.data
+            if response.data.get('password'):
+                errors = {'password': _('Password is too weak.')}
+            else:
+                errors = response.data
 
         if 'view' in context and \
             isinstance(context['view'], AccountView) and \

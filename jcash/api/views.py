@@ -25,6 +25,8 @@ from rest_auth.views import (
     PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView, LoginView
 )
 from allauth.account.utils import send_email_confirmation
+from zxcvbn_password import zxcvbn
+
 from jcash.api.models import (
     Address,
     Account,
@@ -1645,8 +1647,11 @@ class ValidatePasswordView(GenericAPIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            return Response({'success': True})
+        score = zxcvbn(request.data.get('password', ''))['score']
+        if serializer.is_valid(raise_exception=False):
+            return Response({'success': True, 'score': score})
+        else:
+            return Response({'success': False, 'score': score, 'error': _('Password is too weak.')}, status=400)
 
 
 @docstring_parameter(get_status_class_members(KycSteps))

@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     'rest_auth',
     'corsheaders',
     'raven.contrib.django.raven_compat',
+    'zxcvbn_password',
 ]
 
 MIDDLEWARE = [
@@ -151,16 +152,13 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-    {
-        'NAME': 'jcash.api.validators.CustomPasswordValidator',
+        'NAME': 'zxcvbn_password.ZXCVBNValidator',
+        'OPTIONS': {
+            'min_score': int(os.getenv('PASSWORD_MIN_SCORE', 3))
+        }
     }
 ]
 
