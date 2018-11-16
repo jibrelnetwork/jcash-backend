@@ -155,6 +155,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
+
         'NAME': 'zxcvbn_password.ZXCVBNValidator',
         'OPTIONS': {
             'min_score': int(os.getenv('PASSWORD_MIN_SCORE', 3))
