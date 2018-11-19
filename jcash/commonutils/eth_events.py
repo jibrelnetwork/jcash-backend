@@ -32,8 +32,8 @@ def get_incoming_txs(
     event_abi = contract_events[event_name]._get_event_abi()
     topic_set = construct_event_topic_set(event_abi)
 
-    filter = web3.eth.filter({'topics': topic_set[0], 'address': contract_address.lower(), 'fromBlock':block_number})
-    logs = web3.eth.getFilterLogs(filter.filter_id)
+    logs = web3.eth.getLogs({'topics': topic_set[0], 'address': contract_address.lower(), 'fromBlock':block_number})
+
     result = []
     for log_entry in logs:
         block_number = log_entry['blockNumber']
@@ -83,8 +83,7 @@ def get_replenishers(
         event_abi = contract_events[event_name]._get_event_abi()
         topic_set = construct_event_topic_set(event_abi)
 
-        filter = web3.eth.filter({'topics': topic_set[0], 'address': contract_address.lower(), 'fromBlock':block_number})
-        logs = web3.eth.getFilterLogs(filter.filter_id)
+        logs = web3.eth.getLogs({'topics': topic_set[0], 'address': contract_address.lower(), 'fromBlock':block_number})
 
         for log_entry in logs:
             log_block_number = log_entry['blockNumber']
