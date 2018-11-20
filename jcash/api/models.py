@@ -96,7 +96,7 @@ class Account(models.Model):
     is_identity_verified = models.BooleanField(default=False, verbose_name='Verified')
     is_identity_declined = models.BooleanField(default=False, verbose_name='Declined')
     is_blocked = models.BooleanField(default=False, verbose_name='Blocked')
-    is_verification_report_available = models.BooleanField(default=False, verbose_name='Verification report')
+    is_verification_report_available = models.BooleanField(default=False, verbose_name='Screened')
 
     comment = models.TextField(null=True, blank=True)
     tracking = JSONField(blank=True, default=dict)
@@ -192,7 +192,6 @@ class Account(models.Model):
         with transaction.atomic():
             self.is_identity_verified = False
             self.is_identity_declined = True
-            self.is_verification_report_available = False
             self.save()
             doc_verification = None
             customer = self.get_customer()
