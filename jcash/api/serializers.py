@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 
 from django.db import transaction
+from django.db.models import Q
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model, authenticate, password_validation
@@ -27,8 +28,8 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
-    ApplicationCancelReason, ExchangeFee, VideoVerification,
-    NotificationType,
+    ApplicationCancelReason, ExchangeFee, NotificationType, get_email_templates,
+    KycSteps, get_account_types
 )
 from jcash.api.validators import BirthdayValidator
 from jcash.commonutils import (
@@ -657,6 +658,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
         "outgoing_tx_id": "0x60cb8ecad",
         "outgoing_tx_value": 1810.0,
         "base_currency": "eth",
+        "token_address": "0x6666666",
         "reciprocal_currency": "jAED",
         "base_amount": 1.0,
         "reciprocal_amount": 1810.0,
@@ -682,6 +684,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     round_digits = serializers.SerializerMethodField()
     fee = serializers.SerializerMethodField(help_text='Exchange fee (JNT)')
+    token_address = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -689,7 +692,7 @@ class ApplicationsSerializer(serializers.ModelSerializer):
                   'incoming_tx_value', 'outgoing_tx_value', 'source_address', 'exchanger_address',
                   'base_currency', 'base_amount', 'reciprocal_currency', 'reciprocal_amount_actual',
                   'reciprocal_amount', 'rate', 'is_active', 'status', 'is_reverse', 'reason', 'round_digits',
-                  'fee')
+                  'fee', 'token_address')
 
     def get_fee(self, obj):
         return obj.fee
@@ -801,6 +804,9 @@ class ApplicationsSerializer(serializers.ModelSerializer):
             return tx.value
 
         return 0
+
+    def get_token_address(self, obj):
+        return obj.currency_pair.reciprocal_currency.view_address
 
 
 class AddressVerifySerializer(serializers.Serializer):
@@ -1304,6 +1310,8 @@ class PersonalContactInfoSerializer(serializers.Serializer):
                     personal.account.type = AccountType.personal
                     personal.account.save()
                 personal.status = str(CustomerStatus.address)
+                if personal.kyc_step < int(KycSteps.address):
+                    personal.kyc_step = int(KycSteps.address)
                 personal.save()
 
 
@@ -1355,6 +1363,9 @@ class PersonalAddressSerializer(serializers.Serializer):
                     personal.account.type = AccountType.personal
                     personal.account.save()
                 personal.status = str(CustomerStatus.income_info)
+                if personal.kyc_step < int(KycSteps.income_info):
+                    personal.kyc_step = int(KycSteps.income_info)
+
                 personal.save()
 
 
@@ -1401,6 +1412,8 @@ class PersonalIncomeInfoSerializer(serializers.Serializer):
                     personal.account.type = AccountType.personal
                     personal.account.save()
                 personal.status = str(CustomerStatus.documents)
+                if personal.kyc_step < int(KycSteps.documents):
+                    personal.kyc_step = int(KycSteps.documents)
                 personal.save()
 
 
@@ -1423,27 +1436,33 @@ class PersonalDocumentsSerializer(serializers.Serializer):
 
         with transaction.atomic():
             if serializer_fields.get('passport') and self.validated_data.get('passport'):
-                passport_document = Document.objects.create(user=personal.account.user, personal=personal)
+                passport_document = Document.objects.create(user=personal.account.user)
                 passport_document.image = self.validated_data['passport']
                 passport_document.group = DocumentGroup.personal
                 passport_document.type = DocumentType.passport
                 passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
                 passport_document.save()
             if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
-                utilitybills_document = Document.objects.create(user=personal.account.user, personal=personal)
+                utilitybills_document = Document.objects.create(user=personal.account.user)
                 utilitybills_document.image = self.validated_data['utilitybills']
                 utilitybills_document.group = DocumentGroup.personal
                 utilitybills_document.type = DocumentType.utilitybills
                 utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
                 utilitybills_document.save()
             if serializer_fields.get('selfie') and self.validated_data.get('selfie'):
-                selfie_document = Document.objects.create(user=personal.account.user, personal=personal)
+                selfie_document = Document.objects.create(user=personal.account.user)
                 selfie_document.image = self.validated_data['selfie']
                 selfie_document.group = DocumentGroup.personal
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
+
+            personal.passport = passport_document
+            personal.utilitybills = utilitybills_document
+            personal.selfie = selfie_document
+
             personal.last_updated_at = timezone.now()
+
             if personal.account is not None:
                 if personal.account.is_identity_declined:
                     personal.account.is_identity_declined = False
@@ -1455,49 +1474,11 @@ class PersonalDocumentsSerializer(serializers.Serializer):
                 personal.account.last_updated_at = personal.last_updated_at
                 personal.account.type = AccountType.personal
                 personal.account.save()
-            personal.status = str(CustomerStatus.submitted)
+
+            personal.status = str(CustomerStatus.video_verification)
+            if personal.kyc_step < int(KycSteps.video_verification):
+                personal.kyc_step = int(KycSteps.video_verification)
             personal.save()
-
-            try:
-                last_document_verification = DocumentVerification.objects\
-                    .filter(personal_id=personal.uuid)\
-                    .latest('created_at')
-                if 'firstname' not in last_document_verification.meta or\
-                        'lastname' not in last_document_verification.meta or\
-                        personal.firstname != last_document_verification.meta['firstname'] or\
-                        personal.lastname != last_document_verification.meta['lastname']:
-                    is_applicant_changed = True
-                else:
-                    is_applicant_changed = False
-            except DocumentVerification.DoesNotExist:
-                is_applicant_changed = False
-
-            doc_verification = DocumentVerification.objects.create(
-                user=personal.account.user,
-                personal=personal,
-                passport=passport_document,
-                utilitybills=utilitybills_document,
-                selfie=selfie_document,
-                meta={'firstname': str(personal.firstname),
-                      'lastname': str(personal.lastname),
-                      'middlename': str(personal.middlename),
-                      'nationality': str(personal.nationality),
-                      'birthday': str(personal.birthday),
-                      'phone': str(personal.phone),
-                      'country': str(personal.country),
-                      'street': str(personal.street),
-                      'apartment': str(personal.apartment),
-                      'city': str(personal.city),
-                      'postcode': str(personal.postcode),
-                      'profession': str(personal.profession),
-                      'income_source': str(personal.income_source),
-                      'assets_origin': str(personal.assets_origin),
-                      'jcash_use': str(personal.jcash_use)},
-                is_applicant_changed=is_applicant_changed)
-
-            doc_verification.save()
-            ga_integration.on_status_registration_complete(personal.account)
-            notify.send_email_jcash_application_underway(personal.account.user.email, personal.account.user.pk)
 
 
 class PersonalSerializer(serializers.ModelSerializer):
@@ -1591,6 +1572,8 @@ class CorporateCompanyInfoSerializer(serializers.Serializer):
                     corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.business_address)
+                if corporate.kyc_step < int(KycSteps.address):
+                    corporate.kyc_step = int(KycSteps.address)
                 corporate.save()
 
 
@@ -1642,6 +1625,8 @@ class CorporateAddressSerializer(serializers.Serializer):
                     corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.income_info)
+                if corporate.kyc_step < int(KycSteps.income_info):
+                    corporate.kyc_step = int(KycSteps.income_info)
                 corporate.save()
 
 
@@ -1694,6 +1679,8 @@ class CorporateIncomeInfoSerializer(serializers.Serializer):
                     corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.primary_contact)
+                if corporate.kyc_step < int(KycSteps.primary_contact):
+                    corporate.kyc_step = int(KycSteps.primary_contact)
                 corporate.save()
 
 
@@ -1784,6 +1771,8 @@ class CorporateContactInfoSerializer(serializers.Serializer):
                     corporate.account.type = AccountType.corporate
                     corporate.account.save()
                 corporate.status = str(CustomerStatus.documents)
+                if corporate.kyc_step < int(KycSteps.documents):
+                    corporate.kyc_step = int(KycSteps.documents)
                 corporate.save()
 
 
@@ -1806,27 +1795,33 @@ class CorporateDocumentsSerializer(serializers.Serializer):
 
         with transaction.atomic():
             if serializer_fields.get('passport') and self.validated_data.get('passport'):
-                passport_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
+                passport_document = Document.objects.create(user=corporate.account.user)
                 passport_document.image = self.validated_data['passport']
                 passport_document.group = DocumentGroup.corporate
                 passport_document.type = DocumentType.passport
                 passport_document.ext = DocumentHelper.get_document_filename_extension(passport_document.image.name)
                 passport_document.save()
             if serializer_fields.get('utilitybills') and self.validated_data.get('utilitybills'):
-                utilitybills_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
+                utilitybills_document = Document.objects.create(user=corporate.account.user)
                 utilitybills_document.image = self.validated_data['utilitybills']
                 utilitybills_document.group = DocumentGroup.corporate
                 utilitybills_document.type = DocumentType.utilitybills
                 utilitybills_document.ext = DocumentHelper.get_document_filename_extension(utilitybills_document.image.name)
                 utilitybills_document.save()
             if serializer_fields.get('selfie') and self.validated_data.get('selfie'):
-                selfie_document = Document.objects.create(user=corporate.account.user, corporate=corporate)
+                selfie_document = Document.objects.create(user=corporate.account.user)
                 selfie_document.image = self.validated_data['selfie']
                 selfie_document.group = DocumentGroup.corporate
                 selfie_document.type = DocumentType.selfie
                 selfie_document.ext = DocumentHelper.get_document_filename_extension(selfie_document.image.name)
                 selfie_document.save()
+
+            corporate.passport = passport_document
+            corporate.utilitybills = utilitybills_document
+            corporate.selfie = selfie_document
+
             corporate.last_updated_at = timezone.now()
+
             if corporate.account is not None:
                 if corporate.account.is_identity_declined:
                     corporate.account.is_identity_declined = False
@@ -1838,59 +1833,10 @@ class CorporateDocumentsSerializer(serializers.Serializer):
                 corporate.account.last_updated_at = corporate.last_updated_at
                 corporate.account.type = AccountType.corporate
                 corporate.account.save()
-            corporate.status = str(CustomerStatus.submitted)
+            corporate.status = str(CustomerStatus.video_verification)
+            if corporate.kyc_step < int(KycSteps.video_verification):
+                corporate.kyc_step = int(KycSteps.video_verification)
             corporate.save()
-
-            try:
-                last_document_verification = DocumentVerification.objects\
-                    .filter(corporate_id=corporate.uuid)\
-                    .latest('created_at')
-                if 'contact_firstname' not in last_document_verification.meta or \
-                        'contact_lastname' not in last_document_verification.meta or\
-                        corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or\
-                        corporate.contact_lastname != last_document_verification.meta['contact_lastname']:
-                    is_applicant_changed = True
-                else:
-                    is_applicant_changed = False
-            except DocumentVerification.DoesNotExist:
-                is_applicant_changed = False
-
-            doc_verification = DocumentVerification.objects.create(
-                user=corporate.account.user,
-                corporate=corporate,
-                passport=passport_document,
-                utilitybills=utilitybills_document,
-                selfie=selfie_document,
-                meta={'name': str(corporate.name),
-                      'domicile_country': str(corporate.domicile_country),
-                      'business_phone': str(corporate.business_phone),
-                      'country': str(corporate.country),
-                      'street': str(corporate.street),
-                      'apartment': str(corporate.apartment),
-                      'city': str(corporate.city),
-                      'postcode': str(corporate.postcode),
-                      'industry': str(corporate.industry),
-                      'assets_origin': str(corporate.assets_origin),
-                      'currency_nature': str(corporate.currency_nature),
-                      'assets_origin_description': str(corporate.assets_origin_description),
-                      'jcash_use': str(corporate.jcash_use),
-                      'contact_firstname': str(corporate.contact_firstname),
-                      'contact_lastname': str(corporate.contact_lastname),
-                      'contact_middlename': str(corporate.contact_middlename),
-                      'contact_birthday': str(corporate.contact_birthday),
-                      'contact_nationality': str(corporate.contact_nationality),
-                      'contact_residency': str(corporate.contact_residency),
-                      'contact_phone': str(corporate.contact_phone),
-                      'contact_email': str(corporate.contact_email),
-                      'contact_street': str(corporate.contact_street),
-                      'contact_apartment': str(corporate.contact_apartment),
-                      'contact_city': str(corporate.contact_city),
-                      'contact_postcode': str(corporate.contact_postcode)},
-                is_applicant_changed=is_applicant_changed)
-
-            doc_verification.save()
-            ga_integration.on_status_registration_complete(corporate.account)
-            notify.send_email_jcash_application_underway(corporate.account.user.email, corporate.account.user.pk)
 
 
 class CorporateSerializer(serializers.ModelSerializer):
@@ -1980,10 +1926,10 @@ class CustomersSerializer(serializers.Serializer):
 
     type = serializers.SerializerMethodField()
     uuid = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
+    kyc_step = serializers.SerializerMethodField()
 
     class Meta:
-        fields = ('type', 'uuid', 'status')
+        fields = ('type', 'uuid', 'kyc_step')
 
     def get_type(self, obj):
         if isinstance(obj, Personal):
@@ -1996,8 +1942,8 @@ class CustomersSerializer(serializers.Serializer):
     def get_uuid(self, obj):
         return obj.uuid
 
-    def get_status(self, obj):
-        return obj.status
+    def get_kyc_step(self, obj):
+        return obj.kyc_step
 
 
 class CheckTokenSerializer(serializers.Serializer):
@@ -2039,29 +1985,115 @@ class VideoVerificationSerializer(serializers.Serializer):
     """
     vid = serializers.CharField(required=True)
 
-    def validate(self, attrs):
-        user = self.context.get('user')
+    def create_corporate_document_verification(self, account, video_id, is_data_changed):
+        return DocumentVerification.objects.create(
+            user=account.user,
+            corporate=account.corporate,
+            passport=account.corporate.passport,
+            utilitybills=account.corporate.utilitybills,
+            selfie=account.corporate.selfie,
+            video_reg_id=video_id,
+            meta={'name': str(account.corporate.name),
+                  'domicile_country': str(account.corporate.domicile_country),
+                  'business_phone': str(account.corporate.business_phone),
+                  'country': str(account.corporate.country),
+                  'street': str(account.corporate.street),
+                  'apartment': str(account.corporate.apartment),
+                  'city': str(account.corporate.city),
+                  'postcode': str(account.corporate.postcode),
+                  'industry': str(account.corporate.industry),
+                  'assets_origin': str(account.corporate.assets_origin),
+                  'currency_nature': str(account.corporate.currency_nature),
+                  'assets_origin_description': str(account.corporate.assets_origin_description),
+                  'jcash_use': str(account.corporate.jcash_use),
+                  'contact_firstname': str(account.corporate.contact_firstname),
+                  'contact_lastname': str(account.corporate.contact_lastname),
+                  'contact_middlename': str(account.corporate.contact_middlename),
+                  'contact_birthday': str(account.corporate.contact_birthday),
+                  'contact_nationality': str(account.corporate.contact_nationality),
+                  'contact_residency': str(account.corporate.contact_residency),
+                  'contact_phone': str(account.corporate.contact_phone),
+                  'contact_email': str(account.corporate.contact_email),
+                  'contact_street': str(account.corporate.contact_street),
+                  'contact_apartment': str(account.corporate.contact_apartment),
+                  'contact_city': str(account.corporate.contact_city),
+                  'contact_postcode': str(account.corporate.contact_postcode)},
+            is_applicant_changed=is_data_changed)
+
+    def create_personal_document_verification(self, account, video_id, is_data_changed):
+        return DocumentVerification.objects.create(
+            user=account.user,
+            personal=account.personal,
+            passport=account.personal.passport,
+            utilitybills=account.personal.utilitybills,
+            selfie=account.personal.selfie,
+            video_reg_id=video_id,
+            meta={'firstname': str(account.personal.firstname),
+                  'lastname': str(account.personal.lastname),
+                  'middlename': str(account.personal.middlename),
+                  'nationality': str(account.personal.nationality),
+                  'birthday': str(account.personal.birthday),
+                  'phone': str(account.personal.phone),
+                  'country': str(account.personal.country),
+                  'street': str(account.personal.street),
+                  'apartment': str(account.personal.apartment),
+                  'city': str(account.personal.city),
+                  'postcode': str(account.personal.postcode),
+                  'profession': str(account.personal.profession),
+                  'income_source': str(account.personal.income_source),
+                  'assets_origin': str(account.personal.assets_origin),
+                  'jcash_use': str(account.personal.jcash_use)},
+            is_applicant_changed=is_data_changed)
+
+    def is_personal_changed(self, user):
         try:
-            self.video_verification = VideoVerification.objects\
-                .filter(user=user)\
+            last_document_verification = DocumentVerification.objects \
+                .filter(Q(user=user) & ~Q(personal=None)) \
                 .latest('created_at')
-        except VideoVerification.DoesNotExist:
-            raise serializers.ValidationError(_("verification has not started yet"))
+            if 'firstname' not in last_document_verification.meta or \
+                    'lastname' not in last_document_verification.meta or \
+                    user.account.personal.firstname != last_document_verification.meta['firstname'] or \
+                    user.account.personal.lastname != last_document_verification.meta['lastname']:
+                return True
+            else:
+                return False
+        except DocumentVerification.DoesNotExist:
+            return False
 
-        if self.video_verification.video_id:
-            raise serializers.ValidationError(_('verification completed'))
-
-        if hasattr(user, 'account') and user.account:
-            if user.account.is_identity_verified or \
-                    user.account.is_identity_declined:
-                raise serializers.ValidationError(_('verification completed'))
-
-        return attrs
+    def is_corporate_changed(self, user):
+        try:
+            last_document_verification = DocumentVerification.objects \
+                .filter(Q(user=user) & ~Q(corporate=None)) \
+                .latest('created_at')
+            if 'contact_firstname' not in last_document_verification.meta or \
+                    'contact_lastname' not in last_document_verification.meta or \
+                    user.account.corporate.contact_firstname != last_document_verification.meta['contact_firstname'] or \
+                    user.account.corporate.contact_lastname != last_document_verification.meta['contact_lastname']:
+                return True
+            else:
+                return False
+        except DocumentVerification.DoesNotExist:
+            return False
 
     def save(self):
+        customer_type = self.context.get('customer_type')
+        user = self.context.get('user')
+        video_reg_id = self.validated_data.get('vid')
+
         with transaction.atomic():
-            self.video_verification.video_id = self.validated_data.get('vid')
-            self.video_verification.save()
+            if customer_type == AccountType.personal:
+                self.create_personal_document_verification(user.account, video_reg_id, self.is_personal_changed(user))
+                user.account.personal.status = str(CustomerStatus.submitted)
+                user.account.personal.kyc_step = int(KycSteps.submitted)
+                user.account.personal.save()
+            elif customer_type == AccountType.corporate:
+                self.create_corporate_document_verification(user.account, video_reg_id, self.is_corporate_changed(user))
+                user.account.corporate.status = str(CustomerStatus.submitted)
+                user.account.corporate.kyc_step = int(KycSteps.submitted)
+                user.account.corporate.save()
+
+        ga_integration.on_status_registration_complete(user.account)
+        notify.send_email_jcash_application_underway(user.email, user.pk)
 
 
 class SendEmailSerializer(serializers.Serializer):
@@ -2156,6 +2188,70 @@ class SendEmailSerializer(serializers.Serializer):
                 notify.send_email_eth_address_added(to_address,
                                                     self.validated_data.get('eth_address', ''),
                                                     None, True)
-            elif template == NotificationType.video_verification:
-                notify.send_email_video_verification(to_address, self.validated_data.get('activate_url', ''),
-                                                     None, True)
+
+
+class ConfirmationsSerializer(serializers.Serializer):
+    """
+    Serializer for update confirmations.
+    """
+    is_terms_agreed = serializers.BooleanField(required=True)
+    is_not_political = serializers.BooleanField(required=True)
+    is_ultimate_owner = serializers.BooleanField(required=True)
+    is_information_confirmed = serializers.BooleanField(required=True)
+
+    def validate(self, attrs):
+        user = self.context.get('user')
+        customer_type = self.context.get('customer_type')
+        if customer_type not in get_account_types():
+            raise serializers.ValidationError(_("wrong customer type"))
+
+        customer = None
+
+        if customer_type == AccountType.corporate and \
+                hasattr(user.account, AccountType.corporate) and \
+                user.account.corporate:
+            customer = user.account.corporate
+
+        if customer_type == AccountType.personal and \
+                hasattr(user.account, AccountType.personal) and \
+                user.account.personal:
+            customer = user.account.personal
+
+        if not customer:
+            raise serializers.ValidationError(_("no such customer"))
+
+        attrs['customer'] = customer
+        attrs['customer_type'] = customer_type
+
+        return attrs
+
+
+    def save(self):
+        customer = self.validated_data.get('customer')
+        customer_type = self.validated_data.get('customer_type')
+
+        with transaction.atomic():
+            customer.is_terms_agreed = self.validated_data.get('is_terms_agreed')
+            customer.is_not_political = self.validated_data.get('is_not_political')
+            customer.is_ultimate_owner = self.validated_data.get('is_ultimate_owner')
+            customer.is_information_confirmed = self.validated_data.get('is_information_confirmed')
+
+            customer.last_updated_at = timezone.now()
+
+            if customer.account is not None:
+                customer.account.last_updated_at = timezone.now()
+                customer.account.type = AccountType.personal
+                customer.account.save()
+
+            if customer_type == AccountType.corporate:
+                customer.status = str(CustomerStatus.company_info)
+                if customer.kyc_step < int(KycSteps.company_info):
+                    customer.kyc_step = int(KycSteps.company_info)
+            elif customer_type == AccountType.personal:
+                customer.status = str(CustomerStatus.contact_info)
+                if customer.kyc_step < int(KycSteps.contact_info):
+                    customer.kyc_step = int(KycSteps.contact_info)
+
+            customer.save()
+
+            logger.info('Confirmations: succeeded {}'.format(customer.account.user.username))

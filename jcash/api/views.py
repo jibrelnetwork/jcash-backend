@@ -25,10 +25,13 @@ from rest_auth.views import (
     PasswordChangeView, PasswordResetView, PasswordResetConfirmView, LogoutView, LoginView
 )
 from allauth.account.utils import send_email_confirmation
+from zxcvbn_password import zxcvbn
+
 from jcash.api.models import (
     Address,
     Account,
     AccountStatus,
+    AccountType,
     CurrencyPair,
     Application,
     ApplicationStatus,
@@ -39,7 +42,7 @@ from jcash.api.models import (
     Corporate,
     CustomerStatus,
     ExchangeFee,
-    VideoVerification,
+    KycSteps,
     get_email_templates,
 )
 from jcash.api.serializers import (
@@ -76,10 +79,11 @@ from jcash.api.serializers import (
     ValidatePasswordSerializer,
     VideoVerificationSerializer,
     SendEmailSerializer,
+    ConfirmationsSerializer,
 )
 from jcash.commonutils import currencyrates, math, notify
 from jcash.commonutils.db_utils import require_lock
-from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL
+from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL, LOGIC__VIDEO_VERIFY_TEXT
 from jcash.appprocessor.commands import proof_of_solvency
 from jcash.api.pagination import ApplicationPageNumberPagination
 
@@ -597,6 +601,7 @@ class ApplicationView(GenericAPIView):
     "outgoing_tx_value": 0,
     "source_address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
     "exchanger_address": "0x55555555",
+    "token_address": "0x6666666",
     "base_currency": "ETH",
     "base_amount": 1,
     "reciprocal_currency": "jAED",
@@ -696,6 +701,7 @@ class ApplicationDetailView(GenericAPIView):
     "outgoing_tx_value": 0,
     "source_address": "0xc1fd943329dac131f6f8ab3c0290e02b7651e2f2",
     "exchanger_address": "0x55555555",
+    "token_address": "0x6666666",
     "base_currency": "ETH",
     "base_amount": 1,
     "reciprocal_currency": "jAED",
@@ -759,27 +765,32 @@ class VideoVerificationView(GenericAPIView):
     authentication_classes = (authentication.TokenAuthentication,)
     serializer_class = VideoVerificationSerializer
     parser_classes = (JSONParser,)
+    customer_type = None
 
     def get(self, request):
-        try:
-            verification = VideoVerification.objects\
-                .filter(user=request.user)\
-                .latest('created_at')
-        except VideoVerification.DoesNotExist:
-            return Response({"success": False, "error": "verification has not started yet"}, status=400)
+        account = AccountView.ensure_account(request)
 
-        if verification.video_id:
-            return Response({"success": False, "error": "verification completed"}, status=400)
+        customer = None
 
-        if hasattr(request.user, 'account') and request.user.account:
-            if request.user.account.is_identity_verified or \
-                    request.user.account.is_identity_declined:
-                return Response({"success": False, "error": "verification completed"}, status=400)
+        if self.customer_type == AccountType.personal and hasattr(account, Account.rel_personal):
+            customer = account.personal
 
-        return Response({"success": True, "message": verification.message})
+        if self.customer_type == AccountType.corporate and hasattr(account, Account.rel_corporate):
+            customer = account.corporate
+
+        if not customer:
+            return Response({'success': False, 'error': 'customer does not exist'})
+
+        video_message = LOGIC__VIDEO_VERIFY_TEXT.format(
+            customer.firstname if isinstance(customer, Personal) else customer.contact_firstname,
+            customer.lastname if isinstance(customer, Personal) else customer.contact_lastname,
+            customer.country if isinstance(customer, Personal) else customer.contact_residency)
+
+        return Response({"success": True, "message": video_message})
 
     def post(self, request):
-        serializer = self.serializer_class(data=request.data, context={'user': request.user})
+        serializer = self.serializer_class(data=request.data,
+                                           context={'user': request.user, 'customer_type': self.customer_type})
         if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response({"success": True})
@@ -1636,11 +1647,14 @@ class ValidatePasswordView(GenericAPIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            return Response({'success': True})
+        score = zxcvbn(request.data.get('password', ''))['score']
+        if serializer.is_valid(raise_exception=False):
+            return Response({'success': True, 'score': score})
+        else:
+            return Response({'success': False, 'score': score, 'error': _('Password is too weak.')}, status=400)
 
 
-@docstring_parameter(get_status_class_members(CustomerStatus))
+@docstring_parameter(get_status_class_members(KycSteps))
 class CustomersView(GenericAPIView):
     """
     get:
@@ -1651,10 +1665,10 @@ class CustomersView(GenericAPIView):
     ```
     {{"success": true, "customers": [{{ "type": "personal",
                      "uuid": "f9229b1b-f859-4cc9-b8ef-501238ca721b",
-                     "status": "submitted"}}]}}
+                     "kyc_step": 0}}]}}
     ```
 
-    **Customers Statuses**
+    **KYC Steps**
 
     {0}
 
@@ -1796,3 +1810,80 @@ class SendEmailView(GenericAPIView):
         if serializer.is_valid(raise_exception=True):
             serializer.save()
             return Response({'success': True})
+
+
+class ConfirmationsView(GenericAPIView):
+    """
+    get:
+    Get confirmations.
+
+    Response example:
+
+    ```
+    {"success": true, "is_terms_agreed": false, "is_not_political": false, "is_ultimate_owner": false,
+     "is_information_confirmed": false} |
+    {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+
+    post:
+    Updates confirmations
+
+    Response example:
+
+    ```
+    {"success": true} | {"success": false, "error": "error_description"}
+    ```
+
+    * Requires token authentication.
+    """
+
+    authentication_classes = (authentication.TokenAuthentication,)
+    serializer_class = ConfirmationsSerializer
+    parser_classes = (JSONParser,)
+    customer_type = None
+
+    def get(self, request):
+        account = AccountView.ensure_account(request)
+
+        customer = None
+
+        if self.customer_type == AccountType.personal and hasattr(account, Account.rel_personal):
+            customer = account.personal
+
+        if self.customer_type == AccountType.corporate and hasattr(account, Account.rel_corporate):
+            customer = account.corporate
+
+        if not customer:
+            return Response({'success': False, 'error': 'customer does not exist'})
+        else:
+            return Response(
+                {
+                    'success': True,
+                    "is_terms_agreed": customer.is_terms_agreed,
+                    "is_not_political": customer.is_not_political,
+                    "is_ultimate_owner": customer.is_ultimate_owner,
+                    "is_information_confirmed": customer.is_information_confirmed
+                }
+            )
+
+    def post(self, request):
+        is_have_kyc_rights, error = Account.check_kyc_rights(request.user)
+
+        with transaction.atomic():
+            account = AccountView.ensure_account(request)
+            if self.customer_type == AccountType.personal:
+                PersonalContactInfoView.ensure_personal(account)
+            elif self.customer_type == AccountType.corporate:
+                CorporateCompanyInfoView.ensure_corporate(account)
+
+        if not is_have_kyc_rights:
+            return Response({"success": False, "error": error}, status=400)
+
+        serializer = self.serializer_class(data=request.data,
+                                           context={'user': request.user, 'customer_type': self.customer_type})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response({'success': True})
