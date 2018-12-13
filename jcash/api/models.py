@@ -185,7 +185,7 @@ class Account(models.Model):
                 doc_verification.save()
 
             notify.send_email_jcash_application_approved(self.user.email if self.user else None,
-                                                         FRONTEND_URL,
+                                                         "{}/dashboard/kyc-verified".format(FRONTEND_URL),
                                                          self.user.id if self.user else None)
 
     def decline_verification(self, reason):
