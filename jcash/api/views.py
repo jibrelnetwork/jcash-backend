@@ -83,6 +83,7 @@ from jcash.api.serializers import (
 )
 from jcash.commonutils import currencyrates, math, notify, eth_contracts
 from jcash.commonutils.db_utils import require_lock
+from jcash.commonutils.healthcheck import healthcheck
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL, LOGIC__VIDEO_VERIFY_TEXT
 from jcash.appprocessor.commands import proof_of_solvency
 from jcash.api.pagination import ApplicationPageNumberPagination
@@ -1893,3 +1894,32 @@ class ConfirmationsView(GenericAPIView):
         serializer.save()
 
         return Response({'success': True})
+
+
+class HealthcheckView(GenericAPIView):
+    """
+    get:
+    Health check
+
+    Response example:
+
+    ```
+    {
+      "hostname": "hostname",
+      "version": "0.1.0",
+      "loadavg": [
+        2.3408203125,
+        4.88671875,
+        5.32763671875
+      ],
+      "uptime": "0:00:50.319202",
+      "sys_uptime": "n/a"
+    }
+    ```
+    """
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = ValidatePasswordSerializer
+    parser_classes = (JSONParser,)
+
+    def get(self, request):
+        return Response(healthcheck())

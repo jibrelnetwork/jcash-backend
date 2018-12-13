@@ -23,7 +23,8 @@ from jcash.api.views import (
     ResendEmailConfirmationView, CustomUserDetailsView,
     RegisterView, CustomPasswordChangeView, CustomPasswordResetView,
     CustomPasswordResetConfirmView, CustomVerifyEmailView,
-    CustomLogoutView, CustomLoginView, CheckTokenView, ValidatePasswordView
+    CustomLogoutView, CustomLoginView, CheckTokenView, ValidatePasswordView,
+    HealthcheckView,
 )
 from rest_auth.views import (
     LoginView
@@ -53,6 +54,9 @@ urlpatterns = [
 
     # API
     url(r'^api/', include('jcash.api.urls')),
+
+    # healthcheck
+    url(r'^healthcheck', HealthcheckView.as_view()),
 ]
 
 
