@@ -41,9 +41,9 @@ from jcash.api.models import (
     Personal,
     Corporate,
     CustomerStatus,
-    ExchangeFee,
     KycSteps,
     get_email_templates,
+    Currency,
 )
 from jcash.api.serializers import (
     AccountSerializer,
@@ -81,7 +81,7 @@ from jcash.api.serializers import (
     SendEmailSerializer,
     ConfirmationsSerializer,
 )
-from jcash.commonutils import currencyrates, math, notify
+from jcash.commonutils import currencyrates, math, notify, eth_contracts
 from jcash.commonutils.db_utils import require_lock
 from jcash.settings import LOGIC__MAX_ADDRESSES_NUM, FRONTEND_URL, LOGIC__VIDEO_VERIFY_TEXT
 from jcash.appprocessor.commands import proof_of_solvency
@@ -217,12 +217,15 @@ class FeeJntView(APIView):
     authentication_classes = (authentication.TokenAuthentication,)
 
     def get(self, request):
-        fee_entry = ExchangeFee.objects.all().order_by("-from_block").first()
-        if not fee_entry:
-            return Response({'success': False, 'error': 'Fee does not exist.'}, status=400)
+        try:
+            eth_currency = Currency.objects.get(Q(symbol__icontains='eth') &
+                                                ~Q(is_disabled=True))
+            fee = eth_contracts.feeJNT(eth_currency.abi,
+                                       eth_currency.exchanger_address)
 
-        data = {'success': True,
-                'value': fee_entry.value}
+            return Response({'success': True, 'value': fee})
+        except:
+            return Response({'success': False, 'error': 'Fee does not exist.'}, status=400)
 
         return Response(data)
 
