@@ -1650,7 +1650,10 @@ class ValidatePasswordView(GenericAPIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        score = zxcvbn(request.data.get('password', ''))['score']
+        try:
+            score = zxcvbn(request.data.get('password', ''))['score']
+        except IndexError:
+            score = 0
         if serializer.is_valid(raise_exception=False):
             return Response({'success': True, 'score': score})
         else:
