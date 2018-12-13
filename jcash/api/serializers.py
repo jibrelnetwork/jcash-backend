@@ -28,7 +28,7 @@ from jcash.api.models import (
     IncomingTransaction, Exchange, Refund, Country,
     Personal, AccountType, PersonalFieldLength, DocumentGroup, DocumentType,
     CorporateFieldLength, Corporate, CustomerStatus, DocumentVerification,
-    ApplicationCancelReason, ExchangeFee, NotificationType, get_email_templates,
+    ApplicationCancelReason, NotificationType, get_email_templates,
     KycSteps, get_account_types
 )
 from jcash.api.validators import BirthdayValidator
@@ -1106,9 +1106,8 @@ class ApplicationSerializer(serializers.Serializer):
         else:
             if eth_contracts.balanceJnt(currency_pair.base_currency.abi, address_attr) < feeJNT:
                 raise serializers.ValidationError({'jnt': str(ApplicationCancelReason.not_enough_jnt)})
+            attrs['fee'] = feeJNT
 
-        fee_entry = ExchangeFee.objects.all().order_by("-from_block").first()
-        attrs['fee'] = fee_entry.value if fee_entry else 0.0
         attrs['is_reverse_operation'] = is_reverse_operation
 
         return attrs

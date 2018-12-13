@@ -1169,17 +1169,6 @@ class IncomingTransaction(models.Model):
         )
 
 
-# Exchange Fee
-class ExchangeFee(models.Model):
-    value = models.FloatField(default=0)
-    type = models.CharField(max_length=20, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    from_block = models.IntegerField(blank=True, null=True)
-
-    class Meta:
-        db_table = 'exchange_fee'
-
-
 # Exchange
 class Exchange(models.Model):
     version = IntegerVersionField()
